@@ -1,7 +1,46 @@
 local build = {
-  expression(val): if std.type(val) == 'object' then if std.objectHas(val, '_') then if std.objectHas(val._, 'ref') then val._.ref else '"%s"' % [std.strReplace(val._.str, '\n', '\\n')] else std.mapWithKey(function(key, value) self.expression(value), val) else if std.type(val) == 'array' then std.map(function(element) self.expression(element), val) else if std.type(val) == 'string' then '"%s"' % [std.strReplace(val, '\n', '\\n')] else val,
-  template(val): if std.type(val) == 'object' then if std.objectHas(val, '_') then if std.objectHas(val._, 'ref') then '${%s}' % [val._.ref] else val._.str else std.mapWithKey(function(key, value) self.template(value), val) else if std.type(val) == 'array' then std.map(function(element) self.template(element), val) else if std.type(val) == 'string' then val else val,
-  providerRequirements(val): if std.type(val) == 'object' then if std.objectHas(val, '_') then std.get(val._, 'providerRequirements', {}) else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.providerRequirements(val[key]), std.objectFields(val)), {}) else if std.type(val) == 'array' then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.providerRequirements(element), val), {}) else {},
+  expression(val):
+    if std.type(val) == 'object' then
+      if std.objectHas(val, '_')
+      then
+        if std.objectHas(val._, 'ref')
+        then val._.ref
+        else '"%s"' % [val._.str]
+      else '{%s}' % [std.join(',', std.map(function(key) '%s:%s' % [self.expression(key), self.expression(val[key])], std.objectFields(val)))]
+    else if std.type(val) == 'array' then '[%s]' % [std.join(',', std.map(function(element) self.expression(element), val))]
+    else if std.type(val) == 'string' then '"%s"' % [val]
+    else '"%s"' % [val],
+  template(val):
+    if std.type(val) == 'object' then
+      if std.objectHas(val, '_')
+      then
+        if std.objectHas(val._, 'ref')
+        then std.strReplace(self.string(val), '\n', '\\n')
+        else val._.str
+      else std.mapWithKey(function(key, value) self.template(value), val)
+    else if std.type(val) == 'array' then std.map(function(element) self.template(element), val)
+    else if std.type(val) == 'string' then std.strReplace(self.string(val), '\n', '\\n')
+    else val,
+  string(val):
+    if std.type(val) == 'object' then
+      if std.objectHas(val, '_')
+      then
+        if std.objectHas(val._, 'ref')
+        then '${%s}' % [val._.ref]
+        else val._.str
+      else '${%s}' % [self.expression(val)]
+    else if std.type(val) == 'array' then '${%s}' % [self.expression(val)]
+    else if std.type(val) == 'string' then val
+    else val,
+  providerRequirements(val):
+    if std.type(val) == 'object'
+    then
+      if std.objectHas(val, '_')
+      then std.get(val._, 'providerRequirements', {})
+      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.providerRequirements(val[key]), std.objectFields(val)), {})
+    else if std.type(val) == 'array'
+    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.providerRequirements(element), val), {})
+    else {},
 };
 
 local providerTemplate(provider, requirements, configuration) = {
@@ -58,7 +97,7 @@ local providerTemplate(provider, requirements, configuration) = {
 local provider(configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/aws',
-    version: '5.85.0',
+    version: '5.88.0',
   },
   local provider = providerTemplate('aws', requirements, configuration),
   resource: {
@@ -5257,6 +5296,42 @@ local provider(configuration) = {
       tags: resource.field('tags'),
       tags_all: resource.field('tags_all'),
     },
+    cloudwatch_contributor_insight_rule(name, block): {
+      local resource = blockType.resource('aws_cloudwatch_contributor_insight_rule', name),
+      _: resource._(block, {
+        resource_arn: build.template(std.get(block, 'resource_arn', null)),
+        rule_definition: build.template(block.rule_definition),
+        rule_name: build.template(block.rule_name),
+        rule_state: build.template(std.get(block, 'rule_state', null)),
+        tags: build.template(std.get(block, 'tags', null)),
+        tags_all: build.template(std.get(block, 'tags_all', null)),
+      }),
+      resource_arn: resource.field('resource_arn'),
+      rule_definition: resource.field('rule_definition'),
+      rule_name: resource.field('rule_name'),
+      rule_state: resource.field('rule_state'),
+      tags: resource.field('tags'),
+      tags_all: resource.field('tags_all'),
+    },
+    cloudwatch_contributor_managed_insight_rule(name, block): {
+      local resource = blockType.resource('aws_cloudwatch_contributor_managed_insight_rule', name),
+      _: resource._(block, {
+        arn: build.template(std.get(block, 'arn', null)),
+        resource_arn: build.template(block.resource_arn),
+        rule_name: build.template(std.get(block, 'rule_name', null)),
+        state: build.template(std.get(block, 'state', null)),
+        tags: build.template(std.get(block, 'tags', null)),
+        tags_all: build.template(std.get(block, 'tags_all', null)),
+        template_name: build.template(block.template_name),
+      }),
+      arn: resource.field('arn'),
+      resource_arn: resource.field('resource_arn'),
+      rule_name: resource.field('rule_name'),
+      state: resource.field('state'),
+      tags: resource.field('tags'),
+      tags_all: resource.field('tags_all'),
+      template_name: resource.field('template_name'),
+    },
     cloudwatch_dashboard(name, block): {
       local resource = blockType.resource('aws_cloudwatch_dashboard', name),
       _: resource._(block, {
@@ -8522,6 +8597,8 @@ local provider(configuration) = {
         option_group_name: build.template(std.get(block, 'option_group_name', null)),
         parameter_group_name: build.template(std.get(block, 'parameter_group_name', null)),
         password: build.template(std.get(block, 'password', null)),
+        password_wo: build.template(std.get(block, 'password_wo', null)),
+        password_wo_version: build.template(std.get(block, 'password_wo_version', null)),
         performance_insights_enabled: build.template(std.get(block, 'performance_insights_enabled', null)),
         performance_insights_kms_key_id: build.template(std.get(block, 'performance_insights_kms_key_id', null)),
         performance_insights_retention_period: build.template(std.get(block, 'performance_insights_retention_period', null)),
@@ -8601,6 +8678,8 @@ local provider(configuration) = {
       option_group_name: resource.field('option_group_name'),
       parameter_group_name: resource.field('parameter_group_name'),
       password: resource.field('password'),
+      password_wo: resource.field('password_wo'),
+      password_wo_version: resource.field('password_wo_version'),
       performance_insights_enabled: resource.field('performance_insights_enabled'),
       performance_insights_kms_key_id: resource.field('performance_insights_kms_key_id'),
       performance_insights_retention_period: resource.field('performance_insights_retention_period'),
@@ -9927,6 +10006,8 @@ local provider(configuration) = {
         id: build.template(std.get(block, 'id', null)),
         kms_key_id: build.template(std.get(block, 'kms_key_id', null)),
         master_password: build.template(std.get(block, 'master_password', null)),
+        master_password_wo: build.template(std.get(block, 'master_password_wo', null)),
+        master_password_wo_version: build.template(std.get(block, 'master_password_wo_version', null)),
         master_username: build.template(std.get(block, 'master_username', null)),
         port: build.template(std.get(block, 'port', null)),
         preferred_backup_window: build.template(std.get(block, 'preferred_backup_window', null)),
@@ -9962,6 +10043,8 @@ local provider(configuration) = {
       id: resource.field('id'),
       kms_key_id: resource.field('kms_key_id'),
       master_password: resource.field('master_password'),
+      master_password_wo: resource.field('master_password_wo'),
+      master_password_wo_version: resource.field('master_password_wo_version'),
       master_username: resource.field('master_username'),
       port: resource.field('port'),
       preferred_backup_window: resource.field('preferred_backup_window'),
@@ -10858,6 +10941,7 @@ local provider(configuration) = {
         export_format: build.template(std.get(block, 'export_format', null)),
         export_status: build.template(std.get(block, 'export_status', null)),
         export_time: build.template(std.get(block, 'export_time', null)),
+        export_type: build.template(std.get(block, 'export_type', null)),
         id: build.template(std.get(block, 'id', null)),
         item_count: build.template(std.get(block, 'item_count', null)),
         manifest_files_s3_key: build.template(std.get(block, 'manifest_files_s3_key', null)),
@@ -10875,6 +10959,7 @@ local provider(configuration) = {
       export_format: resource.field('export_format'),
       export_status: resource.field('export_status'),
       export_time: resource.field('export_time'),
+      export_type: resource.field('export_type'),
       id: resource.field('id'),
       item_count: resource.field('item_count'),
       manifest_files_s3_key: resource.field('manifest_files_s3_key'),
@@ -24048,6 +24133,29 @@ local provider(configuration) = {
       instance_ports: resource.field('instance_ports'),
       load_balancer: resource.field('load_balancer'),
     },
+    qbusiness_application(name, block): {
+      local resource = blockType.resource('aws_qbusiness_application', name),
+      _: resource._(block, {
+        arn: build.template(std.get(block, 'arn', null)),
+        description: build.template(std.get(block, 'description', null)),
+        display_name: build.template(block.display_name),
+        iam_service_role_arn: build.template(block.iam_service_role_arn),
+        id: build.template(std.get(block, 'id', null)),
+        identity_center_application_arn: build.template(std.get(block, 'identity_center_application_arn', null)),
+        identity_center_instance_arn: build.template(block.identity_center_instance_arn),
+        tags: build.template(std.get(block, 'tags', null)),
+        tags_all: build.template(std.get(block, 'tags_all', null)),
+      }),
+      arn: resource.field('arn'),
+      description: resource.field('description'),
+      display_name: resource.field('display_name'),
+      iam_service_role_arn: resource.field('iam_service_role_arn'),
+      id: resource.field('id'),
+      identity_center_application_arn: resource.field('identity_center_application_arn'),
+      identity_center_instance_arn: resource.field('identity_center_instance_arn'),
+      tags: resource.field('tags'),
+      tags_all: resource.field('tags_all'),
+    },
     qldb_ledger(name, block): {
       local resource = blockType.resource('aws_qldb_ledger', name),
       _: resource._(block, {
@@ -24682,9 +24790,13 @@ local provider(configuration) = {
         kms_key_id: build.template(std.get(block, 'kms_key_id', null)),
         manage_master_user_password: build.template(std.get(block, 'manage_master_user_password', null)),
         master_password: build.template(std.get(block, 'master_password', null)),
+        master_password_wo: build.template(std.get(block, 'master_password_wo', null)),
+        master_password_wo_version: build.template(std.get(block, 'master_password_wo_version', null)),
         master_user_secret: build.template(std.get(block, 'master_user_secret', null)),
         master_user_secret_kms_key_id: build.template(std.get(block, 'master_user_secret_kms_key_id', null)),
         master_username: build.template(std.get(block, 'master_username', null)),
+        monitoring_interval: build.template(std.get(block, 'monitoring_interval', null)),
+        monitoring_role_arn: build.template(std.get(block, 'monitoring_role_arn', null)),
         network_type: build.template(std.get(block, 'network_type', null)),
         performance_insights_enabled: build.template(std.get(block, 'performance_insights_enabled', null)),
         performance_insights_kms_key_id: build.template(std.get(block, 'performance_insights_kms_key_id', null)),
@@ -24747,9 +24859,13 @@ local provider(configuration) = {
       kms_key_id: resource.field('kms_key_id'),
       manage_master_user_password: resource.field('manage_master_user_password'),
       master_password: resource.field('master_password'),
+      master_password_wo: resource.field('master_password_wo'),
+      master_password_wo_version: resource.field('master_password_wo_version'),
       master_user_secret: resource.field('master_user_secret'),
       master_user_secret_kms_key_id: resource.field('master_user_secret_kms_key_id'),
       master_username: resource.field('master_username'),
+      monitoring_interval: resource.field('monitoring_interval'),
+      monitoring_role_arn: resource.field('monitoring_role_arn'),
       network_type: resource.field('network_type'),
       performance_insights_enabled: resource.field('performance_insights_enabled'),
       performance_insights_kms_key_id: resource.field('performance_insights_kms_key_id'),
@@ -25209,6 +25325,8 @@ local provider(configuration) = {
         master_password: build.template(std.get(block, 'master_password', null)),
         master_password_secret_arn: build.template(std.get(block, 'master_password_secret_arn', null)),
         master_password_secret_kms_key_id: build.template(std.get(block, 'master_password_secret_kms_key_id', null)),
+        master_password_wo: build.template(std.get(block, 'master_password_wo', null)),
+        master_password_wo_version: build.template(std.get(block, 'master_password_wo_version', null)),
         master_username: build.template(std.get(block, 'master_username', null)),
         multi_az: build.template(std.get(block, 'multi_az', null)),
         node_type: build.template(block.node_type),
@@ -25258,6 +25376,8 @@ local provider(configuration) = {
       master_password: resource.field('master_password'),
       master_password_secret_arn: resource.field('master_password_secret_arn'),
       master_password_secret_kms_key_id: resource.field('master_password_secret_kms_key_id'),
+      master_password_wo: resource.field('master_password_wo'),
+      master_password_wo_version: resource.field('master_password_wo_version'),
       master_username: resource.field('master_username'),
       multi_az: resource.field('multi_az'),
       node_type: resource.field('node_type'),
@@ -25735,6 +25855,8 @@ local provider(configuration) = {
         admin_password_secret_arn: build.template(std.get(block, 'admin_password_secret_arn', null)),
         admin_password_secret_kms_key_id: build.template(std.get(block, 'admin_password_secret_kms_key_id', null)),
         admin_user_password: build.template(std.get(block, 'admin_user_password', null)),
+        admin_user_password_wo: build.template(std.get(block, 'admin_user_password_wo', null)),
+        admin_user_password_wo_version: build.template(std.get(block, 'admin_user_password_wo_version', null)),
         admin_username: build.template(std.get(block, 'admin_username', null)),
         arn: build.template(std.get(block, 'arn', null)),
         db_name: build.template(std.get(block, 'db_name', null)),
@@ -25752,6 +25874,8 @@ local provider(configuration) = {
       admin_password_secret_arn: resource.field('admin_password_secret_arn'),
       admin_password_secret_kms_key_id: resource.field('admin_password_secret_kms_key_id'),
       admin_user_password: resource.field('admin_user_password'),
+      admin_user_password_wo: resource.field('admin_user_password_wo'),
+      admin_user_password_wo_version: resource.field('admin_user_password_wo_version'),
       admin_username: resource.field('admin_username'),
       arn: resource.field('arn'),
       db_name: resource.field('db_name'),
@@ -25897,6 +26021,7 @@ local provider(configuration) = {
     rekognition_stream_processor(name, block): {
       local resource = blockType.resource('aws_rekognition_stream_processor', name),
       _: resource._(block, {
+        arn: build.template(std.get(block, 'arn', null)),
         kms_key_id: build.template(std.get(block, 'kms_key_id', null)),
         name: build.template(block.name),
         role_arn: build.template(block.role_arn),
@@ -25904,6 +26029,7 @@ local provider(configuration) = {
         tags: build.template(std.get(block, 'tags', null)),
         tags_all: build.template(std.get(block, 'tags_all', null)),
       }),
+      arn: resource.field('arn'),
       kms_key_id: resource.field('kms_key_id'),
       name: resource.field('name'),
       role_arn: resource.field('role_arn'),
@@ -28662,18 +28788,24 @@ local provider(configuration) = {
       local resource = blockType.resource('aws_secretsmanager_secret_version', name),
       _: resource._(block, {
         arn: build.template(std.get(block, 'arn', null)),
+        has_secret_string_wo: build.template(std.get(block, 'has_secret_string_wo', null)),
         id: build.template(std.get(block, 'id', null)),
         secret_binary: build.template(std.get(block, 'secret_binary', null)),
         secret_id: build.template(block.secret_id),
         secret_string: build.template(std.get(block, 'secret_string', null)),
+        secret_string_wo: build.template(std.get(block, 'secret_string_wo', null)),
+        secret_string_wo_version: build.template(std.get(block, 'secret_string_wo_version', null)),
         version_id: build.template(std.get(block, 'version_id', null)),
         version_stages: build.template(std.get(block, 'version_stages', null)),
       }),
       arn: resource.field('arn'),
+      has_secret_string_wo: resource.field('has_secret_string_wo'),
       id: resource.field('id'),
       secret_binary: resource.field('secret_binary'),
       secret_id: resource.field('secret_id'),
       secret_string: resource.field('secret_string'),
+      secret_string_wo: resource.field('secret_string_wo'),
+      secret_string_wo_version: resource.field('secret_string_wo_version'),
       version_id: resource.field('version_id'),
       version_stages: resource.field('version_stages'),
     },
@@ -30842,6 +30974,7 @@ local provider(configuration) = {
         arn: build.template(std.get(block, 'arn', null)),
         data_type: build.template(std.get(block, 'data_type', null)),
         description: build.template(std.get(block, 'description', null)),
+        has_value_wo: build.template(std.get(block, 'has_value_wo', null)),
         id: build.template(std.get(block, 'id', null)),
         insecure_value: build.template(std.get(block, 'insecure_value', null)),
         key_id: build.template(std.get(block, 'key_id', null)),
@@ -30852,12 +30985,15 @@ local provider(configuration) = {
         tier: build.template(std.get(block, 'tier', null)),
         type: build.template(block.type),
         value: build.template(std.get(block, 'value', null)),
+        value_wo: build.template(std.get(block, 'value_wo', null)),
+        value_wo_version: build.template(std.get(block, 'value_wo_version', null)),
         version: build.template(std.get(block, 'version', null)),
       }),
       allowed_pattern: resource.field('allowed_pattern'),
       arn: resource.field('arn'),
       data_type: resource.field('data_type'),
       description: resource.field('description'),
+      has_value_wo: resource.field('has_value_wo'),
       id: resource.field('id'),
       insecure_value: resource.field('insecure_value'),
       key_id: resource.field('key_id'),
@@ -30868,6 +31004,8 @@ local provider(configuration) = {
       tier: resource.field('tier'),
       type: resource.field('type'),
       value: resource.field('value'),
+      value_wo: resource.field('value_wo'),
+      value_wo_version: resource.field('value_wo_version'),
       version: resource.field('version'),
     },
     ssm_patch_baseline(name, block): {
@@ -33122,6 +33260,7 @@ local provider(configuration) = {
         id: build.template(std.get(block, 'id', null)),
         resource_arn: build.template(std.get(block, 'resource_arn', null)),
         resource_identifier: build.template(block.resource_identifier),
+        service_network_log_type: build.template(std.get(block, 'service_network_log_type', null)),
         tags: build.template(std.get(block, 'tags', null)),
         tags_all: build.template(std.get(block, 'tags_all', null)),
       }),
@@ -33130,6 +33269,7 @@ local provider(configuration) = {
       id: resource.field('id'),
       resource_arn: resource.field('resource_arn'),
       resource_identifier: resource.field('resource_identifier'),
+      service_network_log_type: resource.field('service_network_log_type'),
       tags: resource.field('tags'),
       tags_all: resource.field('tags_all'),
     },
@@ -36164,6 +36304,15 @@ local provider(configuration) = {
       id: resource.field('id'),
       region: resource.field('region'),
     },
+    cloudwatch_contributor_managed_insight_rules(name, block): {
+      local resource = blockType.resource('aws_cloudwatch_contributor_managed_insight_rules', name),
+      _: resource._(block, {
+        managed_rules: build.template(std.get(block, 'managed_rules', null)),
+        resource_arn: build.template(block.resource_arn),
+      }),
+      managed_rules: resource.field('managed_rules'),
+      resource_arn: resource.field('resource_arn'),
+    },
     cloudwatch_event_bus(name, block): {
       local resource = blockType.resource('aws_cloudwatch_event_bus', name),
       _: resource._(block, {
@@ -37781,6 +37930,7 @@ local provider(configuration) = {
         id: build.template(std.get(block, 'id', null)),
         local_secondary_index: build.template(std.get(block, 'local_secondary_index', null)),
         name: build.template(block.name),
+        on_demand_throughput: build.template(std.get(block, 'on_demand_throughput', null)),
         point_in_time_recovery: build.template(std.get(block, 'point_in_time_recovery', null)),
         range_key: build.template(std.get(block, 'range_key', null)),
         read_capacity: build.template(std.get(block, 'read_capacity', null)),
@@ -37803,6 +37953,7 @@ local provider(configuration) = {
       id: resource.field('id'),
       local_secondary_index: resource.field('local_secondary_index'),
       name: resource.field('name'),
+      on_demand_throughput: resource.field('on_demand_throughput'),
       point_in_time_recovery: resource.field('point_in_time_recovery'),
       range_key: resource.field('range_key'),
       read_capacity: resource.field('read_capacity'),
@@ -44269,6 +44420,8 @@ local provider(configuration) = {
         kms_key_id: build.template(std.get(block, 'kms_key_id', null)),
         master_user_secret: build.template(std.get(block, 'master_user_secret', null)),
         master_username: build.template(std.get(block, 'master_username', null)),
+        monitoring_interval: build.template(std.get(block, 'monitoring_interval', null)),
+        monitoring_role_arn: build.template(std.get(block, 'monitoring_role_arn', null)),
         network_type: build.template(std.get(block, 'network_type', null)),
         port: build.template(std.get(block, 'port', null)),
         preferred_backup_window: build.template(std.get(block, 'preferred_backup_window', null)),
@@ -44303,6 +44456,8 @@ local provider(configuration) = {
       kms_key_id: resource.field('kms_key_id'),
       master_user_secret: resource.field('master_user_secret'),
       master_username: resource.field('master_username'),
+      monitoring_interval: resource.field('monitoring_interval'),
+      monitoring_role_arn: resource.field('monitoring_role_arn'),
       network_type: resource.field('network_type'),
       port: resource.field('port'),
       preferred_backup_window: resource.field('preferred_backup_window'),
