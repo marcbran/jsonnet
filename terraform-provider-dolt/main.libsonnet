@@ -1,7 +1,46 @@
 local build = {
-  expression(val): if std.type(val) == 'object' then if std.objectHas(val, '_') then if std.objectHas(val._, 'ref') then val._.ref else '"%s"' % [std.strReplace(val._.str, '\n', '\\n')] else std.mapWithKey(function(key, value) self.expression(value), val) else if std.type(val) == 'array' then std.map(function(element) self.expression(element), val) else if std.type(val) == 'string' then '"%s"' % [std.strReplace(val, '\n', '\\n')] else val,
-  template(val): if std.type(val) == 'object' then if std.objectHas(val, '_') then if std.objectHas(val._, 'ref') then '${%s}' % [val._.ref] else val._.str else std.mapWithKey(function(key, value) self.template(value), val) else if std.type(val) == 'array' then std.map(function(element) self.template(element), val) else if std.type(val) == 'string' then val else val,
-  providerRequirements(val): if std.type(val) == 'object' then if std.objectHas(val, '_') then std.get(val._, 'providerRequirements', {}) else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.providerRequirements(val[key]), std.objectFields(val)), {}) else if std.type(val) == 'array' then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.providerRequirements(element), val), {}) else {},
+  expression(val):
+    if std.type(val) == 'object' then
+      if std.objectHas(val, '_')
+      then
+        if std.objectHas(val._, 'ref')
+        then val._.ref
+        else '"%s"' % [val._.str]
+      else '{%s}' % [std.join(',', std.map(function(key) '%s:%s' % [self.expression(key), self.expression(val[key])], std.objectFields(val)))]
+    else if std.type(val) == 'array' then '[%s]' % [std.join(',', std.map(function(element) self.expression(element), val))]
+    else if std.type(val) == 'string' then '"%s"' % [val]
+    else '"%s"' % [val],
+  template(val):
+    if std.type(val) == 'object' then
+      if std.objectHas(val, '_')
+      then
+        if std.objectHas(val._, 'ref')
+        then std.strReplace(self.string(val), '\n', '\\n')
+        else val._.str
+      else std.mapWithKey(function(key, value) self.template(value), val)
+    else if std.type(val) == 'array' then std.map(function(element) self.template(element), val)
+    else if std.type(val) == 'string' then std.strReplace(self.string(val), '\n', '\\n')
+    else val,
+  string(val):
+    if std.type(val) == 'object' then
+      if std.objectHas(val, '_')
+      then
+        if std.objectHas(val._, 'ref')
+        then '${%s}' % [val._.ref]
+        else val._.str
+      else '${%s}' % [self.expression(val)]
+    else if std.type(val) == 'array' then '${%s}' % [self.expression(val)]
+    else if std.type(val) == 'string' then val
+    else val,
+  providerRequirements(val):
+    if std.type(val) == 'object'
+    then
+      if std.objectHas(val, '_')
+      then std.get(val._, 'providerRequirements', {})
+      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.providerRequirements(val[key]), std.objectFields(val)), {})
+    else if std.type(val) == 'array'
+    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.providerRequirements(element), val), {})
+    else {},
 };
 
 local providerTemplate(provider, requirements, configuration) = {
