@@ -101,7 +101,7 @@ local provider(configuration) = {
   },
   local provider = providerTemplate('jsonnet', requirements, configuration),
   func: {
-    evaluate(code): provider.func('evaluate', [code]),
+    evaluate(code, options): provider.func('evaluate', [code, options]),
   },
 };
 
