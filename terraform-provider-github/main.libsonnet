@@ -97,7 +97,7 @@ local providerTemplate(provider, requirements, configuration) = {
 local provider(configuration) = {
   local requirements = {
     source: 'registry.terraform.io/integrations/github',
-    version: '6.5.0',
+    version: '6.6.0',
   },
   local provider = providerTemplate('github', requirements, configuration),
   resource: {
