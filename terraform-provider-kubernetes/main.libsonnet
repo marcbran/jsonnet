@@ -97,7 +97,7 @@ local providerTemplate(provider, requirements, configuration) = {
 local provider(configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/kubernetes',
-    version: '2.35.1',
+    version: '2.36.0',
   },
   local provider = providerTemplate('kubernetes', requirements, configuration),
   resource: {
