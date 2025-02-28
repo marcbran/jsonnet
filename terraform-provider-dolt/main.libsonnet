@@ -97,55 +97,45 @@ local providerTemplate(provider, requirements, configuration) = {
 local provider(configuration) = {
   local requirements = {
     source: 'registry.terraform.io/marcbran/dolt',
-    version: '0.0.1',
+    version: '0.1.3',
   },
   local provider = providerTemplate('dolt', requirements, configuration),
   resource: {
     local blockType = provider.blockType('resource'),
-    repository(name, block): {
-      local resource = blockType.resource('dolt_repository', name),
+    database(name, block): {
+      local resource = blockType.resource('dolt_database', name),
       _: resource._(block, {
-        email: build.template(block.email),
         name: build.template(block.name),
-        path: build.template(block.path),
       }),
-      email: resource.field('email'),
       name: resource.field('name'),
-      path: resource.field('path'),
     },
     rowset(name, block): {
       local resource = blockType.resource('dolt_rowset', name),
       _: resource._(block, {
-        author_email: build.template(block.author_email),
-        author_name: build.template(block.author_name),
         columns: build.template(block.columns),
-        repository_path: build.template(block.repository_path),
-        table_name: build.template(block.table_name),
+        database: build.template(block.database),
+        row_count: build.template(std.get(block, 'row_count', null)),
+        table: build.template(block.table),
         unique_column: build.template(block.unique_column),
         values: build.template(block.values),
       }),
-      author_email: resource.field('author_email'),
-      author_name: resource.field('author_name'),
       columns: resource.field('columns'),
-      repository_path: resource.field('repository_path'),
-      table_name: resource.field('table_name'),
+      database: resource.field('database'),
+      row_count: resource.field('row_count'),
+      table: resource.field('table'),
       unique_column: resource.field('unique_column'),
       values: resource.field('values'),
     },
     table(name, block): {
       local resource = blockType.resource('dolt_table', name),
       _: resource._(block, {
-        author_email: build.template(block.author_email),
-        author_name: build.template(block.author_name),
+        database: build.template(block.database),
         name: build.template(block.name),
         query: build.template(block.query),
-        repository_path: build.template(block.repository_path),
       }),
-      author_email: resource.field('author_email'),
-      author_name: resource.field('author_name'),
+      database: resource.field('database'),
       name: resource.field('name'),
       query: resource.field('query'),
-      repository_path: resource.field('repository_path'),
     },
   },
 };
@@ -153,7 +143,9 @@ local provider(configuration) = {
 local providerWithConfiguration = provider(null) + {
   withConfiguration(alias, block): provider(std.prune({
     alias: alias,
-    endpoint: build.template(std.get(block, 'endpoint', null)),
+    email: build.template(block.email),
+    name: build.template(block.name),
+    path: build.template(block.path),
   })),
 };
 
