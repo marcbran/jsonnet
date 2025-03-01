@@ -97,7 +97,7 @@ local providerTemplate(provider, requirements, configuration) = {
 local provider(configuration) = {
   local requirements = {
     source: 'registry.terraform.io/marcbran/dolt',
-    version: '0.1.3',
+    version: '0.2.0',
   },
   local provider = providerTemplate('dolt', requirements, configuration),
   resource: {
@@ -128,6 +128,17 @@ local provider(configuration) = {
     },
     table(name, block): {
       local resource = blockType.resource('dolt_table', name),
+      _: resource._(block, {
+        database: build.template(block.database),
+        name: build.template(block.name),
+        query: build.template(block.query),
+      }),
+      database: resource.field('database'),
+      name: resource.field('name'),
+      query: resource.field('query'),
+    },
+    view(name, block): {
+      local resource = blockType.resource('dolt_view', name),
       _: resource._(block, {
         database: build.template(block.database),
         name: build.template(block.name),
