@@ -1,4 +1,4 @@
-local dolt = import 'terraform-provider-dolt/main.libsonnet';
+local doltProvider = import 'terraform-provider-dolt/main.libsonnet';
 local jsonnet = import 'terraform-provider-jsonnet/main.libsonnet';
 local tf = import 'terraform/main.libsonnet';
 
@@ -65,15 +65,19 @@ local resourceGroupsValues(resourceGroups, mappers) =
   local values = resourcesValues(mapResources);
   { [value[0]]: value for value in values };
 
-local resourceRowset(name, block) =
-  local resourceGroups = [
-    terraformResourceGroup(resource)
-    for resource in std.get(block, 'terraformResources', [])
-  ] + std.get(block, 'resourceGroups', []);
+local resourceRowset(dolt, name, block) =
+  local resourceGroups =
+    [terraformResourceGroup(resource) for resource in block.terraformResources] +
+    block.resourceGroups;
   local values =
     tf.jsondecode(jsonnet.func.evaluate(
       tf.Format(
-        "local main = import 'versource/main.libsonnet'; local resourceGroups = %s; local mappers = import 'mappers.libsonnet'; main.resourceGroupsValues(resourceGroups, mappers)",
+        std.strReplace(|||
+          local main = import 'versource/main.libsonnet';
+          local resourceGroups = %s;
+          local mappers = import 'mappers.libsonnet';
+          main.resourceGroupsValues(resourceGroups, mappers)
+        |||, '\n', ' '),
         [tf.jsonencode(resourceGroups)]
       ),
       {
@@ -81,40 +85,37 @@ local resourceRowset(name, block) =
       }
     ));
   dolt.resource.rowset(name, {
-    repository_path: block.table.repository_path,
-    author_name: block.table.author_name,
-    author_email: block.table.author_email,
-    table_name: block.table.name,
-
+    database: block.database.name,
+    table: block.table.name,
     columns: ['uuid', 'provider', 'provider_alias', 'resource_type', 'namespace', 'name', 'data'],
     unique_column: 'uuid',
     values: values,
   });
 
-local groups = {
-  virtualResources(name, resources): {
-    provider: 'versource',
-    providerAlias: '',
-    resourceType: 'VirtualResource',
-    namespace: '',
-    name: name,
-    resources: resources,
-  },
-};
+local flattenObject(value) =
+  if std.type(value) == 'object' then
+    std.foldl(function(acc, curr) acc + curr, [
+      {
+        [std.join('_', std.filter(function(key) key != '', [child.key, childChild.key]))]: childChild.value
+        for childChild in std.objectKeysValues(flattenObject(child.value))
+      }
+      for child in std.objectKeysValues(value)
+    ], {})
+  else { '': value };
 
-local cfg(block) =
-  local repo = dolt.resource.repository('repository', {
-    path: '../data',
+local tfCfg(block) =
+  local dolt = doltProvider.withConfiguration('default', {
+    path: '../db',
     name: block.name,
     email: block.email,
   });
+  local database = dolt.resource.database('database', {
+    name: 'versource',
+  });
   local table = dolt.resource.table('table', {
-    repository_path: repo.path,
-    author_name: repo.name,
-    author_email: repo.email,
-
+    database: database.name,
     name: 'resources',
-    query: |||
+    query: std.strReplace(|||
       CREATE TABLE resources (
         uuid CHAR(36) PRIMARY KEY,
         provider VARCHAR(100) NOT NULL,
@@ -124,23 +125,48 @@ local cfg(block) =
         name VARCHAR(100) NOT NULL,
         data JSON,
         CONSTRAINT unique_resource UNIQUE (provider, provider_alias, resource_type, namespace, name)
-      );
-    |||,
+      )
+    |||, '\n', ' '),
   });
-  local rowset = resourceRowset('resources', {
+  local viewItemsView = dolt.resource.view('view_items_view', {
+    database: database.name,
+    name: 'view_items',
+    query: std.strReplace(|||
+      SELECT
+        CONCAT('view-', REPLACE(table_name, "_", "-")) as uid,
+        REPLACE(table_name, "_", "-") as title,
+        '' as arg
+      FROM information_schema.views
+      WHERE table_name LIKE '%_items'
+      AND table_name <> 'view_items'
+      AND table_schema = DATABASE()
+    |||, '\n', ' '),
+  });
+  local rowset = resourceRowset(dolt, 'resources', {
+    database: database,
     table: table,
-    terraformResources: block.terraformResources,
-    resourceGroups: block.resourceGroups,
+    terraformResources: std.get(block, 'terraformResources', []),
+    resourceGroups: std.get(block, 'resourceGroups', []),
   });
+  local views = [dolt.resource.view('%s_items_view' % view.key, {
+    database: database.name,
+    name: '%s_items' % view.key,
+    query: std.strReplace(view.value, '\n', ' '),
+  }) for view in std.objectKeysValues(flattenObject(std.get(block, 'views', {})))];
   local doltResources = [
-    repo,
+    database,
     table,
+    viewItemsView,
     rowset,
-  ];
+  ] + views;
   tf.Cfg(block.supportingTerraformResources + block.terraformResources + doltResources);
+
+local cfg(block) = {
+  'sync/main.tf.json': std.manifestJson(tfCfg(block)),
+  'sync/mappers.libsonnet': std.get(block, 'mappers', '{}'),
+};
 
 {
   resourceGroupsValues: resourceGroupsValues,
   cfg: cfg,
-  groups: groups,
 }
