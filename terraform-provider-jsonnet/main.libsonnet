@@ -97,7 +97,7 @@ local providerTemplate(provider, requirements, configuration) = {
 local provider(configuration) = {
   local requirements = {
     source: 'registry.terraform.io/marcbran/jsonnet',
-    version: '0.2.0',
+    version: '0.3.0',
   },
   local provider = providerTemplate('jsonnet', requirements, configuration),
   func: {
