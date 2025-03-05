@@ -60,7 +60,7 @@ local resourcesValues(resources) = [
 ];
 
 local resourceGroupsValues(resourceGroups, plugins) =
-  local adapters = { [plugin.key]: plugin.value.adapters for plugin in std.objectKeysValues(block.plugins) };
+  local adapters = { [plugin.key]: plugin.value.adapters for plugin in std.objectKeysValues(plugins) };
   local resources = resourceGroupsResources(resourceGroups);
   local mapResources = mappedResources(resources, adapters);
   local values = resourcesValues(mapResources);
@@ -76,8 +76,8 @@ local resourceRowset(dolt, name, block) =
         std.strReplace(|||
           local main = import 'versource/main.libsonnet';
           local resourceGroups = %s;
-          local adapters = import 'adapters.libsonnet';
-          main.resourceGroupsValues(resourceGroups, adapters)
+          local plugins = import 'plugins.libsonnet';
+          main.resourceGroupsValues(resourceGroups, plugins)
         |||, '\n', ' '),
         [tf.jsonencode(resourceGroups)]
       ),
@@ -180,10 +180,11 @@ local cfg(block) =
     terraformResources: std.get(block, 'terraformResources', []),
     resourceGroups: std.get(block, 'resourceGroups', []),
     plugins: std.get(block, 'plugins', {}),
+    pluginsstr: std.get(block, 'pluginsstr', '{}'),
   };
   {
     'sync/main.tf.json': std.manifestJson(tfCfg(blockWithDefaults)),
-    'sync/plugins.libsonnet': blockWithDefaults.plugins,
+    'sync/plugins.libsonnet': blockWithDefaults.pluginsstr,
   };
 
 {
