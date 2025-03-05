@@ -30,9 +30,9 @@ local resourceGroupsResources(resourceGroups) = std.flattenArrays([
   for resourceGroup in resourceGroups
 ]);
 
-local resourceMapper(resource, mappers) = std.get(std.get(mappers, resource.provider, {}), resource.resourceType, function(resource) resource);
-local mappedResources(resources, mappers) = std.flattenArrays([
-  local mapper = resourceMapper(resource, mappers);
+local resourceMapper(resource, adapters) = std.get(std.get(adapters, resource.provider, {}), resource.resourceType, function(resource) resource);
+local mappedResources(resources, adapters) = std.flattenArrays([
+  local mapper = resourceMapper(resource, adapters);
   local result = mapper(resource);
   if std.type(result) == 'array' then result else [result]
   for resource in resources
@@ -59,9 +59,10 @@ local resourcesValues(resources) = [
   for resource in resources
 ];
 
-local resourceGroupsValues(resourceGroups, mappers) =
+local resourceGroupsValues(resourceGroups, plugins) =
+  local adapters = { [plugin.key]: plugin.value.adapters for plugin in std.objectKeysValues(block.plugins) };
   local resources = resourceGroupsResources(resourceGroups);
-  local mapResources = mappedResources(resources, mappers);
+  local mapResources = mappedResources(resources, adapters);
   local values = resourcesValues(mapResources);
   { [value[0]]: value for value in values };
 
@@ -75,8 +76,8 @@ local resourceRowset(dolt, name, block) =
         std.strReplace(|||
           local main = import 'versource/main.libsonnet';
           local resourceGroups = %s;
-          local mappers = import 'mappers.libsonnet';
-          main.resourceGroupsValues(resourceGroups, mappers)
+          local adapters = import 'adapters.libsonnet';
+          main.resourceGroupsValues(resourceGroups, adapters)
         |||, '\n', ' '),
         [tf.jsonencode(resourceGroups)]
       ),
@@ -102,6 +103,19 @@ local flattenObject(value) =
       for child in std.objectKeysValues(value)
     ], {})
   else { '': value };
+local pluginViews(dolt, block) =
+  local views = {
+    [plugin.key]: plugin.value.views
+    for plugin in std.objectKeysValues(block.plugins)
+  };
+  [
+    dolt.resource.view('%s_items_view' % view.key, {
+      database: block.database.name,
+      name: '%s_items' % view.key,
+      query: std.strReplace(view.value, '\n', ' '),
+    })
+    for view in std.objectKeysValues(flattenObject(views))
+  ];
 
 local tfCfg(block) =
   local dolt = doltProvider.withConfiguration('default', {
@@ -145,14 +159,13 @@ local tfCfg(block) =
   local rowset = resourceRowset(dolt, 'resources', {
     database: database,
     table: table,
-    terraformResources: std.get(block, 'terraformResources', []),
-    resourceGroups: std.get(block, 'resourceGroups', []),
+    terraformResources: block.terraformResources,
+    resourceGroups: block.resourceGroups,
   });
-  local views = [dolt.resource.view('%s_items_view' % view.key, {
-    database: database.name,
-    name: '%s_items' % view.key,
-    query: std.strReplace(view.value, '\n', ' '),
-  }) for view in std.objectKeysValues(flattenObject(std.get(block, 'views', {})))];
+  local views = pluginViews(dolt, {
+    database: database,
+    plugins: block.plugins,
+  });
   local doltResources = [
     database,
     table,
@@ -161,10 +174,17 @@ local tfCfg(block) =
   ] + views;
   tf.Cfg(block.supportingTerraformResources + block.terraformResources + doltResources);
 
-local cfg(block) = {
-  'sync/main.tf.json': std.manifestJson(tfCfg(block)),
-  'sync/mappers.libsonnet': std.get(block, 'mappers', '{}'),
-};
+local cfg(block) =
+  local blockWithDefaults = block {
+    supportingTerraformResources: std.get(block, 'supportingTerraformResources', []),
+    terraformResources: std.get(block, 'terraformResources', []),
+    resourceGroups: std.get(block, 'resourceGroups', []),
+    plugins: std.get(block, 'plugins', {}),
+  };
+  {
+    'sync/main.tf.json': std.manifestJson(tfCfg(blockWithDefaults)),
+    'sync/plugins.libsonnet': blockWithDefaults.plugins,
+  };
 
 {
   resourceGroupsValues: resourceGroupsValues,
