@@ -129,10 +129,12 @@ local provider(configuration) = {
     table(name, block): {
       local resource = blockType.resource('dolt_table', name),
       _: resource._(block, {
+        columns: build.template(std.get(block, 'columns', null)),
         database: build.template(block.database),
         name: build.template(block.name),
         query: build.template(block.query),
       }),
+      columns: resource.field('columns'),
       database: resource.field('database'),
       name: resource.field('name'),
       query: resource.field('query'),
@@ -147,6 +149,27 @@ local provider(configuration) = {
       database: resource.field('database'),
       name: resource.field('name'),
       query: resource.field('query'),
+    },
+  },
+  data: {
+    local blockType = provider.blockType('data'),
+    database(name, block): {
+      local resource = blockType.resource('dolt_database', name),
+      _: resource._(block, {
+        name: build.template(block.name),
+      }),
+      name: resource.field('name'),
+    },
+    table(name, block): {
+      local resource = blockType.resource('dolt_table', name),
+      _: resource._(block, {
+        columns: build.template(std.get(block, 'columns', null)),
+        database: build.template(block.database),
+        name: build.template(block.name),
+      }),
+      columns: resource.field('columns'),
+      database: resource.field('database'),
+      name: resource.field('name'),
     },
   },
 };
