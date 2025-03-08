@@ -97,9 +97,23 @@ local providerTemplate(provider, requirements, configuration) = {
 local provider(configuration) = {
   local requirements = {
     source: 'registry.terraform.io/marcbran/jsonnet',
-    version: '0.3.0',
+    version: '0.4.0',
   },
   local provider = providerTemplate('jsonnet', requirements, configuration),
+  data: {
+    local blockType = provider.blockType('data'),
+    code(name, block): {
+      local resource = blockType.resource('jsonnet_code', name),
+      _: resource._(block, {
+        code: build.template(block.code),
+        options: build.template(std.get(block, 'options', null)),
+        output: build.template(std.get(block, 'output', null)),
+      }),
+      code: resource.field('code'),
+      options: resource.field('options'),
+      output: resource.field('output'),
+    },
+  },
   func: {
     evaluate(code, options): provider.func('evaluate', [code, options]),
   },
