@@ -2,6 +2,47 @@ local doltProvider = import 'terraform-provider-dolt/main.libsonnet';
 local jsonnet = import 'terraform-provider-jsonnet/main.libsonnet';
 local tf = import 'terraform/main.libsonnet';
 
+local flattenObject(value) =
+  if std.type(value) == 'object' then
+    std.foldl(function(acc, curr) acc + curr, [
+      {
+        [std.join('_', std.filter(function(key) key != '', [child.key, childChild.key]))]: childChild.value
+        for childChild in std.objectKeysValues(flattenObject(child.value))
+      }
+      for child in std.objectKeysValues(value)
+    ], {})
+  else { '': value };
+
+local pluginViews(plugins) =
+  local views = {
+    [plugin.key]: plugin.value.views
+    for plugin in std.objectKeysValues(plugins)
+  };
+  {
+    ['%s_items' % view.key]: {
+      name: '%s_items' % view.key,
+      query: std.strReplace(view.value, '\n', ' '),
+    }
+    for view in std.objectKeysValues(flattenObject(views))
+  };
+
+local pluginViewsCfg(dolt, block) =
+  local data = jsonnet.data.code('plugin_views', {
+    code: std.strReplace(|||
+      local main = import 'versource/main.libsonnet';
+      local plugins = import 'plugins/main.libsonnet';
+      main.pluginViews(plugins)
+    |||, '\n', ' '),
+  });
+  local resource = dolt.resource.view('plugin_views', {
+    for_each: tf.jsondecode(data.output),
+    database: block.database.name,
+    depends_on: ['dolt_table.table'],
+    name: tf.lookup(tf.Each.value, 'name', ''),
+    query: tf.lookup(tf.Each.value, 'query', ''),
+  });
+  [data, resource];
+
 local terraformResourceGroup(resource) = {
   provider: resource._.provider,
   providerAlias: if resource._.providerAlias == null then '' else resource._.providerAlias,
@@ -30,9 +71,9 @@ local resourceGroupsResources(resourceGroups) = std.flattenArrays([
   for resourceGroup in resourceGroups
 ]);
 
-local resourceMapper(resource, adapters) = std.get(std.get(adapters, resource.provider, {}), resource.resourceType, function(resource) resource);
-local mappedResources(resources, adapters) = std.flattenArrays([
-  local mapper = resourceMapper(resource, adapters);
+local resourceAdapter(resource, adapters) = std.get(std.get(adapters, resource.provider, {}), resource.resourceType, function(resource) resource);
+local adaptResources(resources, adapters) = std.flattenArrays([
+  local mapper = resourceAdapter(resource, adapters);
   local result = mapper(resource);
   if std.type(result) == 'array' then result else [result]
   for resource in resources
@@ -62,8 +103,8 @@ local resourcesValues(resources) = [
 local resourceGroupsValues(resourceGroups, plugins) =
   local adapters = { [plugin.key]: plugin.value.adapters for plugin in std.objectKeysValues(plugins) };
   local resources = resourceGroupsResources(resourceGroups);
-  local mapResources = mappedResources(resources, adapters);
-  local values = resourcesValues(mapResources);
+  local adaptedResources = adaptResources(resources, adapters);
+  local values = resourcesValues(adaptedResources);
   { [value[0]]: value for value in values };
 
 local resourceRowset(dolt, name, block) =
@@ -75,14 +116,14 @@ local resourceRowset(dolt, name, block) =
       tf.Format(
         std.strReplace(|||
           local main = import 'versource/main.libsonnet';
+          local plugins = import 'plugins/main.libsonnet';
           local resourceGroups = %s;
-          local plugins = import 'plugins.libsonnet';
           main.resourceGroupsValues(resourceGroups, plugins)
         |||, '\n', ' '),
         [tf.jsonencode(resourceGroups)]
       ),
       {
-        jpaths: ['vendor'],
+        jpaths: [],
       }
     ));
   dolt.resource.rowset(name, {
@@ -93,33 +134,9 @@ local resourceRowset(dolt, name, block) =
     values: values,
   });
 
-local flattenObject(value) =
-  if std.type(value) == 'object' then
-    std.foldl(function(acc, curr) acc + curr, [
-      {
-        [std.join('_', std.filter(function(key) key != '', [child.key, childChild.key]))]: childChild.value
-        for childChild in std.objectKeysValues(flattenObject(child.value))
-      }
-      for child in std.objectKeysValues(value)
-    ], {})
-  else { '': value };
-local pluginViews(dolt, block) =
-  local views = {
-    [plugin.key]: plugin.value.views
-    for plugin in std.objectKeysValues(block.plugins)
-  };
-  [
-    dolt.resource.view('%s_items_view' % view.key, {
-      database: block.database.name,
-      name: '%s_items' % view.key,
-      query: std.strReplace(view.value, '\n', ' '),
-    })
-    for view in std.objectKeysValues(flattenObject(views))
-  ];
-
-local tfCfg(block) =
+local ddlTfCfg(block) =
   local dolt = doltProvider.withConfiguration('default', {
-    path: '../db',
+    path: '../../db',
     name: block.name,
     email: block.email,
   });
@@ -144,6 +161,7 @@ local tfCfg(block) =
   });
   local viewItemsView = dolt.resource.view('view_items_view', {
     database: database.name,
+    depends_on: ['dolt_table.table'],
     name: 'view_items',
     query: std.strReplace(|||
       SELECT
@@ -156,38 +174,65 @@ local tfCfg(block) =
       AND table_schema = DATABASE()
     |||, '\n', ' '),
   });
+  local views = pluginViewsCfg(dolt, {
+    database: database,
+    table: table,
+  });
+  local doltResources = [
+    database,
+    table,
+    viewItemsView,
+  ] + views;
+  {
+    'sync/ddl/main.tf.json': tf.Cfg(doltResources),
+  };
+
+local dmlTfCfg(folder, block) =
+  local dolt = doltProvider.withConfiguration('default', {
+    path: '../../db',
+    name: block.name,
+    email: block.email,
+  });
+  local database = dolt.data.database('database', {
+    name: 'versource',
+  });
+  local table = dolt.data.table('table', {
+    database: database.name,
+    name: 'resources',
+  });
   local rowset = resourceRowset(dolt, 'resources', {
     database: database,
     table: table,
     terraformResources: block.terraformResources,
     resourceGroups: block.resourceGroups,
   });
-  local views = pluginViews(dolt, {
-    database: database,
-    plugins: block.plugins,
-  });
   local doltResources = [
     database,
     table,
-    viewItemsView,
     rowset,
-  ] + views;
-  tf.Cfg(block.supportingTerraformResources + block.terraformResources + doltResources);
+  ];
+  {
+    ['sync/%s/main.tf.json' % folder]: tf.Cfg(block.supportingTerraformResources + block.terraformResources + doltResources),
+  };
 
 local cfg(block) =
-  local blockWithDefaults = block {
-    supportingTerraformResources: std.get(block, 'supportingTerraformResources', []),
-    terraformResources: std.get(block, 'terraformResources', []),
-    resourceGroups: std.get(block, 'resourceGroups', []),
-    plugins: std.get(block, 'plugins', {}),
-    pluginsstr: std.get(block, 'pluginsstr', '{}'),
-  };
-  {
-    'sync/main.tf.json': std.manifestJson(tfCfg(blockWithDefaults)),
-    'sync/plugins.libsonnet': blockWithDefaults.pluginsstr,
-  };
+  local coreConfig = ddlTfCfg(block);
+  local resourceConfigs = [
+    dmlTfCfg(b.key, b.value {
+      name: block.name,
+      email: block.email,
+      supportingTerraformResources: std.get(b.value, 'supportingTerraformResources', []),
+      terraformResources: std.get(b.value, 'terraformResources', []),
+      resourceGroups: std.get(b.value, 'resourceGroups', []),
+    })
+    for b in std.objectKeysValues(block.resources)
+  ];
+  local configs = [coreConfig] + resourceConfigs;
+  local mergedConfig = std.foldl(function(acc, curr) acc + curr, configs, {});
+  { [kv.key]: std.manifestJson(kv.value) for kv in std.objectKeysValues(mergedConfig) };
 
 {
   resourceGroupsValues: resourceGroupsValues,
+  pluginViews: pluginViews,
   cfg: cfg,
 }
