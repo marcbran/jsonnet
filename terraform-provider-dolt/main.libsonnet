@@ -97,7 +97,7 @@ local providerTemplate(provider, requirements, configuration) = {
 local provider(configuration) = {
   local requirements = {
     source: 'registry.terraform.io/marcbran/dolt',
-    version: '0.2.0',
+    version: '0.3.1',
   },
   local provider = providerTemplate('dolt', requirements, configuration),
   resource: {
