@@ -212,7 +212,7 @@ local dmlTfCfg(folder, block) =
     rowset,
   ];
   {
-    ['sync/%s/main.tf.json' % folder]: tf.Cfg(block.supportingTerraformResources + block.terraformResources + doltResources),
+    ['sync/%s/main.tf.json' % folder]: tf.Cfg(doltResources),
   };
 
 local cfg(block) =
@@ -221,7 +221,6 @@ local cfg(block) =
     dmlTfCfg(b.key, b.value {
       name: block.name,
       email: block.email,
-      supportingTerraformResources: std.get(b.value, 'supportingTerraformResources', []),
       terraformResources: std.get(b.value, 'terraformResources', []),
       resourceGroups: std.get(b.value, 'resourceGroups', []),
     })
