@@ -32,37 +32,42 @@ local build = {
     else if std.type(val) == 'array' then '${%s}' % [self.expression(val)]
     else if std.type(val) == 'string' then val
     else val,
-  providerRequirements(val):
+  blocks(val):
     if std.type(val) == 'object'
     then
       if std.objectHas(val, '_')
-      then std.get(val._, 'providerRequirements', {})
-      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.providerRequirements(val[key]), std.objectFields(val)), {})
+      then
+        if std.objectHas(val._, 'blocks')
+        then val._.blocks
+        else
+          if std.objectHas(val._, 'block')
+          then { [val._.ref]: val._.block }
+          else {}
+      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.blocks(val[key]), std.objectFields(val)), {})
     else if std.type(val) == 'array'
-    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.providerRequirements(element), val), {})
+    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.blocks(element), val), {})
     else {},
 };
 
 local providerTemplate(provider, requirements, configuration) = {
-  local providerRequirements = { [provider]: requirements },
+  local providerRequirements = { ['terraform.required_providers.%s' % [provider]]: requirements },
   local providerAlias = if configuration == null then null else configuration.alias,
-  local providerWithAlias = if configuration == null then null else '%s.%s' % [provider, providerAlias],
-  local providerConfiguration = if configuration == null then {} else { [providerWithAlias]: { provider: { [provider]: configuration } } },
-  local providerReference = if configuration == null then {} else { provider: providerWithAlias },
+  local providerRef = if configuration == null then null else '%s.%s' % [provider, providerAlias],
+  local providerConfiguration = if configuration == null then {} else { [providerRef]: { provider: { [provider]: configuration } } },
+  local providerRefBlock = if configuration == null then {} else { provider: providerRef },
   blockType(blockType): {
     local blockTypePath = if blockType == 'resource' then [] else ['data'],
     resource(type, name): {
       local resourceType = std.substr(type, std.length(provider) + 1, std.length(type)),
       local resourcePath = blockTypePath + [type, name],
       _(rawBlock, block): {
+        local _ = self,
         local metaBlock = {
           depends_on: build.template(std.get(rawBlock, 'depends_on', null)),
           count: build.template(std.get(rawBlock, 'count', null)),
           for_each: build.template(std.get(rawBlock, 'for_each', null)),
         },
         type: if std.objectHas(rawBlock, 'for_each') then 'map' else if std.objectHas(rawBlock, 'count') then 'list' else 'object',
-        providerRequirements: build.providerRequirements(rawBlock) + providerRequirements,
-        providerConfiguration: providerConfiguration,
         provider: provider,
         providerAlias: providerAlias,
         resourceType: resourceType,
@@ -71,15 +76,19 @@ local providerTemplate(provider, requirements, configuration) = {
         block: {
           [blockType]: {
             [type]: {
-              [name]: std.prune(metaBlock + block + providerReference),
+              [name]: std.prune(metaBlock + block + providerRefBlock),
             },
           },
         },
+        blocks: build.blocks(rawBlock) + providerRequirements + providerConfiguration + {
+          [_.ref]: _.block,
+        },
       },
-      field(fieldName): {
+      field(blocks, fieldName): {
         local fieldPath = resourcePath + [fieldName],
         _: {
           ref: std.join('.', fieldPath),
+          blocks: blocks,
         },
       },
     },
@@ -87,9 +96,8 @@ local providerTemplate(provider, requirements, configuration) = {
   func(name, parameters=[]): {
     local parameterString = std.join(', ', [build.expression(parameter) for parameter in parameters]),
     _: {
-      providerRequirements: build.providerRequirements(parameters) + providerRequirements,
-      providerConfiguration: providerConfiguration,
       ref: 'provider::%s::%s(%s)' % [provider, name, parameterString],
+      blocks: build.blocks(parameters) + providerRequirements + providerConfiguration,
     },
   },
 };
@@ -97,7 +105,7 @@ local providerTemplate(provider, requirements, configuration) = {
 local provider(configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/time',
-    version: '0.12.1',
+    version: '0.13.0',
   },
   local provider = providerTemplate('time', requirements, configuration),
   resource: {
@@ -123,23 +131,23 @@ local provider(configuration) = {
         unix: build.template(std.get(block, 'unix', null)),
         year: build.template(std.get(block, 'year', null)),
       }),
-      base_rfc3339: resource.field('base_rfc3339'),
-      day: resource.field('day'),
-      hour: resource.field('hour'),
-      id: resource.field('id'),
-      minute: resource.field('minute'),
-      month: resource.field('month'),
-      offset_days: resource.field('offset_days'),
-      offset_hours: resource.field('offset_hours'),
-      offset_minutes: resource.field('offset_minutes'),
-      offset_months: resource.field('offset_months'),
-      offset_seconds: resource.field('offset_seconds'),
-      offset_years: resource.field('offset_years'),
-      rfc3339: resource.field('rfc3339'),
-      second: resource.field('second'),
-      triggers: resource.field('triggers'),
-      unix: resource.field('unix'),
-      year: resource.field('year'),
+      base_rfc3339: resource.field(self._.blocks, 'base_rfc3339'),
+      day: resource.field(self._.blocks, 'day'),
+      hour: resource.field(self._.blocks, 'hour'),
+      id: resource.field(self._.blocks, 'id'),
+      minute: resource.field(self._.blocks, 'minute'),
+      month: resource.field(self._.blocks, 'month'),
+      offset_days: resource.field(self._.blocks, 'offset_days'),
+      offset_hours: resource.field(self._.blocks, 'offset_hours'),
+      offset_minutes: resource.field(self._.blocks, 'offset_minutes'),
+      offset_months: resource.field(self._.blocks, 'offset_months'),
+      offset_seconds: resource.field(self._.blocks, 'offset_seconds'),
+      offset_years: resource.field(self._.blocks, 'offset_years'),
+      rfc3339: resource.field(self._.blocks, 'rfc3339'),
+      second: resource.field(self._.blocks, 'second'),
+      triggers: resource.field(self._.blocks, 'triggers'),
+      unix: resource.field(self._.blocks, 'unix'),
+      year: resource.field(self._.blocks, 'year'),
     },
     rotating(name, block): {
       local resource = blockType.resource('time_rotating', name),
@@ -161,22 +169,22 @@ local provider(configuration) = {
         unix: build.template(std.get(block, 'unix', null)),
         year: build.template(std.get(block, 'year', null)),
       }),
-      day: resource.field('day'),
-      hour: resource.field('hour'),
-      id: resource.field('id'),
-      minute: resource.field('minute'),
-      month: resource.field('month'),
-      rfc3339: resource.field('rfc3339'),
-      rotation_days: resource.field('rotation_days'),
-      rotation_hours: resource.field('rotation_hours'),
-      rotation_minutes: resource.field('rotation_minutes'),
-      rotation_months: resource.field('rotation_months'),
-      rotation_rfc3339: resource.field('rotation_rfc3339'),
-      rotation_years: resource.field('rotation_years'),
-      second: resource.field('second'),
-      triggers: resource.field('triggers'),
-      unix: resource.field('unix'),
-      year: resource.field('year'),
+      day: resource.field(self._.blocks, 'day'),
+      hour: resource.field(self._.blocks, 'hour'),
+      id: resource.field(self._.blocks, 'id'),
+      minute: resource.field(self._.blocks, 'minute'),
+      month: resource.field(self._.blocks, 'month'),
+      rfc3339: resource.field(self._.blocks, 'rfc3339'),
+      rotation_days: resource.field(self._.blocks, 'rotation_days'),
+      rotation_hours: resource.field(self._.blocks, 'rotation_hours'),
+      rotation_minutes: resource.field(self._.blocks, 'rotation_minutes'),
+      rotation_months: resource.field(self._.blocks, 'rotation_months'),
+      rotation_rfc3339: resource.field(self._.blocks, 'rotation_rfc3339'),
+      rotation_years: resource.field(self._.blocks, 'rotation_years'),
+      second: resource.field(self._.blocks, 'second'),
+      triggers: resource.field(self._.blocks, 'triggers'),
+      unix: resource.field(self._.blocks, 'unix'),
+      year: resource.field(self._.blocks, 'year'),
     },
     sleep(name, block): {
       local resource = blockType.resource('time_sleep', name),
@@ -186,10 +194,10 @@ local provider(configuration) = {
         id: build.template(std.get(block, 'id', null)),
         triggers: build.template(std.get(block, 'triggers', null)),
       }),
-      create_duration: resource.field('create_duration'),
-      destroy_duration: resource.field('destroy_duration'),
-      id: resource.field('id'),
-      triggers: resource.field('triggers'),
+      create_duration: resource.field(self._.blocks, 'create_duration'),
+      destroy_duration: resource.field(self._.blocks, 'destroy_duration'),
+      id: resource.field(self._.blocks, 'id'),
+      triggers: resource.field(self._.blocks, 'triggers'),
     },
     static(name, block): {
       local resource = blockType.resource('time_static', name),
@@ -205,20 +213,22 @@ local provider(configuration) = {
         unix: build.template(std.get(block, 'unix', null)),
         year: build.template(std.get(block, 'year', null)),
       }),
-      day: resource.field('day'),
-      hour: resource.field('hour'),
-      id: resource.field('id'),
-      minute: resource.field('minute'),
-      month: resource.field('month'),
-      rfc3339: resource.field('rfc3339'),
-      second: resource.field('second'),
-      triggers: resource.field('triggers'),
-      unix: resource.field('unix'),
-      year: resource.field('year'),
+      day: resource.field(self._.blocks, 'day'),
+      hour: resource.field(self._.blocks, 'hour'),
+      id: resource.field(self._.blocks, 'id'),
+      minute: resource.field(self._.blocks, 'minute'),
+      month: resource.field(self._.blocks, 'month'),
+      rfc3339: resource.field(self._.blocks, 'rfc3339'),
+      second: resource.field(self._.blocks, 'second'),
+      triggers: resource.field(self._.blocks, 'triggers'),
+      unix: resource.field(self._.blocks, 'unix'),
+      year: resource.field(self._.blocks, 'year'),
     },
   },
   func: {
+    duration_parse(duration): provider.func('duration_parse', [duration]),
     rfc3339_parse(timestamp): provider.func('rfc3339_parse', [timestamp]),
+    unix_timestamp_parse(unix_timestamp): provider.func('unix_timestamp_parse', [unix_timestamp]),
   },
 };
 
