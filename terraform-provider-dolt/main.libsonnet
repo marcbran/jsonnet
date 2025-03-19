@@ -32,37 +32,42 @@ local build = {
     else if std.type(val) == 'array' then '${%s}' % [self.expression(val)]
     else if std.type(val) == 'string' then val
     else val,
-  providerRequirements(val):
+  blocks(val):
     if std.type(val) == 'object'
     then
       if std.objectHas(val, '_')
-      then std.get(val._, 'providerRequirements', {})
-      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.providerRequirements(val[key]), std.objectFields(val)), {})
+      then
+        if std.objectHas(val._, 'blocks')
+        then val._.blocks
+        else
+          if std.objectHas(val._, 'block')
+          then { [val._.ref]: val._.block }
+          else {}
+      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.blocks(val[key]), std.objectFields(val)), {})
     else if std.type(val) == 'array'
-    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.providerRequirements(element), val), {})
+    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.blocks(element), val), {})
     else {},
 };
 
 local providerTemplate(provider, requirements, configuration) = {
-  local providerRequirements = { [provider]: requirements },
+  local providerRequirements = { ['terraform.required_providers.%s' % [provider]]: requirements },
   local providerAlias = if configuration == null then null else configuration.alias,
-  local providerWithAlias = if configuration == null then null else '%s.%s' % [provider, providerAlias],
-  local providerConfiguration = if configuration == null then {} else { [providerWithAlias]: { provider: { [provider]: configuration } } },
-  local providerReference = if configuration == null then {} else { provider: providerWithAlias },
+  local providerRef = if configuration == null then null else '%s.%s' % [provider, providerAlias],
+  local providerConfiguration = if configuration == null then {} else { [providerRef]: { provider: { [provider]: configuration } } },
+  local providerRefBlock = if configuration == null then {} else { provider: providerRef },
   blockType(blockType): {
     local blockTypePath = if blockType == 'resource' then [] else ['data'],
     resource(type, name): {
       local resourceType = std.substr(type, std.length(provider) + 1, std.length(type)),
       local resourcePath = blockTypePath + [type, name],
       _(rawBlock, block): {
+        local _ = self,
         local metaBlock = {
           depends_on: build.template(std.get(rawBlock, 'depends_on', null)),
           count: build.template(std.get(rawBlock, 'count', null)),
           for_each: build.template(std.get(rawBlock, 'for_each', null)),
         },
         type: if std.objectHas(rawBlock, 'for_each') then 'map' else if std.objectHas(rawBlock, 'count') then 'list' else 'object',
-        providerRequirements: build.providerRequirements(rawBlock) + providerRequirements,
-        providerConfiguration: providerConfiguration,
         provider: provider,
         providerAlias: providerAlias,
         resourceType: resourceType,
@@ -71,15 +76,19 @@ local providerTemplate(provider, requirements, configuration) = {
         block: {
           [blockType]: {
             [type]: {
-              [name]: std.prune(metaBlock + block + providerReference),
+              [name]: std.prune(metaBlock + block + providerRefBlock),
             },
           },
         },
+        blocks: build.blocks(rawBlock) + providerRequirements + providerConfiguration + {
+          [_.ref]: _.block,
+        },
       },
-      field(fieldName): {
+      field(blocks, fieldName): {
         local fieldPath = resourcePath + [fieldName],
         _: {
           ref: std.join('.', fieldPath),
+          blocks: blocks,
         },
       },
     },
@@ -87,9 +96,8 @@ local providerTemplate(provider, requirements, configuration) = {
   func(name, parameters=[]): {
     local parameterString = std.join(', ', [build.expression(parameter) for parameter in parameters]),
     _: {
-      providerRequirements: build.providerRequirements(parameters) + providerRequirements,
-      providerConfiguration: providerConfiguration,
       ref: 'provider::%s::%s(%s)' % [provider, name, parameterString],
+      blocks: build.blocks(parameters) + providerRequirements + providerConfiguration,
     },
   },
 };
@@ -107,7 +115,7 @@ local provider(configuration) = {
       _: resource._(block, {
         name: build.template(block.name),
       }),
-      name: resource.field('name'),
+      name: resource.field(self._.blocks, 'name'),
     },
     rowset(name, block): {
       local resource = blockType.resource('dolt_rowset', name),
@@ -119,12 +127,12 @@ local provider(configuration) = {
         unique_column: build.template(block.unique_column),
         values: build.template(block.values),
       }),
-      columns: resource.field('columns'),
-      database: resource.field('database'),
-      row_count: resource.field('row_count'),
-      table: resource.field('table'),
-      unique_column: resource.field('unique_column'),
-      values: resource.field('values'),
+      columns: resource.field(self._.blocks, 'columns'),
+      database: resource.field(self._.blocks, 'database'),
+      row_count: resource.field(self._.blocks, 'row_count'),
+      table: resource.field(self._.blocks, 'table'),
+      unique_column: resource.field(self._.blocks, 'unique_column'),
+      values: resource.field(self._.blocks, 'values'),
     },
     table(name, block): {
       local resource = blockType.resource('dolt_table', name),
@@ -134,10 +142,10 @@ local provider(configuration) = {
         name: build.template(block.name),
         query: build.template(block.query),
       }),
-      columns: resource.field('columns'),
-      database: resource.field('database'),
-      name: resource.field('name'),
-      query: resource.field('query'),
+      columns: resource.field(self._.blocks, 'columns'),
+      database: resource.field(self._.blocks, 'database'),
+      name: resource.field(self._.blocks, 'name'),
+      query: resource.field(self._.blocks, 'query'),
     },
     view(name, block): {
       local resource = blockType.resource('dolt_view', name),
@@ -146,9 +154,9 @@ local provider(configuration) = {
         name: build.template(block.name),
         query: build.template(block.query),
       }),
-      database: resource.field('database'),
-      name: resource.field('name'),
-      query: resource.field('query'),
+      database: resource.field(self._.blocks, 'database'),
+      name: resource.field(self._.blocks, 'name'),
+      query: resource.field(self._.blocks, 'query'),
     },
   },
   data: {
@@ -158,7 +166,7 @@ local provider(configuration) = {
       _: resource._(block, {
         name: build.template(block.name),
       }),
-      name: resource.field('name'),
+      name: resource.field(self._.blocks, 'name'),
     },
     table(name, block): {
       local resource = blockType.resource('dolt_table', name),
@@ -167,9 +175,9 @@ local provider(configuration) = {
         database: build.template(block.database),
         name: build.template(block.name),
       }),
-      columns: resource.field('columns'),
-      database: resource.field('database'),
-      name: resource.field('name'),
+      columns: resource.field(self._.blocks, 'columns'),
+      database: resource.field(self._.blocks, 'database'),
+      name: resource.field(self._.blocks, 'name'),
     },
   },
 };
