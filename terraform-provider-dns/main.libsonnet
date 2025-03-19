@@ -32,37 +32,42 @@ local build = {
     else if std.type(val) == 'array' then '${%s}' % [self.expression(val)]
     else if std.type(val) == 'string' then val
     else val,
-  providerRequirements(val):
+  blocks(val):
     if std.type(val) == 'object'
     then
       if std.objectHas(val, '_')
-      then std.get(val._, 'providerRequirements', {})
-      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.providerRequirements(val[key]), std.objectFields(val)), {})
+      then
+        if std.objectHas(val._, 'blocks')
+        then val._.blocks
+        else
+          if std.objectHas(val._, 'block')
+          then { [val._.ref]: val._.block }
+          else {}
+      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.blocks(val[key]), std.objectFields(val)), {})
     else if std.type(val) == 'array'
-    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.providerRequirements(element), val), {})
+    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.blocks(element), val), {})
     else {},
 };
 
 local providerTemplate(provider, requirements, configuration) = {
-  local providerRequirements = { [provider]: requirements },
+  local providerRequirements = { ['terraform.required_providers.%s' % [provider]]: requirements },
   local providerAlias = if configuration == null then null else configuration.alias,
-  local providerWithAlias = if configuration == null then null else '%s.%s' % [provider, providerAlias],
-  local providerConfiguration = if configuration == null then {} else { [providerWithAlias]: { provider: { [provider]: configuration } } },
-  local providerReference = if configuration == null then {} else { provider: providerWithAlias },
+  local providerRef = if configuration == null then null else '%s.%s' % [provider, providerAlias],
+  local providerConfiguration = if configuration == null then {} else { [providerRef]: { provider: { [provider]: configuration } } },
+  local providerRefBlock = if configuration == null then {} else { provider: providerRef },
   blockType(blockType): {
     local blockTypePath = if blockType == 'resource' then [] else ['data'],
     resource(type, name): {
       local resourceType = std.substr(type, std.length(provider) + 1, std.length(type)),
       local resourcePath = blockTypePath + [type, name],
       _(rawBlock, block): {
+        local _ = self,
         local metaBlock = {
           depends_on: build.template(std.get(rawBlock, 'depends_on', null)),
           count: build.template(std.get(rawBlock, 'count', null)),
           for_each: build.template(std.get(rawBlock, 'for_each', null)),
         },
         type: if std.objectHas(rawBlock, 'for_each') then 'map' else if std.objectHas(rawBlock, 'count') then 'list' else 'object',
-        providerRequirements: build.providerRequirements(rawBlock) + providerRequirements,
-        providerConfiguration: providerConfiguration,
         provider: provider,
         providerAlias: providerAlias,
         resourceType: resourceType,
@@ -71,15 +76,19 @@ local providerTemplate(provider, requirements, configuration) = {
         block: {
           [blockType]: {
             [type]: {
-              [name]: std.prune(metaBlock + block + providerReference),
+              [name]: std.prune(metaBlock + block + providerRefBlock),
             },
           },
         },
+        blocks: build.blocks(rawBlock) + providerRequirements + providerConfiguration + {
+          [_.ref]: _.block,
+        },
       },
-      field(fieldName): {
+      field(blocks, fieldName): {
         local fieldPath = resourcePath + [fieldName],
         _: {
           ref: std.join('.', fieldPath),
+          blocks: blocks,
         },
       },
     },
@@ -87,9 +96,8 @@ local providerTemplate(provider, requirements, configuration) = {
   func(name, parameters=[]): {
     local parameterString = std.join(', ', [build.expression(parameter) for parameter in parameters]),
     _: {
-      providerRequirements: build.providerRequirements(parameters) + providerRequirements,
-      providerConfiguration: providerConfiguration,
       ref: 'provider::%s::%s(%s)' % [provider, name, parameterString],
+      blocks: build.blocks(parameters) + providerRequirements + providerConfiguration,
     },
   },
 };
@@ -111,11 +119,11 @@ local provider(configuration) = {
         ttl: build.template(std.get(block, 'ttl', null)),
         zone: build.template(block.zone),
       }),
-      addresses: resource.field('addresses'),
-      id: resource.field('id'),
-      name: resource.field('name'),
-      ttl: resource.field('ttl'),
-      zone: resource.field('zone'),
+      addresses: resource.field(self._.blocks, 'addresses'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      ttl: resource.field(self._.blocks, 'ttl'),
+      zone: resource.field(self._.blocks, 'zone'),
     },
     aaaa_record_set(name, block): {
       local resource = blockType.resource('dns_aaaa_record_set', name),
@@ -126,11 +134,11 @@ local provider(configuration) = {
         ttl: build.template(std.get(block, 'ttl', null)),
         zone: build.template(block.zone),
       }),
-      addresses: resource.field('addresses'),
-      id: resource.field('id'),
-      name: resource.field('name'),
-      ttl: resource.field('ttl'),
-      zone: resource.field('zone'),
+      addresses: resource.field(self._.blocks, 'addresses'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      ttl: resource.field(self._.blocks, 'ttl'),
+      zone: resource.field(self._.blocks, 'zone'),
     },
     cname_record(name, block): {
       local resource = blockType.resource('dns_cname_record', name),
@@ -141,11 +149,11 @@ local provider(configuration) = {
         ttl: build.template(std.get(block, 'ttl', null)),
         zone: build.template(block.zone),
       }),
-      cname: resource.field('cname'),
-      id: resource.field('id'),
-      name: resource.field('name'),
-      ttl: resource.field('ttl'),
-      zone: resource.field('zone'),
+      cname: resource.field(self._.blocks, 'cname'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      ttl: resource.field(self._.blocks, 'ttl'),
+      zone: resource.field(self._.blocks, 'zone'),
     },
     mx_record_set(name, block): {
       local resource = blockType.resource('dns_mx_record_set', name),
@@ -155,10 +163,10 @@ local provider(configuration) = {
         ttl: build.template(std.get(block, 'ttl', null)),
         zone: build.template(block.zone),
       }),
-      id: resource.field('id'),
-      name: resource.field('name'),
-      ttl: resource.field('ttl'),
-      zone: resource.field('zone'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      ttl: resource.field(self._.blocks, 'ttl'),
+      zone: resource.field(self._.blocks, 'zone'),
     },
     ns_record_set(name, block): {
       local resource = blockType.resource('dns_ns_record_set', name),
@@ -169,11 +177,11 @@ local provider(configuration) = {
         ttl: build.template(std.get(block, 'ttl', null)),
         zone: build.template(block.zone),
       }),
-      id: resource.field('id'),
-      name: resource.field('name'),
-      nameservers: resource.field('nameservers'),
-      ttl: resource.field('ttl'),
-      zone: resource.field('zone'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      nameservers: resource.field(self._.blocks, 'nameservers'),
+      ttl: resource.field(self._.blocks, 'ttl'),
+      zone: resource.field(self._.blocks, 'zone'),
     },
     ptr_record(name, block): {
       local resource = blockType.resource('dns_ptr_record', name),
@@ -184,11 +192,11 @@ local provider(configuration) = {
         ttl: build.template(std.get(block, 'ttl', null)),
         zone: build.template(block.zone),
       }),
-      id: resource.field('id'),
-      name: resource.field('name'),
-      ptr: resource.field('ptr'),
-      ttl: resource.field('ttl'),
-      zone: resource.field('zone'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      ptr: resource.field(self._.blocks, 'ptr'),
+      ttl: resource.field(self._.blocks, 'ttl'),
+      zone: resource.field(self._.blocks, 'zone'),
     },
     srv_record_set(name, block): {
       local resource = blockType.resource('dns_srv_record_set', name),
@@ -198,10 +206,10 @@ local provider(configuration) = {
         ttl: build.template(std.get(block, 'ttl', null)),
         zone: build.template(block.zone),
       }),
-      id: resource.field('id'),
-      name: resource.field('name'),
-      ttl: resource.field('ttl'),
-      zone: resource.field('zone'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      ttl: resource.field(self._.blocks, 'ttl'),
+      zone: resource.field(self._.blocks, 'zone'),
     },
     txt_record_set(name, block): {
       local resource = blockType.resource('dns_txt_record_set', name),
@@ -212,11 +220,11 @@ local provider(configuration) = {
         txt: build.template(block.txt),
         zone: build.template(block.zone),
       }),
-      id: resource.field('id'),
-      name: resource.field('name'),
-      ttl: resource.field('ttl'),
-      txt: resource.field('txt'),
-      zone: resource.field('zone'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      ttl: resource.field(self._.blocks, 'ttl'),
+      txt: resource.field(self._.blocks, 'txt'),
+      zone: resource.field(self._.blocks, 'zone'),
     },
   },
   data: {
@@ -228,9 +236,9 @@ local provider(configuration) = {
         host: build.template(block.host),
         id: build.template(std.get(block, 'id', null)),
       }),
-      addrs: resource.field('addrs'),
-      host: resource.field('host'),
-      id: resource.field('id'),
+      addrs: resource.field(self._.blocks, 'addrs'),
+      host: resource.field(self._.blocks, 'host'),
+      id: resource.field(self._.blocks, 'id'),
     },
     aaaa_record_set(name, block): {
       local resource = blockType.resource('dns_aaaa_record_set', name),
@@ -239,9 +247,9 @@ local provider(configuration) = {
         host: build.template(block.host),
         id: build.template(std.get(block, 'id', null)),
       }),
-      addrs: resource.field('addrs'),
-      host: resource.field('host'),
-      id: resource.field('id'),
+      addrs: resource.field(self._.blocks, 'addrs'),
+      host: resource.field(self._.blocks, 'host'),
+      id: resource.field(self._.blocks, 'id'),
     },
     cname_record_set(name, block): {
       local resource = blockType.resource('dns_cname_record_set', name),
@@ -250,9 +258,9 @@ local provider(configuration) = {
         host: build.template(block.host),
         id: build.template(std.get(block, 'id', null)),
       }),
-      cname: resource.field('cname'),
-      host: resource.field('host'),
-      id: resource.field('id'),
+      cname: resource.field(self._.blocks, 'cname'),
+      host: resource.field(self._.blocks, 'host'),
+      id: resource.field(self._.blocks, 'id'),
     },
     mx_record_set(name, block): {
       local resource = blockType.resource('dns_mx_record_set', name),
@@ -261,9 +269,9 @@ local provider(configuration) = {
         id: build.template(std.get(block, 'id', null)),
         mx: build.template(std.get(block, 'mx', null)),
       }),
-      domain: resource.field('domain'),
-      id: resource.field('id'),
-      mx: resource.field('mx'),
+      domain: resource.field(self._.blocks, 'domain'),
+      id: resource.field(self._.blocks, 'id'),
+      mx: resource.field(self._.blocks, 'mx'),
     },
     ns_record_set(name, block): {
       local resource = blockType.resource('dns_ns_record_set', name),
@@ -272,9 +280,9 @@ local provider(configuration) = {
         id: build.template(std.get(block, 'id', null)),
         nameservers: build.template(std.get(block, 'nameservers', null)),
       }),
-      host: resource.field('host'),
-      id: resource.field('id'),
-      nameservers: resource.field('nameservers'),
+      host: resource.field(self._.blocks, 'host'),
+      id: resource.field(self._.blocks, 'id'),
+      nameservers: resource.field(self._.blocks, 'nameservers'),
     },
     ptr_record_set(name, block): {
       local resource = blockType.resource('dns_ptr_record_set', name),
@@ -283,9 +291,9 @@ local provider(configuration) = {
         ip_address: build.template(block.ip_address),
         ptr: build.template(std.get(block, 'ptr', null)),
       }),
-      id: resource.field('id'),
-      ip_address: resource.field('ip_address'),
-      ptr: resource.field('ptr'),
+      id: resource.field(self._.blocks, 'id'),
+      ip_address: resource.field(self._.blocks, 'ip_address'),
+      ptr: resource.field(self._.blocks, 'ptr'),
     },
     srv_record_set(name, block): {
       local resource = blockType.resource('dns_srv_record_set', name),
@@ -294,9 +302,9 @@ local provider(configuration) = {
         service: build.template(block.service),
         srv: build.template(std.get(block, 'srv', null)),
       }),
-      id: resource.field('id'),
-      service: resource.field('service'),
-      srv: resource.field('srv'),
+      id: resource.field(self._.blocks, 'id'),
+      service: resource.field(self._.blocks, 'service'),
+      srv: resource.field(self._.blocks, 'srv'),
     },
     txt_record_set(name, block): {
       local resource = blockType.resource('dns_txt_record_set', name),
@@ -306,10 +314,10 @@ local provider(configuration) = {
         record: build.template(std.get(block, 'record', null)),
         records: build.template(std.get(block, 'records', null)),
       }),
-      host: resource.field('host'),
-      id: resource.field('id'),
-      record: resource.field('record'),
-      records: resource.field('records'),
+      host: resource.field(self._.blocks, 'host'),
+      id: resource.field(self._.blocks, 'id'),
+      record: resource.field(self._.blocks, 'record'),
+      records: resource.field(self._.blocks, 'records'),
     },
   },
 };
