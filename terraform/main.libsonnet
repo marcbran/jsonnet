@@ -35,52 +35,42 @@ local build = {
     else if std.type(val) == 'string' then val
     else val,
 
-  providerRequirements(val):
-    if (std.type(val) == 'object')
+  blocks(val):
+    if std.type(val) == 'object'
     then
-      if (std.objectHas(val, '_'))
-      then std.get(val._, 'providerRequirements', {})
+      if std.objectHas(val, '_')
+      then
+        if std.objectHas(val._, 'blocks')
+        then val._.blocks
+        else
+          if std.objectHas(val._, 'block')
+          then { [val._.ref]: val._block }
+          else {}
       else std.foldl(
         function(acc, val) std.mergePatch(acc, val),
-        std.map(function(key) build.providerRequirements(val[key]), std.objectFields(val)),
+        std.map(function(key) build.blocks(val[key]), std.objectFields(val)),
         {}
       )
-    else if (std.type(val) == 'array')
+    else if std.type(val) == 'array'
     then std.foldl(
       function(acc, val) std.mergePatch(acc, val),
-      std.map(function(element) build.providerRequirements(element), val),
+      std.map(function(element) build.blocks(element), val),
       {}
     )
     else {},
 
-  providerConfiguration(val):
-    if (std.type(val) == 'object')
-    then
-      if (std.objectHas(val, '_'))
-      then std.get(val._, 'providerConfiguration', {})
-      else std.foldl(
-        function(acc, val) std.mergePatch(acc, val),
-        std.map(function(key) build.providerConfiguration(val[key]), std.objectFields(val)),
-        {}
-      )
-    else if (std.type(val) == 'array')
-    then std.foldl(
-      function(acc, val) std.mergePatch(acc, val),
-      std.map(function(element) build.providerConfiguration(element), val),
-      {}
-    )
-    else {},
 };
 
 local Format(string, values) = {
   _: {
-    providerRequirements: build.providerRequirements(values),
     str: string % [build.template(value) for value in values],
+    blocks: build.blocks(values),
   },
 };
 
 local Variable(name, block) = {
   _: {
+    local _ = self,
     ref: 'var.%s' % [name],
     block: {
       variable: {
@@ -95,12 +85,15 @@ local Variable(name, block) = {
         }),
       },
     },
+    blocks: {
+      [_.ref]: _.block,
+    },
   },
 };
 
 local Output(name, block) = {
   _: {
-    providerRequirements: build.providerRequirements(block),
+    local _ = self,
     block: {
       output: {
         [name]: std.prune({
@@ -113,27 +106,39 @@ local Output(name, block) = {
         }),
       },
     },
+    blocks: build.blocks(block) + {
+      ['output.%s' % [name]]: _.block,
+    },
   },
 };
 
 local Local(name, value) = {
   _: {
+    local _ = self,
     ref: 'local.%s' % [name],
-    providerRequirements: build.providerRequirements(value),
     block: {
       locals: {
         [name]: build.template(value),
       },
     },
+    blocks: build.blocks(value) + {
+      [_.ref]: _.block,
+    },
   },
 };
 
+// TODO There is no good support for modules at this time
 local Module(name, block) = {
   _: {
+    local _ = self,
+    ref: 'module.%s' % [name],
     block: {
       module: {
         [name]: block,
       },
+    },
+    blocks: build.blocks(block) + {
+      [_.ref]: _.block,
     },
   },
 };
@@ -222,8 +227,8 @@ local For(keyIdVal, val=null) = {
 local func(name, parameters=[]) = {
   local parameterString = std.join(', ', [build.expression(parameter) for parameter in parameters]),
   _: {
-    providerRequirements: build.providerRequirements(parameters),
     ref: '%s(%s)' % [name, parameterString],
+    blocks: build.blocks(parameters),
   },
 };
 
@@ -365,31 +370,31 @@ local functions = {
   type(val): func('type', [val]),
 };
 
-local extractBlocks(obj) =
-  if (std.type(obj) == 'object')
-  then
-    if (std.objectHas(obj, '_'))
-    then [std.get(obj._, 'block', {})]
-    else std.foldl(
-      function(acc, obj) acc + obj,
-      std.map(function(key) extractBlocks(obj[key]), std.objectFields(obj)),
-      []
-    )
-  else if (std.type(obj) == 'array')
-  then std.foldl(
-    function(acc, obj) acc + obj,
-    std.map(function(element) extractBlocks(element), obj),
-    []
-  )
-  else [];
+local nestKv(keys, value) =
+  if std.length(keys) == 0 then value else { ['%s' % keys[0]]+: nestKv(keys[1:], value) };
+
+local unflattenObject(value) = std.foldl(function(acc, curr) acc + curr, [
+  nestKv(std.split(kv.key, '.'), kv.value)
+  for kv in std.objectKeysValues(value)
+], {});
 
 local Cfg(resources) =
-  local preamble = [{
-    terraform: {
-      required_providers: build.providerRequirements(resources),
-    },
-  }] + std.objectValues(build.providerConfiguration(resources));
-  preamble + extractBlocks(resources);
+  local blocks = build.blocks(resources);
+  local terraformBlock = unflattenObject({
+    [kv.key]: kv.value
+    for kv in std.objectKeysValues(blocks)
+    if std.startsWith(kv.key, 'terraform')
+  });
+  local terraformBlocks =
+    if std.length(terraformBlock) > 0
+    then [terraformBlock]
+    else [];
+  local regularBlocks = [
+    kv.value
+    for kv in std.objectKeysValues(blocks)
+    if !std.startsWith(kv.key, 'terraform')
+  ];
+  terraformBlocks + regularBlocks;
 
 local terraform = functions + operators + {
   build: build,
