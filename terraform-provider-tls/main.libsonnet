@@ -32,37 +32,42 @@ local build = {
     else if std.type(val) == 'array' then '${%s}' % [self.expression(val)]
     else if std.type(val) == 'string' then val
     else val,
-  providerRequirements(val):
+  blocks(val):
     if std.type(val) == 'object'
     then
       if std.objectHas(val, '_')
-      then std.get(val._, 'providerRequirements', {})
-      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.providerRequirements(val[key]), std.objectFields(val)), {})
+      then
+        if std.objectHas(val._, 'blocks')
+        then val._.blocks
+        else
+          if std.objectHas(val._, 'block')
+          then { [val._.ref]: val._.block }
+          else {}
+      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.blocks(val[key]), std.objectFields(val)), {})
     else if std.type(val) == 'array'
-    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.providerRequirements(element), val), {})
+    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.blocks(element), val), {})
     else {},
 };
 
 local providerTemplate(provider, requirements, configuration) = {
-  local providerRequirements = { [provider]: requirements },
+  local providerRequirements = { ['terraform.required_providers.%s' % [provider]]: requirements },
   local providerAlias = if configuration == null then null else configuration.alias,
-  local providerWithAlias = if configuration == null then null else '%s.%s' % [provider, providerAlias],
-  local providerConfiguration = if configuration == null then {} else { [providerWithAlias]: { provider: { [provider]: configuration } } },
-  local providerReference = if configuration == null then {} else { provider: providerWithAlias },
+  local providerRef = if configuration == null then null else '%s.%s' % [provider, providerAlias],
+  local providerConfiguration = if configuration == null then {} else { [providerRef]: { provider: { [provider]: configuration } } },
+  local providerRefBlock = if configuration == null then {} else { provider: providerRef },
   blockType(blockType): {
     local blockTypePath = if blockType == 'resource' then [] else ['data'],
     resource(type, name): {
       local resourceType = std.substr(type, std.length(provider) + 1, std.length(type)),
       local resourcePath = blockTypePath + [type, name],
       _(rawBlock, block): {
+        local _ = self,
         local metaBlock = {
           depends_on: build.template(std.get(rawBlock, 'depends_on', null)),
           count: build.template(std.get(rawBlock, 'count', null)),
           for_each: build.template(std.get(rawBlock, 'for_each', null)),
         },
         type: if std.objectHas(rawBlock, 'for_each') then 'map' else if std.objectHas(rawBlock, 'count') then 'list' else 'object',
-        providerRequirements: build.providerRequirements(rawBlock) + providerRequirements,
-        providerConfiguration: providerConfiguration,
         provider: provider,
         providerAlias: providerAlias,
         resourceType: resourceType,
@@ -71,15 +76,19 @@ local providerTemplate(provider, requirements, configuration) = {
         block: {
           [blockType]: {
             [type]: {
-              [name]: std.prune(metaBlock + block + providerReference),
+              [name]: std.prune(metaBlock + block + providerRefBlock),
             },
           },
         },
+        blocks: build.blocks(rawBlock) + providerRequirements + providerConfiguration + {
+          [_.ref]: _.block,
+        },
       },
-      field(fieldName): {
+      field(blocks, fieldName): {
         local fieldPath = resourcePath + [fieldName],
         _: {
           ref: std.join('.', fieldPath),
+          blocks: blocks,
         },
       },
     },
@@ -87,9 +96,8 @@ local providerTemplate(provider, requirements, configuration) = {
   func(name, parameters=[]): {
     local parameterString = std.join(', ', [build.expression(parameter) for parameter in parameters]),
     _: {
-      providerRequirements: build.providerRequirements(parameters) + providerRequirements,
-      providerConfiguration: providerConfiguration,
       ref: 'provider::%s::%s(%s)' % [provider, name, parameterString],
+      blocks: build.blocks(parameters) + providerRequirements + providerConfiguration,
     },
   },
 };
@@ -113,13 +121,13 @@ local provider(configuration) = {
         private_key_pem: build.template(block.private_key_pem),
         uris: build.template(std.get(block, 'uris', null)),
       }),
-      cert_request_pem: resource.field('cert_request_pem'),
-      dns_names: resource.field('dns_names'),
-      id: resource.field('id'),
-      ip_addresses: resource.field('ip_addresses'),
-      key_algorithm: resource.field('key_algorithm'),
-      private_key_pem: resource.field('private_key_pem'),
-      uris: resource.field('uris'),
+      cert_request_pem: resource.field(self._.blocks, 'cert_request_pem'),
+      dns_names: resource.field(self._.blocks, 'dns_names'),
+      id: resource.field(self._.blocks, 'id'),
+      ip_addresses: resource.field(self._.blocks, 'ip_addresses'),
+      key_algorithm: resource.field(self._.blocks, 'key_algorithm'),
+      private_key_pem: resource.field(self._.blocks, 'private_key_pem'),
+      uris: resource.field(self._.blocks, 'uris'),
     },
     locally_signed_cert(name, block): {
       local resource = blockType.resource('tls_locally_signed_cert', name),
@@ -139,20 +147,20 @@ local provider(configuration) = {
         validity_period_hours: build.template(block.validity_period_hours),
         validity_start_time: build.template(std.get(block, 'validity_start_time', null)),
       }),
-      allowed_uses: resource.field('allowed_uses'),
-      ca_cert_pem: resource.field('ca_cert_pem'),
-      ca_key_algorithm: resource.field('ca_key_algorithm'),
-      ca_private_key_pem: resource.field('ca_private_key_pem'),
-      cert_pem: resource.field('cert_pem'),
-      cert_request_pem: resource.field('cert_request_pem'),
-      early_renewal_hours: resource.field('early_renewal_hours'),
-      id: resource.field('id'),
-      is_ca_certificate: resource.field('is_ca_certificate'),
-      ready_for_renewal: resource.field('ready_for_renewal'),
-      set_subject_key_id: resource.field('set_subject_key_id'),
-      validity_end_time: resource.field('validity_end_time'),
-      validity_period_hours: resource.field('validity_period_hours'),
-      validity_start_time: resource.field('validity_start_time'),
+      allowed_uses: resource.field(self._.blocks, 'allowed_uses'),
+      ca_cert_pem: resource.field(self._.blocks, 'ca_cert_pem'),
+      ca_key_algorithm: resource.field(self._.blocks, 'ca_key_algorithm'),
+      ca_private_key_pem: resource.field(self._.blocks, 'ca_private_key_pem'),
+      cert_pem: resource.field(self._.blocks, 'cert_pem'),
+      cert_request_pem: resource.field(self._.blocks, 'cert_request_pem'),
+      early_renewal_hours: resource.field(self._.blocks, 'early_renewal_hours'),
+      id: resource.field(self._.blocks, 'id'),
+      is_ca_certificate: resource.field(self._.blocks, 'is_ca_certificate'),
+      ready_for_renewal: resource.field(self._.blocks, 'ready_for_renewal'),
+      set_subject_key_id: resource.field(self._.blocks, 'set_subject_key_id'),
+      validity_end_time: resource.field(self._.blocks, 'validity_end_time'),
+      validity_period_hours: resource.field(self._.blocks, 'validity_period_hours'),
+      validity_start_time: resource.field(self._.blocks, 'validity_start_time'),
     },
     private_key(name, block): {
       local resource = blockType.resource('tls_private_key', name),
@@ -169,17 +177,17 @@ local provider(configuration) = {
         public_key_pem: build.template(std.get(block, 'public_key_pem', null)),
         rsa_bits: build.template(std.get(block, 'rsa_bits', null)),
       }),
-      algorithm: resource.field('algorithm'),
-      ecdsa_curve: resource.field('ecdsa_curve'),
-      id: resource.field('id'),
-      private_key_openssh: resource.field('private_key_openssh'),
-      private_key_pem: resource.field('private_key_pem'),
-      private_key_pem_pkcs8: resource.field('private_key_pem_pkcs8'),
-      public_key_fingerprint_md5: resource.field('public_key_fingerprint_md5'),
-      public_key_fingerprint_sha256: resource.field('public_key_fingerprint_sha256'),
-      public_key_openssh: resource.field('public_key_openssh'),
-      public_key_pem: resource.field('public_key_pem'),
-      rsa_bits: resource.field('rsa_bits'),
+      algorithm: resource.field(self._.blocks, 'algorithm'),
+      ecdsa_curve: resource.field(self._.blocks, 'ecdsa_curve'),
+      id: resource.field(self._.blocks, 'id'),
+      private_key_openssh: resource.field(self._.blocks, 'private_key_openssh'),
+      private_key_pem: resource.field(self._.blocks, 'private_key_pem'),
+      private_key_pem_pkcs8: resource.field(self._.blocks, 'private_key_pem_pkcs8'),
+      public_key_fingerprint_md5: resource.field(self._.blocks, 'public_key_fingerprint_md5'),
+      public_key_fingerprint_sha256: resource.field(self._.blocks, 'public_key_fingerprint_sha256'),
+      public_key_openssh: resource.field(self._.blocks, 'public_key_openssh'),
+      public_key_pem: resource.field(self._.blocks, 'public_key_pem'),
+      rsa_bits: resource.field(self._.blocks, 'rsa_bits'),
     },
     self_signed_cert(name, block): {
       local resource = blockType.resource('tls_self_signed_cert', name),
@@ -201,22 +209,22 @@ local provider(configuration) = {
         validity_period_hours: build.template(block.validity_period_hours),
         validity_start_time: build.template(std.get(block, 'validity_start_time', null)),
       }),
-      allowed_uses: resource.field('allowed_uses'),
-      cert_pem: resource.field('cert_pem'),
-      dns_names: resource.field('dns_names'),
-      early_renewal_hours: resource.field('early_renewal_hours'),
-      id: resource.field('id'),
-      ip_addresses: resource.field('ip_addresses'),
-      is_ca_certificate: resource.field('is_ca_certificate'),
-      key_algorithm: resource.field('key_algorithm'),
-      private_key_pem: resource.field('private_key_pem'),
-      ready_for_renewal: resource.field('ready_for_renewal'),
-      set_authority_key_id: resource.field('set_authority_key_id'),
-      set_subject_key_id: resource.field('set_subject_key_id'),
-      uris: resource.field('uris'),
-      validity_end_time: resource.field('validity_end_time'),
-      validity_period_hours: resource.field('validity_period_hours'),
-      validity_start_time: resource.field('validity_start_time'),
+      allowed_uses: resource.field(self._.blocks, 'allowed_uses'),
+      cert_pem: resource.field(self._.blocks, 'cert_pem'),
+      dns_names: resource.field(self._.blocks, 'dns_names'),
+      early_renewal_hours: resource.field(self._.blocks, 'early_renewal_hours'),
+      id: resource.field(self._.blocks, 'id'),
+      ip_addresses: resource.field(self._.blocks, 'ip_addresses'),
+      is_ca_certificate: resource.field(self._.blocks, 'is_ca_certificate'),
+      key_algorithm: resource.field(self._.blocks, 'key_algorithm'),
+      private_key_pem: resource.field(self._.blocks, 'private_key_pem'),
+      ready_for_renewal: resource.field(self._.blocks, 'ready_for_renewal'),
+      set_authority_key_id: resource.field(self._.blocks, 'set_authority_key_id'),
+      set_subject_key_id: resource.field(self._.blocks, 'set_subject_key_id'),
+      uris: resource.field(self._.blocks, 'uris'),
+      validity_end_time: resource.field(self._.blocks, 'validity_end_time'),
+      validity_period_hours: resource.field(self._.blocks, 'validity_period_hours'),
+      validity_start_time: resource.field(self._.blocks, 'validity_start_time'),
     },
   },
   data: {
@@ -230,11 +238,11 @@ local provider(configuration) = {
         url: build.template(std.get(block, 'url', null)),
         verify_chain: build.template(std.get(block, 'verify_chain', null)),
       }),
-      certificates: resource.field('certificates'),
-      content: resource.field('content'),
-      id: resource.field('id'),
-      url: resource.field('url'),
-      verify_chain: resource.field('verify_chain'),
+      certificates: resource.field(self._.blocks, 'certificates'),
+      content: resource.field(self._.blocks, 'content'),
+      id: resource.field(self._.blocks, 'id'),
+      url: resource.field(self._.blocks, 'url'),
+      verify_chain: resource.field(self._.blocks, 'verify_chain'),
     },
     public_key(name, block): {
       local resource = blockType.resource('tls_public_key', name),
@@ -248,14 +256,14 @@ local provider(configuration) = {
         public_key_openssh: build.template(std.get(block, 'public_key_openssh', null)),
         public_key_pem: build.template(std.get(block, 'public_key_pem', null)),
       }),
-      algorithm: resource.field('algorithm'),
-      id: resource.field('id'),
-      private_key_openssh: resource.field('private_key_openssh'),
-      private_key_pem: resource.field('private_key_pem'),
-      public_key_fingerprint_md5: resource.field('public_key_fingerprint_md5'),
-      public_key_fingerprint_sha256: resource.field('public_key_fingerprint_sha256'),
-      public_key_openssh: resource.field('public_key_openssh'),
-      public_key_pem: resource.field('public_key_pem'),
+      algorithm: resource.field(self._.blocks, 'algorithm'),
+      id: resource.field(self._.blocks, 'id'),
+      private_key_openssh: resource.field(self._.blocks, 'private_key_openssh'),
+      private_key_pem: resource.field(self._.blocks, 'private_key_pem'),
+      public_key_fingerprint_md5: resource.field(self._.blocks, 'public_key_fingerprint_md5'),
+      public_key_fingerprint_sha256: resource.field(self._.blocks, 'public_key_fingerprint_sha256'),
+      public_key_openssh: resource.field(self._.blocks, 'public_key_openssh'),
+      public_key_pem: resource.field(self._.blocks, 'public_key_pem'),
     },
   },
 };
