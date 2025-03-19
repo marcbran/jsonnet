@@ -32,37 +32,42 @@ local build = {
     else if std.type(val) == 'array' then '${%s}' % [self.expression(val)]
     else if std.type(val) == 'string' then val
     else val,
-  providerRequirements(val):
+  blocks(val):
     if std.type(val) == 'object'
     then
       if std.objectHas(val, '_')
-      then std.get(val._, 'providerRequirements', {})
-      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.providerRequirements(val[key]), std.objectFields(val)), {})
+      then
+        if std.objectHas(val._, 'blocks')
+        then val._.blocks
+        else
+          if std.objectHas(val._, 'block')
+          then { [val._.ref]: val._.block }
+          else {}
+      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.blocks(val[key]), std.objectFields(val)), {})
     else if std.type(val) == 'array'
-    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.providerRequirements(element), val), {})
+    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.blocks(element), val), {})
     else {},
 };
 
 local providerTemplate(provider, requirements, configuration) = {
-  local providerRequirements = { [provider]: requirements },
+  local providerRequirements = { ['terraform.required_providers.%s' % [provider]]: requirements },
   local providerAlias = if configuration == null then null else configuration.alias,
-  local providerWithAlias = if configuration == null then null else '%s.%s' % [provider, providerAlias],
-  local providerConfiguration = if configuration == null then {} else { [providerWithAlias]: { provider: { [provider]: configuration } } },
-  local providerReference = if configuration == null then {} else { provider: providerWithAlias },
+  local providerRef = if configuration == null then null else '%s.%s' % [provider, providerAlias],
+  local providerConfiguration = if configuration == null then {} else { [providerRef]: { provider: { [provider]: configuration } } },
+  local providerRefBlock = if configuration == null then {} else { provider: providerRef },
   blockType(blockType): {
     local blockTypePath = if blockType == 'resource' then [] else ['data'],
     resource(type, name): {
       local resourceType = std.substr(type, std.length(provider) + 1, std.length(type)),
       local resourcePath = blockTypePath + [type, name],
       _(rawBlock, block): {
+        local _ = self,
         local metaBlock = {
           depends_on: build.template(std.get(rawBlock, 'depends_on', null)),
           count: build.template(std.get(rawBlock, 'count', null)),
           for_each: build.template(std.get(rawBlock, 'for_each', null)),
         },
         type: if std.objectHas(rawBlock, 'for_each') then 'map' else if std.objectHas(rawBlock, 'count') then 'list' else 'object',
-        providerRequirements: build.providerRequirements(rawBlock) + providerRequirements,
-        providerConfiguration: providerConfiguration,
         provider: provider,
         providerAlias: providerAlias,
         resourceType: resourceType,
@@ -71,15 +76,19 @@ local providerTemplate(provider, requirements, configuration) = {
         block: {
           [blockType]: {
             [type]: {
-              [name]: std.prune(metaBlock + block + providerReference),
+              [name]: std.prune(metaBlock + block + providerRefBlock),
             },
           },
         },
+        blocks: build.blocks(rawBlock) + providerRequirements + providerConfiguration + {
+          [_.ref]: _.block,
+        },
       },
-      field(fieldName): {
+      field(blocks, fieldName): {
         local fieldPath = resourcePath + [fieldName],
         _: {
           ref: std.join('.', fieldPath),
+          blocks: blocks,
         },
       },
     },
@@ -87,9 +96,8 @@ local providerTemplate(provider, requirements, configuration) = {
   func(name, parameters=[]): {
     local parameterString = std.join(', ', [build.expression(parameter) for parameter in parameters]),
     _: {
-      providerRequirements: build.providerRequirements(parameters) + providerRequirements,
-      providerConfiguration: providerConfiguration,
       ref: 'provider::%s::%s(%s)' % [provider, name, parameterString],
+      blocks: build.blocks(parameters) + providerRequirements + providerConfiguration,
     },
   },
 };
@@ -110,10 +118,10 @@ local provider(configuration) = {
         keepers: build.template(std.get(block, 'keepers', null)),
         length: build.template(block.length),
       }),
-      base64: resource.field('base64'),
-      hex: resource.field('hex'),
-      keepers: resource.field('keepers'),
-      length: resource.field('length'),
+      base64: resource.field(self._.blocks, 'base64'),
+      hex: resource.field(self._.blocks, 'hex'),
+      keepers: resource.field(self._.blocks, 'keepers'),
+      length: resource.field(self._.blocks, 'length'),
     },
     id(name, block): {
       local resource = blockType.resource('random_id', name),
@@ -127,14 +135,14 @@ local provider(configuration) = {
         keepers: build.template(std.get(block, 'keepers', null)),
         prefix: build.template(std.get(block, 'prefix', null)),
       }),
-      b64_std: resource.field('b64_std'),
-      b64_url: resource.field('b64_url'),
-      byte_length: resource.field('byte_length'),
-      dec: resource.field('dec'),
-      hex: resource.field('hex'),
-      id: resource.field('id'),
-      keepers: resource.field('keepers'),
-      prefix: resource.field('prefix'),
+      b64_std: resource.field(self._.blocks, 'b64_std'),
+      b64_url: resource.field(self._.blocks, 'b64_url'),
+      byte_length: resource.field(self._.blocks, 'byte_length'),
+      dec: resource.field(self._.blocks, 'dec'),
+      hex: resource.field(self._.blocks, 'hex'),
+      id: resource.field(self._.blocks, 'id'),
+      keepers: resource.field(self._.blocks, 'keepers'),
+      prefix: resource.field(self._.blocks, 'prefix'),
     },
     integer(name, block): {
       local resource = blockType.resource('random_integer', name),
@@ -146,12 +154,12 @@ local provider(configuration) = {
         result: build.template(std.get(block, 'result', null)),
         seed: build.template(std.get(block, 'seed', null)),
       }),
-      id: resource.field('id'),
-      keepers: resource.field('keepers'),
-      max: resource.field('max'),
-      min: resource.field('min'),
-      result: resource.field('result'),
-      seed: resource.field('seed'),
+      id: resource.field(self._.blocks, 'id'),
+      keepers: resource.field(self._.blocks, 'keepers'),
+      max: resource.field(self._.blocks, 'max'),
+      min: resource.field(self._.blocks, 'min'),
+      result: resource.field(self._.blocks, 'result'),
+      seed: resource.field(self._.blocks, 'seed'),
     },
     password(name, block): {
       local resource = blockType.resource('random_password', name),
@@ -172,21 +180,21 @@ local provider(configuration) = {
         special: build.template(std.get(block, 'special', null)),
         upper: build.template(std.get(block, 'upper', null)),
       }),
-      bcrypt_hash: resource.field('bcrypt_hash'),
-      id: resource.field('id'),
-      keepers: resource.field('keepers'),
-      length: resource.field('length'),
-      lower: resource.field('lower'),
-      min_lower: resource.field('min_lower'),
-      min_numeric: resource.field('min_numeric'),
-      min_special: resource.field('min_special'),
-      min_upper: resource.field('min_upper'),
-      number: resource.field('number'),
-      numeric: resource.field('numeric'),
-      override_special: resource.field('override_special'),
-      result: resource.field('result'),
-      special: resource.field('special'),
-      upper: resource.field('upper'),
+      bcrypt_hash: resource.field(self._.blocks, 'bcrypt_hash'),
+      id: resource.field(self._.blocks, 'id'),
+      keepers: resource.field(self._.blocks, 'keepers'),
+      length: resource.field(self._.blocks, 'length'),
+      lower: resource.field(self._.blocks, 'lower'),
+      min_lower: resource.field(self._.blocks, 'min_lower'),
+      min_numeric: resource.field(self._.blocks, 'min_numeric'),
+      min_special: resource.field(self._.blocks, 'min_special'),
+      min_upper: resource.field(self._.blocks, 'min_upper'),
+      number: resource.field(self._.blocks, 'number'),
+      numeric: resource.field(self._.blocks, 'numeric'),
+      override_special: resource.field(self._.blocks, 'override_special'),
+      result: resource.field(self._.blocks, 'result'),
+      special: resource.field(self._.blocks, 'special'),
+      upper: resource.field(self._.blocks, 'upper'),
     },
     pet(name, block): {
       local resource = blockType.resource('random_pet', name),
@@ -197,11 +205,11 @@ local provider(configuration) = {
         prefix: build.template(std.get(block, 'prefix', null)),
         separator: build.template(std.get(block, 'separator', null)),
       }),
-      id: resource.field('id'),
-      keepers: resource.field('keepers'),
-      length: resource.field('length'),
-      prefix: resource.field('prefix'),
-      separator: resource.field('separator'),
+      id: resource.field(self._.blocks, 'id'),
+      keepers: resource.field(self._.blocks, 'keepers'),
+      length: resource.field(self._.blocks, 'length'),
+      prefix: resource.field(self._.blocks, 'prefix'),
+      separator: resource.field(self._.blocks, 'separator'),
     },
     shuffle(name, block): {
       local resource = blockType.resource('random_shuffle', name),
@@ -213,12 +221,12 @@ local provider(configuration) = {
         result_count: build.template(std.get(block, 'result_count', null)),
         seed: build.template(std.get(block, 'seed', null)),
       }),
-      id: resource.field('id'),
-      input: resource.field('input'),
-      keepers: resource.field('keepers'),
-      result: resource.field('result'),
-      result_count: resource.field('result_count'),
-      seed: resource.field('seed'),
+      id: resource.field(self._.blocks, 'id'),
+      input: resource.field(self._.blocks, 'input'),
+      keepers: resource.field(self._.blocks, 'keepers'),
+      result: resource.field(self._.blocks, 'result'),
+      result_count: resource.field(self._.blocks, 'result_count'),
+      seed: resource.field(self._.blocks, 'seed'),
     },
     string(name, block): {
       local resource = blockType.resource('random_string', name),
@@ -238,20 +246,20 @@ local provider(configuration) = {
         special: build.template(std.get(block, 'special', null)),
         upper: build.template(std.get(block, 'upper', null)),
       }),
-      id: resource.field('id'),
-      keepers: resource.field('keepers'),
-      length: resource.field('length'),
-      lower: resource.field('lower'),
-      min_lower: resource.field('min_lower'),
-      min_numeric: resource.field('min_numeric'),
-      min_special: resource.field('min_special'),
-      min_upper: resource.field('min_upper'),
-      number: resource.field('number'),
-      numeric: resource.field('numeric'),
-      override_special: resource.field('override_special'),
-      result: resource.field('result'),
-      special: resource.field('special'),
-      upper: resource.field('upper'),
+      id: resource.field(self._.blocks, 'id'),
+      keepers: resource.field(self._.blocks, 'keepers'),
+      length: resource.field(self._.blocks, 'length'),
+      lower: resource.field(self._.blocks, 'lower'),
+      min_lower: resource.field(self._.blocks, 'min_lower'),
+      min_numeric: resource.field(self._.blocks, 'min_numeric'),
+      min_special: resource.field(self._.blocks, 'min_special'),
+      min_upper: resource.field(self._.blocks, 'min_upper'),
+      number: resource.field(self._.blocks, 'number'),
+      numeric: resource.field(self._.blocks, 'numeric'),
+      override_special: resource.field(self._.blocks, 'override_special'),
+      result: resource.field(self._.blocks, 'result'),
+      special: resource.field(self._.blocks, 'special'),
+      upper: resource.field(self._.blocks, 'upper'),
     },
     uuid(name, block): {
       local resource = blockType.resource('random_uuid', name),
@@ -260,9 +268,9 @@ local provider(configuration) = {
         keepers: build.template(std.get(block, 'keepers', null)),
         result: build.template(std.get(block, 'result', null)),
       }),
-      id: resource.field('id'),
-      keepers: resource.field('keepers'),
-      result: resource.field('result'),
+      id: resource.field(self._.blocks, 'id'),
+      keepers: resource.field(self._.blocks, 'keepers'),
+      result: resource.field(self._.blocks, 'result'),
     },
   },
 };
