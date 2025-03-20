@@ -49,12 +49,29 @@ local build = {
     else {},
 };
 
-local providerTemplate(provider, requirements, configuration) = {
-  local providerRequirements = { ['terraform.required_providers.%s' % [provider]]: requirements },
-  local providerAlias = if configuration == null then null else configuration.alias,
-  local providerRef = if configuration == null then null else '%s.%s' % [provider, providerAlias],
-  local providerConfiguration = if configuration == null then {} else { [providerRef]: { provider: { [provider]: configuration } } },
-  local providerRefBlock = if configuration == null then {} else { provider: providerRef },
+local providerTemplate(provider, requirements, rawConfiguration, configuration) = {
+  local providerRequirements = {
+    ['terraform.required_providers.%s' % [provider]]: requirements,
+  },
+  local providerAlias = std.get(configuration, 'alias', null),
+  local providerConfiguration =
+    if configuration == null then { _: { refBlock: {}, blocks: [] } } else {
+      _: {
+        local _ = self,
+        ref: '%s.%s' % [provider, configuration.alias],
+        refBlock: {
+          provider: _.ref,
+        },
+        block: {
+          provider: {
+            [provider]: std.prune(configuration),
+          },
+        },
+        blocks: build.blocks(rawConfiguration) + {
+          [_.ref]: _.block,
+        },
+      },
+    },
   blockType(blockType): {
     local blockTypePath = if blockType == 'resource' then [] else ['data'],
     resource(type, name): {
@@ -76,11 +93,11 @@ local providerTemplate(provider, requirements, configuration) = {
         block: {
           [blockType]: {
             [type]: {
-              [name]: std.prune(metaBlock + block + providerRefBlock),
+              [name]: std.prune(providerConfiguration._.refBlock + metaBlock + block),
             },
           },
         },
-        blocks: build.blocks(rawBlock) + providerRequirements + providerConfiguration + {
+        blocks: build.blocks([providerConfiguration] + [rawBlock]) + providerRequirements + {
           [_.ref]: _.block,
         },
       },
@@ -97,17 +114,17 @@ local providerTemplate(provider, requirements, configuration) = {
     local parameterString = std.join(', ', [build.expression(parameter) for parameter in parameters]),
     _: {
       ref: 'provider::%s::%s(%s)' % [provider, name, parameterString],
-      blocks: build.blocks(parameters) + providerRequirements + providerConfiguration,
+      blocks: build.blocks([providerConfiguration] + [parameters]) + providerRequirements,
     },
   },
 };
 
-local provider(configuration) = {
+local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/aws',
     version: '5.91.0',
   },
-  local provider = providerTemplate('aws', requirements, configuration),
+  local provider = providerTemplate('aws', requirements, rawConfiguration, configuration),
   resource: {
     local blockType = provider.blockType('resource'),
     accessanalyzer_analyzer(name, block): {
@@ -47983,8 +48000,8 @@ local provider(configuration) = {
   },
 };
 
-local providerWithConfiguration = provider(null) + {
-  withConfiguration(alias, block): provider(std.prune({
+local providerWithConfiguration = provider(null, null) + {
+  withConfiguration(alias, block): provider(block, {
     alias: alias,
     access_key: build.template(std.get(block, 'access_key', null)),
     allowed_account_ids: build.template(std.get(block, 'allowed_account_ids', null)),
@@ -48014,7 +48031,7 @@ local providerWithConfiguration = provider(null) + {
     token_bucket_rate_limiter_capacity: build.template(std.get(block, 'token_bucket_rate_limiter_capacity', null)),
     use_dualstack_endpoint: build.template(std.get(block, 'use_dualstack_endpoint', null)),
     use_fips_endpoint: build.template(std.get(block, 'use_fips_endpoint', null)),
-  })),
+  }),
 };
 
 providerWithConfiguration
