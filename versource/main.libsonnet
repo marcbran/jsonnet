@@ -2,12 +2,12 @@ local doltProvider = import 'terraform-provider-dolt/main.libsonnet';
 local jsonnet = import 'terraform-provider-jsonnet/main.libsonnet';
 local tf = import 'terraform/main.libsonnet';
 
-local flattenObject(value) =
-  if std.type(value) == 'object' then
+local flattenObject(value, separator='_', anchorField='') =
+  if std.type(value) == 'object' && !std.objectHas(value, anchorField) then
     std.foldl(function(acc, curr) acc + curr, [
       {
-        [std.join('_', std.filter(function(key) key != '', [child.key, childChild.key]))]: childChild.value
-        for childChild in std.objectKeysValues(flattenObject(child.value))
+        [std.join(separator, std.filter(function(key) key != '', [child.key, childChild.key]))]: childChild.value
+        for childChild in std.objectKeysValues(flattenObject(child.value, separator, anchorField))
       }
       for child in std.objectKeysValues(value)
     ], {})
@@ -188,8 +188,9 @@ local ddlTfCfg(block) =
   };
 
 local dmlTfCfg(folder, block) =
+  local folderDepth = std.length(std.split(folder, '/')) + 1;
   local dolt = doltProvider.withConfiguration('default', {
-    path: '../../db',
+    path: '%sdb' % std.repeat('../', folderDepth),
     name: block.name,
     email: block.email,
   });
@@ -224,7 +225,7 @@ local cfg(block) =
       terraformResources: std.get(b.value, 'terraformResources', []),
       resourceGroups: std.get(b.value, 'resourceGroups', []),
     })
-    for b in std.objectKeysValues(block.resources)
+    for b in std.objectKeysValues(flattenObject(block.resources, '/', 'terraformResources'))
   ];
   local configs = [coreConfig] + resourceConfigs;
   local mergedConfig = std.foldl(function(acc, curr) acc + curr, configs, {});
