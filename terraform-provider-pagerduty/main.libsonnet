@@ -49,12 +49,29 @@ local build = {
     else {},
 };
 
-local providerTemplate(provider, requirements, configuration) = {
-  local providerRequirements = { ['terraform.required_providers.%s' % [provider]]: requirements },
-  local providerAlias = if configuration == null then null else configuration.alias,
-  local providerRef = if configuration == null then null else '%s.%s' % [provider, providerAlias],
-  local providerConfiguration = if configuration == null then {} else { [providerRef]: { provider: { [provider]: configuration } } },
-  local providerRefBlock = if configuration == null then {} else { provider: providerRef },
+local providerTemplate(provider, requirements, rawConfiguration, configuration) = {
+  local providerRequirements = {
+    ['terraform.required_providers.%s' % [provider]]: requirements,
+  },
+  local providerAlias = if configuration == null then null else std.get(configuration, 'alias', null),
+  local providerConfiguration =
+    if configuration == null then { _: { refBlock: {}, blocks: [] } } else {
+      _: {
+        local _ = self,
+        ref: '%s.%s' % [provider, configuration.alias],
+        refBlock: {
+          provider: _.ref,
+        },
+        block: {
+          provider: {
+            [provider]: std.prune(configuration),
+          },
+        },
+        blocks: build.blocks(rawConfiguration) + {
+          [_.ref]: _.block,
+        },
+      },
+    },
   blockType(blockType): {
     local blockTypePath = if blockType == 'resource' then [] else ['data'],
     resource(type, name): {
@@ -76,11 +93,11 @@ local providerTemplate(provider, requirements, configuration) = {
         block: {
           [blockType]: {
             [type]: {
-              [name]: std.prune(metaBlock + block + providerRefBlock),
+              [name]: std.prune(providerConfiguration._.refBlock + metaBlock + block),
             },
           },
         },
-        blocks: build.blocks(rawBlock) + providerRequirements + providerConfiguration + {
+        blocks: build.blocks([providerConfiguration] + [rawBlock]) + providerRequirements + {
           [_.ref]: _.block,
         },
       },
@@ -97,17 +114,17 @@ local providerTemplate(provider, requirements, configuration) = {
     local parameterString = std.join(', ', [build.expression(parameter) for parameter in parameters]),
     _: {
       ref: 'provider::%s::%s(%s)' % [provider, name, parameterString],
-      blocks: build.blocks(parameters) + providerRequirements + providerConfiguration,
+      blocks: build.blocks([providerConfiguration] + [parameters]) + providerRequirements,
     },
   },
 };
 
-local provider(configuration) = {
+local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/pagerduty/pagerduty',
-    version: '3.22.0',
+    version: '3.23.1',
   },
-  local provider = providerTemplate('pagerduty', requirements, configuration),
+  local provider = providerTemplate('pagerduty', requirements, rawConfiguration, configuration),
   resource: {
     local blockType = provider.blockType('resource'),
     addon(name, block): {
@@ -1345,6 +1362,17 @@ local provider(configuration) = {
       members: resource.field(self._.blocks, 'members'),
       team_id: resource.field(self._.blocks, 'team_id'),
     },
+    teams(name, block): {
+      local resource = blockType.resource('pagerduty_teams', name),
+      _: resource._(block, {
+        id: build.template(std.get(block, 'id', null)),
+        query: build.template(std.get(block, 'query', null)),
+        teams: build.template(std.get(block, 'teams', null)),
+      }),
+      id: resource.field(self._.blocks, 'id'),
+      query: resource.field(self._.blocks, 'query'),
+      teams: resource.field(self._.blocks, 'teams'),
+    },
     user(name, block): {
       local resource = blockType.resource('pagerduty_user', name),
       _: resource._(block, {
@@ -1414,8 +1442,8 @@ local provider(configuration) = {
   },
 };
 
-local providerWithConfiguration = provider(null) + {
-  withConfiguration(alias, block): provider(std.prune({
+local providerWithConfiguration = provider(null, null) + {
+  withConfiguration(alias, block): provider(block, {
     alias: alias,
     api_url_override: build.template(std.get(block, 'api_url_override', null)),
     insecure_tls: build.template(std.get(block, 'insecure_tls', null)),
@@ -1423,7 +1451,7 @@ local providerWithConfiguration = provider(null) + {
     skip_credentials_validation: build.template(std.get(block, 'skip_credentials_validation', null)),
     token: build.template(std.get(block, 'token', null)),
     user_token: build.template(std.get(block, 'user_token', null)),
-  })),
+  }),
 };
 
 providerWithConfiguration
