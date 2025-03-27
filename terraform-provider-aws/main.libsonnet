@@ -53,7 +53,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
   local providerRequirements = {
     ['terraform.required_providers.%s' % [provider]]: requirements,
   },
-  local providerAlias = std.get(configuration, 'alias', null),
+  local providerAlias = if configuration == null then null else std.get(configuration, 'alias', null),
   local providerConfiguration =
     if configuration == null then { _: { refBlock: {}, blocks: [] } } else {
       _: {
@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/aws',
-    version: '5.91.0',
+    version: '5.92.0',
   },
   local provider = providerTemplate('aws', requirements, rawConfiguration, configuration),
   resource: {
@@ -3043,6 +3043,25 @@ local provider(rawConfiguration, configuration) = {
       format: resource.field(self._.blocks, 'format'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
+    },
+    athena_capacity_reservation(name, block): {
+      local resource = blockType.resource('aws_athena_capacity_reservation', name),
+      _: resource._(block, {
+        allocated_dpus: build.template(std.get(block, 'allocated_dpus', null)),
+        arn: build.template(std.get(block, 'arn', null)),
+        name: build.template(block.name),
+        status: build.template(std.get(block, 'status', null)),
+        tags: build.template(std.get(block, 'tags', null)),
+        tags_all: build.template(std.get(block, 'tags_all', null)),
+        target_dpus: build.template(block.target_dpus),
+      }),
+      allocated_dpus: resource.field(self._.blocks, 'allocated_dpus'),
+      arn: resource.field(self._.blocks, 'arn'),
+      name: resource.field(self._.blocks, 'name'),
+      status: resource.field(self._.blocks, 'status'),
+      tags: resource.field(self._.blocks, 'tags'),
+      tags_all: resource.field(self._.blocks, 'tags_all'),
+      target_dpus: resource.field(self._.blocks, 'target_dpus'),
     },
     athena_data_catalog(name, block): {
       local resource = blockType.resource('aws_athena_data_catalog', name),
@@ -8609,6 +8628,7 @@ local provider(rawConfiguration, configuration) = {
         copy_tags_to_snapshot: build.template(std.get(block, 'copy_tags_to_snapshot', null)),
         custom_iam_instance_profile: build.template(std.get(block, 'custom_iam_instance_profile', null)),
         customer_owned_ip_enabled: build.template(std.get(block, 'customer_owned_ip_enabled', null)),
+        database_insights_mode: build.template(std.get(block, 'database_insights_mode', null)),
         db_name: build.template(std.get(block, 'db_name', null)),
         db_subnet_group_name: build.template(std.get(block, 'db_subnet_group_name', null)),
         dedicated_log_volume: build.template(std.get(block, 'dedicated_log_volume', null)),
@@ -8690,6 +8710,7 @@ local provider(rawConfiguration, configuration) = {
       copy_tags_to_snapshot: resource.field(self._.blocks, 'copy_tags_to_snapshot'),
       custom_iam_instance_profile: resource.field(self._.blocks, 'custom_iam_instance_profile'),
       customer_owned_ip_enabled: resource.field(self._.blocks, 'customer_owned_ip_enabled'),
+      database_insights_mode: resource.field(self._.blocks, 'database_insights_mode'),
       db_name: resource.field(self._.blocks, 'db_name'),
       db_subnet_group_name: resource.field(self._.blocks, 'db_subnet_group_name'),
       dedicated_log_volume: resource.field(self._.blocks, 'dedicated_log_volume'),
@@ -11240,6 +11261,7 @@ local provider(rawConfiguration, configuration) = {
       _: resource._(block, {
         arn: build.template(std.get(block, 'arn', null)),
         availability_zone: build.template(block.availability_zone),
+        create_time: build.template(std.get(block, 'create_time', null)),
         encrypted: build.template(std.get(block, 'encrypted', null)),
         final_snapshot: build.template(std.get(block, 'final_snapshot', null)),
         id: build.template(std.get(block, 'id', null)),
@@ -11256,6 +11278,7 @@ local provider(rawConfiguration, configuration) = {
       }),
       arn: resource.field(self._.blocks, 'arn'),
       availability_zone: resource.field(self._.blocks, 'availability_zone'),
+      create_time: resource.field(self._.blocks, 'create_time'),
       encrypted: resource.field(self._.blocks, 'encrypted'),
       final_snapshot: resource.field(self._.blocks, 'final_snapshot'),
       id: resource.field(self._.blocks, 'id'),
@@ -34688,6 +34711,7 @@ local provider(rawConfiguration, configuration) = {
         idle_timeout: build.template(std.get(block, 'idle_timeout', null)),
         internal: build.template(std.get(block, 'internal', null)),
         ip_address_type: build.template(std.get(block, 'ip_address_type', null)),
+        ipam_pools: build.template(std.get(block, 'ipam_pools', null)),
         load_balancer_type: build.template(std.get(block, 'load_balancer_type', null)),
         name: build.template(std.get(block, 'name', null)),
         preserve_host_header: build.template(std.get(block, 'preserve_host_header', null)),
@@ -34721,6 +34745,7 @@ local provider(rawConfiguration, configuration) = {
       idle_timeout: resource.field(self._.blocks, 'idle_timeout'),
       internal: resource.field(self._.blocks, 'internal'),
       ip_address_type: resource.field(self._.blocks, 'ip_address_type'),
+      ipam_pools: resource.field(self._.blocks, 'ipam_pools'),
       load_balancer_type: resource.field(self._.blocks, 'load_balancer_type'),
       name: resource.field(self._.blocks, 'name'),
       preserve_host_header: resource.field(self._.blocks, 'preserve_host_header'),
@@ -34934,6 +34959,19 @@ local provider(rawConfiguration, configuration) = {
       name: resource.field(self._.blocks, 'name'),
       tags: resource.field(self._.blocks, 'tags'),
       value: resource.field(self._.blocks, 'value'),
+    },
+    api_gateway_api_keys(name, block): {
+      local resource = blockType.resource('aws_api_gateway_api_keys', name),
+      _: resource._(block, {
+        customer_id: build.template(std.get(block, 'customer_id', null)),
+        id: build.template(std.get(block, 'id', null)),
+        include_values: build.template(std.get(block, 'include_values', null)),
+        items: build.template(std.get(block, 'items', null)),
+      }),
+      customer_id: resource.field(self._.blocks, 'customer_id'),
+      id: resource.field(self._.blocks, 'id'),
+      include_values: resource.field(self._.blocks, 'include_values'),
+      items: resource.field(self._.blocks, 'items'),
     },
     api_gateway_authorizer(name, block): {
       local resource = blockType.resource('aws_api_gateway_authorizer', name),
@@ -37566,6 +37604,7 @@ local provider(rawConfiguration, configuration) = {
         availability_zone: build.template(std.get(block, 'availability_zone', null)),
         backup_retention_period: build.template(std.get(block, 'backup_retention_period', null)),
         ca_cert_identifier: build.template(std.get(block, 'ca_cert_identifier', null)),
+        database_insights_mode: build.template(std.get(block, 'database_insights_mode', null)),
         db_cluster_identifier: build.template(std.get(block, 'db_cluster_identifier', null)),
         db_instance_arn: build.template(std.get(block, 'db_instance_arn', null)),
         db_instance_class: build.template(std.get(block, 'db_instance_class', null)),
@@ -37610,6 +37649,7 @@ local provider(rawConfiguration, configuration) = {
       availability_zone: resource.field(self._.blocks, 'availability_zone'),
       backup_retention_period: resource.field(self._.blocks, 'backup_retention_period'),
       ca_cert_identifier: resource.field(self._.blocks, 'ca_cert_identifier'),
+      database_insights_mode: resource.field(self._.blocks, 'database_insights_mode'),
       db_cluster_identifier: resource.field(self._.blocks, 'db_cluster_identifier'),
       db_instance_arn: resource.field(self._.blocks, 'db_instance_arn'),
       db_instance_class: resource.field(self._.blocks, 'db_instance_class'),
@@ -38310,6 +38350,7 @@ local provider(rawConfiguration, configuration) = {
       _: resource._(block, {
         arn: build.template(std.get(block, 'arn', null)),
         availability_zone: build.template(std.get(block, 'availability_zone', null)),
+        create_time: build.template(std.get(block, 'create_time', null)),
         encrypted: build.template(std.get(block, 'encrypted', null)),
         id: build.template(std.get(block, 'id', null)),
         iops: build.template(std.get(block, 'iops', null)),
@@ -38326,6 +38367,7 @@ local provider(rawConfiguration, configuration) = {
       }),
       arn: resource.field(self._.blocks, 'arn'),
       availability_zone: resource.field(self._.blocks, 'availability_zone'),
+      create_time: resource.field(self._.blocks, 'create_time'),
       encrypted: resource.field(self._.blocks, 'encrypted'),
       id: resource.field(self._.blocks, 'id'),
       iops: resource.field(self._.blocks, 'iops'),
@@ -39827,6 +39869,23 @@ local provider(rawConfiguration, configuration) = {
       name: resource.field(self._.blocks, 'name'),
       token: resource.field(self._.blocks, 'token'),
     },
+    eks_cluster_versions(name, block): {
+      local resource = blockType.resource('aws_eks_cluster_versions', name),
+      _: resource._(block, {
+        cluster_type: build.template(std.get(block, 'cluster_type', null)),
+        cluster_versions: build.template(std.get(block, 'cluster_versions', null)),
+        cluster_versions_only: build.template(std.get(block, 'cluster_versions_only', null)),
+        default_only: build.template(std.get(block, 'default_only', null)),
+        include_all: build.template(std.get(block, 'include_all', null)),
+        version_status: build.template(std.get(block, 'version_status', null)),
+      }),
+      cluster_type: resource.field(self._.blocks, 'cluster_type'),
+      cluster_versions: resource.field(self._.blocks, 'cluster_versions'),
+      cluster_versions_only: resource.field(self._.blocks, 'cluster_versions_only'),
+      default_only: resource.field(self._.blocks, 'default_only'),
+      include_all: resource.field(self._.blocks, 'include_all'),
+      version_status: resource.field(self._.blocks, 'version_status'),
+    },
     eks_clusters(name, block): {
       local resource = blockType.resource('aws_eks_clusters', name),
       _: resource._(block, {
@@ -41021,6 +41080,17 @@ local provider(rawConfiguration, configuration) = {
       id: resource.field(self._.blocks, 'id'),
       identity_store_id: resource.field(self._.blocks, 'identity_store_id'),
     },
+    identitystore_group_memberships(name, block): {
+      local resource = blockType.resource('aws_identitystore_group_memberships', name),
+      _: resource._(block, {
+        group_id: build.template(block.group_id),
+        group_memberships: build.template(std.get(block, 'group_memberships', null)),
+        identity_store_id: build.template(block.identity_store_id),
+      }),
+      group_id: resource.field(self._.blocks, 'group_id'),
+      group_memberships: resource.field(self._.blocks, 'group_memberships'),
+      identity_store_id: resource.field(self._.blocks, 'identity_store_id'),
+    },
     identitystore_groups(name, block): {
       local resource = blockType.resource('aws_identitystore_groups', name),
       _: resource._(block, {
@@ -41068,6 +41138,15 @@ local provider(rawConfiguration, configuration) = {
       user_id: resource.field(self._.blocks, 'user_id'),
       user_name: resource.field(self._.blocks, 'user_name'),
       user_type: resource.field(self._.blocks, 'user_type'),
+    },
+    identitystore_users(name, block): {
+      local resource = blockType.resource('aws_identitystore_users', name),
+      _: resource._(block, {
+        identity_store_id: build.template(block.identity_store_id),
+        users: build.template(std.get(block, 'users', null)),
+      }),
+      identity_store_id: resource.field(self._.blocks, 'identity_store_id'),
+      users: resource.field(self._.blocks, 'users'),
     },
     imagebuilder_component(name, block): {
       local resource = blockType.resource('aws_imagebuilder_component', name),
@@ -42405,6 +42484,7 @@ local provider(rawConfiguration, configuration) = {
         idle_timeout: build.template(std.get(block, 'idle_timeout', null)),
         internal: build.template(std.get(block, 'internal', null)),
         ip_address_type: build.template(std.get(block, 'ip_address_type', null)),
+        ipam_pools: build.template(std.get(block, 'ipam_pools', null)),
         load_balancer_type: build.template(std.get(block, 'load_balancer_type', null)),
         name: build.template(std.get(block, 'name', null)),
         preserve_host_header: build.template(std.get(block, 'preserve_host_header', null)),
@@ -42438,6 +42518,7 @@ local provider(rawConfiguration, configuration) = {
       idle_timeout: resource.field(self._.blocks, 'idle_timeout'),
       internal: resource.field(self._.blocks, 'internal'),
       ip_address_type: resource.field(self._.blocks, 'ip_address_type'),
+      ipam_pools: resource.field(self._.blocks, 'ipam_pools'),
       load_balancer_type: resource.field(self._.blocks, 'load_balancer_type'),
       name: resource.field(self._.blocks, 'name'),
       preserve_host_header: resource.field(self._.blocks, 'preserve_host_header'),
