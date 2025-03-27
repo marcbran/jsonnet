@@ -53,7 +53,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
   local providerRequirements = {
     ['terraform.required_providers.%s' % [provider]]: requirements,
   },
-  local providerAlias = std.get(configuration, 'alias', null),
+  local providerAlias = if configuration == null then null else std.get(configuration, 'alias', null),
   local providerConfiguration =
     if configuration == null then { _: { refBlock: {}, blocks: [] } } else {
       _: {
