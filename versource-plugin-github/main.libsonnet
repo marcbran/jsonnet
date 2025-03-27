@@ -41,7 +41,7 @@
       {
         provider: 'github',
         providerAlias: null,
-        namespace: '%s/%s' % [resource.namespace, resource.name],
+        namespace: resource.name,
         resourceType: 'page',
         name: 'profile',
         data: {
@@ -53,7 +53,7 @@
       {
         provider: 'github',
         providerAlias: null,
-        namespace: '%s/%s' % [resource.namespace, resource.name],
+        namespace: resource.name,
         resourceType: 'page',
         name: 'main',
         data: {
