@@ -231,8 +231,12 @@ local cfg(block) =
   local mergedConfig = std.foldl(function(acc, curr) acc + curr, configs, {});
   { [kv.key]: std.manifestJson(kv.value) for kv in std.objectKeysValues(mergedConfig) };
 
+local project(resource, plugins) =
+  plugins[resource.provider].projections[resource.resourceType](resource);
+
 {
   resourceGroupsValues: resourceGroupsValues,
   pluginViews: pluginViews,
   cfg: cfg,
+  project: project,
 }
