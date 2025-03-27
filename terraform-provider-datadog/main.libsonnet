@@ -49,12 +49,29 @@ local build = {
     else {},
 };
 
-local providerTemplate(provider, requirements, configuration) = {
-  local providerRequirements = { ['terraform.required_providers.%s' % [provider]]: requirements },
-  local providerAlias = if configuration == null then null else configuration.alias,
-  local providerRef = if configuration == null then null else '%s.%s' % [provider, providerAlias],
-  local providerConfiguration = if configuration == null then {} else { [providerRef]: { provider: { [provider]: configuration } } },
-  local providerRefBlock = if configuration == null then {} else { provider: providerRef },
+local providerTemplate(provider, requirements, rawConfiguration, configuration) = {
+  local providerRequirements = {
+    ['terraform.required_providers.%s' % [provider]]: requirements,
+  },
+  local providerAlias = if configuration == null then null else std.get(configuration, 'alias', null),
+  local providerConfiguration =
+    if configuration == null then { _: { refBlock: {}, blocks: [] } } else {
+      _: {
+        local _ = self,
+        ref: '%s.%s' % [provider, configuration.alias],
+        refBlock: {
+          provider: _.ref,
+        },
+        block: {
+          provider: {
+            [provider]: std.prune(configuration),
+          },
+        },
+        blocks: build.blocks(rawConfiguration) + {
+          [_.ref]: _.block,
+        },
+      },
+    },
   blockType(blockType): {
     local blockTypePath = if blockType == 'resource' then [] else ['data'],
     resource(type, name): {
@@ -76,11 +93,11 @@ local providerTemplate(provider, requirements, configuration) = {
         block: {
           [blockType]: {
             [type]: {
-              [name]: std.prune(metaBlock + block + providerRefBlock),
+              [name]: std.prune(providerConfiguration._.refBlock + metaBlock + block),
             },
           },
         },
-        blocks: build.blocks(rawBlock) + providerRequirements + providerConfiguration + {
+        blocks: build.blocks([providerConfiguration] + [rawBlock]) + providerRequirements + {
           [_.ref]: _.block,
         },
       },
@@ -97,17 +114,17 @@ local providerTemplate(provider, requirements, configuration) = {
     local parameterString = std.join(', ', [build.expression(parameter) for parameter in parameters]),
     _: {
       ref: 'provider::%s::%s(%s)' % [provider, name, parameterString],
-      blocks: build.blocks(parameters) + providerRequirements + providerConfiguration,
+      blocks: build.blocks([providerConfiguration] + [parameters]) + providerRequirements,
     },
   },
 };
 
-local provider(configuration) = {
+local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/datadog/datadog',
-    version: '3.57.0',
+    version: '3.58.0',
   },
-  local provider = providerTemplate('datadog', requirements, configuration),
+  local provider = providerTemplate('datadog', requirements, rawConfiguration, configuration),
   resource: {
     local blockType = provider.blockType('resource'),
     action_connection(name, block): {
@@ -168,6 +185,44 @@ local provider(configuration) = {
       key: resource.field(self._.blocks, 'key'),
       name: resource.field(self._.blocks, 'name'),
       scopes: resource.field(self._.blocks, 'scopes'),
+    },
+    appsec_waf_custom_rule(name, block): {
+      local resource = blockType.resource('datadog_appsec_waf_custom_rule', name),
+      _: resource._(block, {
+        blocking: build.template(block.blocking),
+        enabled: build.template(block.enabled),
+        id: build.template(std.get(block, 'id', null)),
+        name: build.template(block.name),
+        path_glob: build.template(std.get(block, 'path_glob', null)),
+        tags: build.template(block.tags),
+      }),
+      blocking: resource.field(self._.blocks, 'blocking'),
+      enabled: resource.field(self._.blocks, 'enabled'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      path_glob: resource.field(self._.blocks, 'path_glob'),
+      tags: resource.field(self._.blocks, 'tags'),
+    },
+    appsec_waf_exclusion_filter(name, block): {
+      local resource = blockType.resource('datadog_appsec_waf_exclusion_filter', name),
+      _: resource._(block, {
+        description: build.template(block.description),
+        enabled: build.template(block.enabled),
+        event_query: build.template(std.get(block, 'event_query', null)),
+        id: build.template(std.get(block, 'id', null)),
+        ip_list: build.template(std.get(block, 'ip_list', null)),
+        on_match: build.template(std.get(block, 'on_match', null)),
+        parameters: build.template(std.get(block, 'parameters', null)),
+        path_glob: build.template(std.get(block, 'path_glob', null)),
+      }),
+      description: resource.field(self._.blocks, 'description'),
+      enabled: resource.field(self._.blocks, 'enabled'),
+      event_query: resource.field(self._.blocks, 'event_query'),
+      id: resource.field(self._.blocks, 'id'),
+      ip_list: resource.field(self._.blocks, 'ip_list'),
+      on_match: resource.field(self._.blocks, 'on_match'),
+      parameters: resource.field(self._.blocks, 'parameters'),
+      path_glob: resource.field(self._.blocks, 'path_glob'),
     },
     authn_mapping(name, block): {
       local resource = blockType.resource('datadog_authn_mapping', name),
@@ -438,6 +493,13 @@ local provider(configuration) = {
       event_generator_name: resource.field(self._.blocks, 'event_generator_name'),
       id: resource.field(self._.blocks, 'id'),
       region: resource.field(self._.blocks, 'region'),
+    },
+    integration_aws_external_id(name, block): {
+      local resource = blockType.resource('datadog_integration_aws_external_id', name),
+      _: resource._(block, {
+        id: build.template(std.get(block, 'id', null)),
+      }),
+      id: resource.field(self._.blocks, 'id'),
     },
     integration_aws_lambda_arn(name, block): {
       local resource = blockType.resource('datadog_integration_aws_lambda_arn', name),
@@ -1090,6 +1152,7 @@ local provider(configuration) = {
       local resource = blockType.resource('datadog_security_monitoring_rule', name),
       _: resource._(block, {
         enabled: build.template(std.get(block, 'enabled', null)),
+        group_signals_by: build.template(std.get(block, 'group_signals_by', null)),
         has_extended_title: build.template(std.get(block, 'has_extended_title', null)),
         id: build.template(std.get(block, 'id', null)),
         message: build.template(block.message),
@@ -1099,6 +1162,7 @@ local provider(configuration) = {
         validate: build.template(std.get(block, 'validate', null)),
       }),
       enabled: resource.field(self._.blocks, 'enabled'),
+      group_signals_by: resource.field(self._.blocks, 'group_signals_by'),
       has_extended_title: resource.field(self._.blocks, 'has_extended_title'),
       id: resource.field(self._.blocks, 'id'),
       message: resource.field(self._.blocks, 'message'),
@@ -1532,6 +1596,25 @@ local provider(configuration) = {
       is_secret: resource.field(self._.blocks, 'is_secret'),
       name: resource.field(self._.blocks, 'name'),
       value: resource.field(self._.blocks, 'value'),
+    },
+    workflow_automation(name, block): {
+      local resource = blockType.resource('datadog_workflow_automation', name),
+      _: resource._(block, {
+        description: build.template(block.description),
+        id: build.template(std.get(block, 'id', null)),
+        name: build.template(block.name),
+        published: build.template(block.published),
+        spec_json: build.template(block.spec_json),
+        tags: build.template(block.tags),
+        webhook_secret: build.template(std.get(block, 'webhook_secret', null)),
+      }),
+      description: resource.field(self._.blocks, 'description'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      published: resource.field(self._.blocks, 'published'),
+      spec_json: resource.field(self._.blocks, 'spec_json'),
+      tags: resource.field(self._.blocks, 'tags'),
+      webhook_secret: resource.field(self._.blocks, 'webhook_secret'),
     },
   },
   data: {
@@ -2230,11 +2313,28 @@ local provider(configuration) = {
       id: resource.field(self._.blocks, 'id'),
       users: resource.field(self._.blocks, 'users'),
     },
+    workflow_automation(name, block): {
+      local resource = blockType.resource('datadog_workflow_automation', name),
+      _: resource._(block, {
+        description: build.template(std.get(block, 'description', null)),
+        id: build.template(block.id),
+        name: build.template(std.get(block, 'name', null)),
+        published: build.template(std.get(block, 'published', null)),
+        spec_json: build.template(std.get(block, 'spec_json', null)),
+        tags: build.template(std.get(block, 'tags', null)),
+      }),
+      description: resource.field(self._.blocks, 'description'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      published: resource.field(self._.blocks, 'published'),
+      spec_json: resource.field(self._.blocks, 'spec_json'),
+      tags: resource.field(self._.blocks, 'tags'),
+    },
   },
 };
 
-local providerWithConfiguration = provider(null) + {
-  withConfiguration(alias, block): provider(std.prune({
+local providerWithConfiguration = provider(null, null) + {
+  withConfiguration(alias, block): provider(block, {
     alias: alias,
     api_key: build.template(std.get(block, 'api_key', null)),
     api_url: build.template(std.get(block, 'api_url', null)),
@@ -2245,7 +2345,7 @@ local providerWithConfiguration = provider(null) + {
     http_client_retry_max_retries: build.template(std.get(block, 'http_client_retry_max_retries', null)),
     http_client_retry_timeout: build.template(std.get(block, 'http_client_retry_timeout', null)),
     validate: build.template(std.get(block, 'validate', null)),
-  })),
+  }),
 };
 
 providerWithConfiguration
