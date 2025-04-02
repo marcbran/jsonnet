@@ -409,5 +409,4 @@ local terraform = functions + operators + {
   For: For,
 };
 
-
 terraform
