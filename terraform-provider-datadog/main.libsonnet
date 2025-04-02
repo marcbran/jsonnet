@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/datadog/datadog',
-    version: '3.58.0',
+    version: '3.59.0',
   },
   local provider = providerTemplate('datadog', requirements, rawConfiguration, configuration),
   resource: {
@@ -172,6 +172,25 @@ local provider(rawConfiguration, configuration) = {
       }),
       filter_ids: resource.field(self._.blocks, 'filter_ids'),
       id: resource.field(self._.blocks, 'id'),
+    },
+    app_builder_app(name, block): {
+      local resource = blockType.resource('datadog_app_builder_app', name),
+      _: resource._(block, {
+        action_query_names_to_connection_ids: build.template(std.get(block, 'action_query_names_to_connection_ids', null)),
+        app_json: build.template(block.app_json),
+        description: build.template(std.get(block, 'description', null)),
+        id: build.template(std.get(block, 'id', null)),
+        name: build.template(std.get(block, 'name', null)),
+        published: build.template(std.get(block, 'published', null)),
+        root_instance_name: build.template(std.get(block, 'root_instance_name', null)),
+      }),
+      action_query_names_to_connection_ids: resource.field(self._.blocks, 'action_query_names_to_connection_ids'),
+      app_json: resource.field(self._.blocks, 'app_json'),
+      description: resource.field(self._.blocks, 'description'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      published: resource.field(self._.blocks, 'published'),
+      root_instance_name: resource.field(self._.blocks, 'root_instance_name'),
     },
     application_key(name, block): {
       local resource = blockType.resource('datadog_application_key', name),
@@ -1118,6 +1137,36 @@ local provider(rawConfiguration, configuration) = {
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
     },
+    rum_retention_filter(name, block): {
+      local resource = blockType.resource('datadog_rum_retention_filter', name),
+      _: resource._(block, {
+        application_id: build.template(block.application_id),
+        enabled: build.template(std.get(block, 'enabled', null)),
+        event_type: build.template(block.event_type),
+        id: build.template(std.get(block, 'id', null)),
+        name: build.template(block.name),
+        query: build.template(std.get(block, 'query', null)),
+        sample_rate: build.template(block.sample_rate),
+      }),
+      application_id: resource.field(self._.blocks, 'application_id'),
+      enabled: resource.field(self._.blocks, 'enabled'),
+      event_type: resource.field(self._.blocks, 'event_type'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      query: resource.field(self._.blocks, 'query'),
+      sample_rate: resource.field(self._.blocks, 'sample_rate'),
+    },
+    rum_retention_filters_order(name, block): {
+      local resource = blockType.resource('datadog_rum_retention_filters_order', name),
+      _: resource._(block, {
+        application_id: build.template(block.application_id),
+        id: build.template(std.get(block, 'id', null)),
+        retention_filter_ids: build.template(block.retention_filter_ids),
+      }),
+      application_id: resource.field(self._.blocks, 'application_id'),
+      id: resource.field(self._.blocks, 'id'),
+      retention_filter_ids: resource.field(self._.blocks, 'retention_filter_ids'),
+    },
     security_monitoring_default_rule(name, block): {
       local resource = blockType.resource('datadog_security_monitoring_default_rule', name),
       _: resource._(block, {
@@ -1652,6 +1701,25 @@ local provider(rawConfiguration, configuration) = {
       filter_ids: resource.field(self._.blocks, 'filter_ids'),
       id: resource.field(self._.blocks, 'id'),
     },
+    app_builder_app(name, block): {
+      local resource = blockType.resource('datadog_app_builder_app', name),
+      _: resource._(block, {
+        action_query_names_to_connection_ids: build.template(std.get(block, 'action_query_names_to_connection_ids', null)),
+        app_json: build.template(std.get(block, 'app_json', null)),
+        description: build.template(std.get(block, 'description', null)),
+        id: build.template(block.id),
+        name: build.template(std.get(block, 'name', null)),
+        published: build.template(std.get(block, 'published', null)),
+        root_instance_name: build.template(std.get(block, 'root_instance_name', null)),
+      }),
+      action_query_names_to_connection_ids: resource.field(self._.blocks, 'action_query_names_to_connection_ids'),
+      app_json: resource.field(self._.blocks, 'app_json'),
+      description: resource.field(self._.blocks, 'description'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      published: resource.field(self._.blocks, 'published'),
+      root_instance_name: resource.field(self._.blocks, 'root_instance_name'),
+    },
     application_key(name, block): {
       local resource = blockType.resource('datadog_application_key', name),
       _: resource._(block, {
@@ -2033,6 +2101,17 @@ local provider(rawConfiguration, configuration) = {
       type: resource.field(self._.blocks, 'type'),
       type_filter: resource.field(self._.blocks, 'type_filter'),
     },
+    rum_retention_filters(name, block): {
+      local resource = blockType.resource('datadog_rum_retention_filters', name),
+      _: resource._(block, {
+        application_id: build.template(block.application_id),
+        id: build.template(std.get(block, 'id', null)),
+        retention_filters: build.template(std.get(block, 'retention_filters', null)),
+      }),
+      application_id: resource.field(self._.blocks, 'application_id'),
+      id: resource.field(self._.blocks, 'id'),
+      retention_filters: resource.field(self._.blocks, 'retention_filters'),
+    },
     security_monitoring_filters(name, block): {
       local resource = blockType.resource('datadog_security_monitoring_filters', name),
       _: resource._(block, {
@@ -2180,6 +2259,29 @@ local provider(rawConfiguration, configuration) = {
       query: resource.field(self._.blocks, 'query'),
       slos: resource.field(self._.blocks, 'slos'),
       tags_query: resource.field(self._.blocks, 'tags_query'),
+    },
+    software_catalog(name, block): {
+      local resource = blockType.resource('datadog_software_catalog', name),
+      _: resource._(block, {
+        entities: build.template(std.get(block, 'entities', null)),
+        filter_exclude_snapshot: build.template(std.get(block, 'filter_exclude_snapshot', null)),
+        filter_id: build.template(std.get(block, 'filter_id', null)),
+        filter_kind: build.template(std.get(block, 'filter_kind', null)),
+        filter_name: build.template(std.get(block, 'filter_name', null)),
+        filter_owner: build.template(std.get(block, 'filter_owner', null)),
+        filter_ref: build.template(std.get(block, 'filter_ref', null)),
+        filter_relation_type: build.template(std.get(block, 'filter_relation_type', null)),
+        id: build.template(std.get(block, 'id', null)),
+      }),
+      entities: resource.field(self._.blocks, 'entities'),
+      filter_exclude_snapshot: resource.field(self._.blocks, 'filter_exclude_snapshot'),
+      filter_id: resource.field(self._.blocks, 'filter_id'),
+      filter_kind: resource.field(self._.blocks, 'filter_kind'),
+      filter_name: resource.field(self._.blocks, 'filter_name'),
+      filter_owner: resource.field(self._.blocks, 'filter_owner'),
+      filter_ref: resource.field(self._.blocks, 'filter_ref'),
+      filter_relation_type: resource.field(self._.blocks, 'filter_relation_type'),
+      id: resource.field(self._.blocks, 'id'),
     },
     synthetics_global_variable(name, block): {
       local resource = blockType.resource('datadog_synthetics_global_variable', name),
