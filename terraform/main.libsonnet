@@ -160,6 +160,7 @@ local operators = {
   local binaryOp(a, op, b) = {
     _: {
       ref: '%s %s %s' % [build.expression(a), op, build.expression(b)],
+      blocks: build.blocks([a, b]),
     },
   },
   mul(a, b): binaryOp(a, '*', b),
@@ -191,6 +192,7 @@ local If(condition) = {
       local falseValString = build.expression(falseVal),
       _: {
         ref: '%s ? %s : %s' % [conditionString, trueValString, falseValString],
+        blocks: build.blocks([condition, trueVal, falseVal]),
       },
     },
   },
@@ -209,6 +211,7 @@ local For(keyIdVal, val=null) = {
       local valueString = build.expression(value),
       _: {
         ref: '[for %s in %s: %s]' % [parameterString, collectionString, valueString],
+        blocks: build.blocks(collection),
       },
     },
     Map(keyValueProvider): {
@@ -219,6 +222,7 @@ local For(keyIdVal, val=null) = {
       local keyValueString = '%s => %s' % [build.expression(keyValue[0]), build.expression(keyValue[1])],
       _: {
         ref: '{for %s in %s: %s }' % [parameterString, collectionString, keyValueString],
+        blocks: build.blocks(collection),
       },
     },
   },
