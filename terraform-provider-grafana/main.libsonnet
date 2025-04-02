@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/grafana/grafana',
-    version: '3.22.0',
+    version: '3.22.2',
   },
   local provider = providerTemplate('grafana', requirements, rawConfiguration, configuration),
   resource: {
@@ -794,6 +794,7 @@ local provider(rawConfiguration, configuration) = {
       local resource = blockType.resource('grafana_frontend_o11y_app', name),
       _: resource._(block, {
         allowed_origins: build.template(block.allowed_origins),
+        collector_endpoint: build.template(std.get(block, 'collector_endpoint', null)),
         extra_log_attributes: build.template(block.extra_log_attributes),
         id: build.template(std.get(block, 'id', null)),
         name: build.template(block.name),
@@ -801,6 +802,7 @@ local provider(rawConfiguration, configuration) = {
         stack_id: build.template(block.stack_id),
       }),
       allowed_origins: resource.field(self._.blocks, 'allowed_origins'),
+      collector_endpoint: resource.field(self._.blocks, 'collector_endpoint'),
       extra_log_attributes: resource.field(self._.blocks, 'extra_log_attributes'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
@@ -1949,6 +1951,7 @@ local provider(rawConfiguration, configuration) = {
       local resource = blockType.resource('grafana_frontend_o11y_app', name),
       _: resource._(block, {
         allowed_origins: build.template(std.get(block, 'allowed_origins', null)),
+        collector_endpoint: build.template(std.get(block, 'collector_endpoint', null)),
         extra_log_attributes: build.template(std.get(block, 'extra_log_attributes', null)),
         id: build.template(std.get(block, 'id', null)),
         name: build.template(block.name),
@@ -1956,6 +1959,7 @@ local provider(rawConfiguration, configuration) = {
         stack_id: build.template(block.stack_id),
       }),
       allowed_origins: resource.field(self._.blocks, 'allowed_origins'),
+      collector_endpoint: resource.field(self._.blocks, 'collector_endpoint'),
       extra_log_attributes: resource.field(self._.blocks, 'extra_log_attributes'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
