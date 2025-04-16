@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/kreuzwerker/docker',
-    version: '3.0.2',
+    version: '3.1.2',
   },
   local provider = providerTemplate('docker', requirements, rawConfiguration, configuration),
   resource: {
@@ -149,6 +149,7 @@ local provider(rawConfiguration, configuration) = {
         container_read_refresh_timeout_milliseconds: build.template(std.get(block, 'container_read_refresh_timeout_milliseconds', null)),
         cpu_set: build.template(std.get(block, 'cpu_set', null)),
         cpu_shares: build.template(std.get(block, 'cpu_shares', null)),
+        cpus: build.template(std.get(block, 'cpus', null)),
         destroy_grace_seconds: build.template(std.get(block, 'destroy_grace_seconds', null)),
         dns: build.template(std.get(block, 'dns', null)),
         dns_opts: build.template(std.get(block, 'dns_opts', null)),
@@ -206,6 +207,7 @@ local provider(rawConfiguration, configuration) = {
       container_read_refresh_timeout_milliseconds: resource.field(self._.blocks, 'container_read_refresh_timeout_milliseconds'),
       cpu_set: resource.field(self._.blocks, 'cpu_set'),
       cpu_shares: resource.field(self._.blocks, 'cpu_shares'),
+      cpus: resource.field(self._.blocks, 'cpus'),
       destroy_grace_seconds: resource.field(self._.blocks, 'destroy_grace_seconds'),
       dns: resource.field(self._.blocks, 'dns'),
       dns_opts: resource.field(self._.blocks, 'dns_opts'),
