@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/kreuzwerker/docker',
-    version: '3.1.2',
+    version: '3.2.0',
   },
   local provider = providerTemplate('docker', requirements, rawConfiguration, configuration),
   resource: {
