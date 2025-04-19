@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/pagerduty/pagerduty',
-    version: '3.23.1',
+    version: '3.24.0',
   },
   local provider = providerTemplate('pagerduty', requirements, rawConfiguration, configuration),
   resource: {
