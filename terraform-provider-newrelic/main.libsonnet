@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/newrelic/newrelic',
-    version: '3.60.2',
+    version: '3.61.0',
   },
   local provider = providerTemplate('newrelic', requirements, rawConfiguration, configuration),
   resource: {
@@ -648,6 +648,7 @@ local provider(rawConfiguration, configuration) = {
         open_violation_on_expiration: build.template(std.get(block, 'open_violation_on_expiration', null)),
         policy_id: build.template(block.policy_id),
         runbook_url: build.template(std.get(block, 'runbook_url', null)),
+        signal_seasonality: build.template(std.get(block, 'signal_seasonality', null)),
         slide_by: build.template(std.get(block, 'slide_by', null)),
         title_template: build.template(std.get(block, 'title_template', null)),
         type: build.template(std.get(block, 'type', null)),
@@ -674,6 +675,7 @@ local provider(rawConfiguration, configuration) = {
       open_violation_on_expiration: resource.field(self._.blocks, 'open_violation_on_expiration'),
       policy_id: resource.field(self._.blocks, 'policy_id'),
       runbook_url: resource.field(self._.blocks, 'runbook_url'),
+      signal_seasonality: resource.field(self._.blocks, 'signal_seasonality'),
       slide_by: resource.field(self._.blocks, 'slide_by'),
       title_template: resource.field(self._.blocks, 'title_template'),
       type: resource.field(self._.blocks, 'type'),
