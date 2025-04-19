@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/datadog/datadog',
-    version: '3.59.1',
+    version: '3.60.0',
   },
   local provider = providerTemplate('datadog', requirements, rawConfiguration, configuration),
   resource: {
@@ -1047,6 +1047,15 @@ local provider(rawConfiguration, configuration) = {
       id: resource.field(self._.blocks, 'id'),
       monitor: resource.field(self._.blocks, 'monitor'),
       url: resource.field(self._.blocks, 'url'),
+    },
+    observability_pipeline(name, block): {
+      local resource = blockType.resource('datadog_observability_pipeline', name),
+      _: resource._(block, {
+        id: build.template(std.get(block, 'id', null)),
+        name: build.template(block.name),
+      }),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
     },
     openapi_api(name, block): {
       local resource = blockType.resource('datadog_openapi_api', name),
