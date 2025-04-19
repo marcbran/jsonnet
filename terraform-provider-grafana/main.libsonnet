@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/grafana/grafana',
-    version: '3.22.2',
+    version: '3.22.3',
   },
   local provider = providerTemplate('grafana', requirements, rawConfiguration, configuration),
   resource: {
@@ -147,6 +147,16 @@ local provider(rawConfiguration, configuration) = {
       text: resource.field(self._.blocks, 'text'),
       time: resource.field(self._.blocks, 'time'),
       time_end: resource.field(self._.blocks, 'time_end'),
+    },
+    apps_dashboard_dashboard_v1alpha1(name, block): {
+      local resource = blockType.resource('grafana_apps_dashboard_dashboard_v1alpha1', name),
+      _: resource._(block, {
+      }),
+    },
+    apps_playlist_playlist_v0alpha1(name, block): {
+      local resource = blockType.resource('grafana_apps_playlist_playlist_v0alpha1', name),
+      _: resource._(block, {
+      }),
     },
     cloud_access_policy(name, block): {
       local resource = blockType.resource('grafana_cloud_access_policy', name),
@@ -1033,12 +1043,14 @@ local provider(rawConfiguration, configuration) = {
       local resource = blockType.resource('grafana_oncall_integration', name),
       _: resource._(block, {
         id: build.template(std.get(block, 'id', null)),
+        labels: build.template(std.get(block, 'labels', null)),
         link: build.template(std.get(block, 'link', null)),
         name: build.template(block.name),
         team_id: build.template(std.get(block, 'team_id', null)),
         type: build.template(block.type),
       }),
       id: resource.field(self._.blocks, 'id'),
+      labels: resource.field(self._.blocks, 'labels'),
       link: resource.field(self._.blocks, 'link'),
       name: resource.field(self._.blocks, 'name'),
       team_id: resource.field(self._.blocks, 'team_id'),
@@ -1919,6 +1931,26 @@ local provider(rawConfiguration, configuration) = {
       url: resource.field(self._.blocks, 'url'),
       username: resource.field(self._.blocks, 'username'),
     },
+    fleet_management_collector(name, block): {
+      local resource = blockType.resource('grafana_fleet_management_collector', name),
+      _: resource._(block, {
+        enabled: build.template(std.get(block, 'enabled', null)),
+        id: build.template(block.id),
+        local_attributes: build.template(std.get(block, 'local_attributes', null)),
+        remote_attributes: build.template(std.get(block, 'remote_attributes', null)),
+      }),
+      enabled: resource.field(self._.blocks, 'enabled'),
+      id: resource.field(self._.blocks, 'id'),
+      local_attributes: resource.field(self._.blocks, 'local_attributes'),
+      remote_attributes: resource.field(self._.blocks, 'remote_attributes'),
+    },
+    fleet_management_collectors(name, block): {
+      local resource = blockType.resource('grafana_fleet_management_collectors', name),
+      _: resource._(block, {
+        collectors: build.template(std.get(block, 'collectors', null)),
+      }),
+      collectors: resource.field(self._.blocks, 'collectors'),
+    },
     folder(name, block): {
       local resource = blockType.resource('grafana_folder', name),
       _: resource._(block, {
@@ -2027,6 +2059,17 @@ local provider(rawConfiguration, configuration) = {
       }),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
+    },
+    oncall_label(name, block): {
+      local resource = blockType.resource('grafana_oncall_label', name),
+      _: resource._(block, {
+        id: build.template(std.get(block, 'id', null)),
+        key: build.template(block.key),
+        value: build.template(block.value),
+      }),
+      id: resource.field(self._.blocks, 'id'),
+      key: resource.field(self._.blocks, 'key'),
+      value: resource.field(self._.blocks, 'value'),
     },
     oncall_outgoing_webhook(name, block): {
       local resource = blockType.resource('grafana_oncall_outgoing_webhook', name),
@@ -2311,11 +2354,13 @@ local providerWithConfiguration = provider(null, null) + {
     insecure_skip_verify: build.template(std.get(block, 'insecure_skip_verify', null)),
     oncall_access_token: build.template(std.get(block, 'oncall_access_token', null)),
     oncall_url: build.template(std.get(block, 'oncall_url', null)),
+    org_id: build.template(std.get(block, 'org_id', null)),
     retries: build.template(std.get(block, 'retries', null)),
     retry_status_codes: build.template(std.get(block, 'retry_status_codes', null)),
     retry_wait: build.template(std.get(block, 'retry_wait', null)),
     sm_access_token: build.template(std.get(block, 'sm_access_token', null)),
     sm_url: build.template(std.get(block, 'sm_url', null)),
+    stack_id: build.template(std.get(block, 'stack_id', null)),
     store_dashboard_sha256: build.template(std.get(block, 'store_dashboard_sha256', null)),
     tls_cert: build.template(std.get(block, 'tls_cert', null)),
     tls_key: build.template(std.get(block, 'tls_key', null)),
