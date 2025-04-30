@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/assert',
-    version: '0.15.0',
+    version: '0.16.0',
   },
   local provider = providerTemplate('assert', requirements, rawConfiguration, configuration),
   func: {
