@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/datadog/datadog',
-    version: '3.60.0',
+    version: '3.61.0',
   },
   local provider = providerTemplate('datadog', requirements, rawConfiguration, configuration),
   resource: {
@@ -157,12 +157,14 @@ local provider(rawConfiguration, configuration) = {
         id: build.template(std.get(block, 'id', null)),
         name: build.template(block.name),
         rate: build.template(block.rate),
+        trace_rate: build.template(std.get(block, 'trace_rate', null)),
       }),
       enabled: resource.field(self._.blocks, 'enabled'),
       filter_type: resource.field(self._.blocks, 'filter_type'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
       rate: resource.field(self._.blocks, 'rate'),
+      trace_rate: resource.field(self._.blocks, 'trace_rate'),
     },
     apm_retention_filter_order(name, block): {
       local resource = blockType.resource('datadog_apm_retention_filter_order', name),
@@ -1047,6 +1049,17 @@ local provider(rawConfiguration, configuration) = {
       id: resource.field(self._.blocks, 'id'),
       monitor: resource.field(self._.blocks, 'monitor'),
       url: resource.field(self._.blocks, 'url'),
+    },
+    monitor_notification_rule(name, block): {
+      local resource = blockType.resource('datadog_monitor_notification_rule', name),
+      _: resource._(block, {
+        id: build.template(std.get(block, 'id', null)),
+        name: build.template(block.name),
+        recipients: build.template(block.recipients),
+      }),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      recipients: resource.field(self._.blocks, 'recipients'),
     },
     observability_pipeline(name, block): {
       local resource = blockType.resource('datadog_observability_pipeline', name),
@@ -1936,6 +1949,17 @@ local provider(rawConfiguration, configuration) = {
       }),
       id: resource.field(self._.blocks, 'id'),
       pipeline_ids: resource.field(self._.blocks, 'pipeline_ids'),
+    },
+    metric_tags(name, block): {
+      local resource = blockType.resource('datadog_metric_tags', name),
+      _: resource._(block, {
+        id: build.template(std.get(block, 'id', null)),
+        metric: build.template(block.metric),
+        tags: build.template(std.get(block, 'tags', null)),
+      }),
+      id: resource.field(self._.blocks, 'id'),
+      metric: resource.field(self._.blocks, 'metric'),
+      tags: resource.field(self._.blocks, 'tags'),
     },
     monitor(name, block): {
       local resource = blockType.resource('datadog_monitor', name),
