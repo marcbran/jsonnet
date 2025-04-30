@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/aws',
-    version: '5.95.0',
+    version: '5.96.0',
   },
   local provider = providerTemplate('aws', requirements, rawConfiguration, configuration),
   resource: {
@@ -1577,6 +1577,7 @@ local provider(rawConfiguration, configuration) = {
         execution_arn: build.template(std.get(block, 'execution_arn', null)),
         fail_on_warnings: build.template(std.get(block, 'fail_on_warnings', null)),
         id: build.template(std.get(block, 'id', null)),
+        ip_address_type: build.template(std.get(block, 'ip_address_type', null)),
         name: build.template(block.name),
         protocol_type: build.template(block.protocol_type),
         route_key: build.template(std.get(block, 'route_key', null)),
@@ -1596,6 +1597,7 @@ local provider(rawConfiguration, configuration) = {
       execution_arn: resource.field(self._.blocks, 'execution_arn'),
       fail_on_warnings: resource.field(self._.blocks, 'fail_on_warnings'),
       id: resource.field(self._.blocks, 'id'),
+      ip_address_type: resource.field(self._.blocks, 'ip_address_type'),
       name: resource.field(self._.blocks, 'name'),
       protocol_type: resource.field(self._.blocks, 'protocol_type'),
       route_key: resource.field(self._.blocks, 'route_key'),
@@ -35259,6 +35261,7 @@ local provider(rawConfiguration, configuration) = {
         disable_execute_api_endpoint: build.template(std.get(block, 'disable_execute_api_endpoint', null)),
         execution_arn: build.template(std.get(block, 'execution_arn', null)),
         id: build.template(std.get(block, 'id', null)),
+        ip_address_type: build.template(std.get(block, 'ip_address_type', null)),
         name: build.template(std.get(block, 'name', null)),
         protocol_type: build.template(std.get(block, 'protocol_type', null)),
         route_selection_expression: build.template(std.get(block, 'route_selection_expression', null)),
@@ -35274,6 +35277,7 @@ local provider(rawConfiguration, configuration) = {
       disable_execute_api_endpoint: resource.field(self._.blocks, 'disable_execute_api_endpoint'),
       execution_arn: resource.field(self._.blocks, 'execution_arn'),
       id: resource.field(self._.blocks, 'id'),
+      ip_address_type: resource.field(self._.blocks, 'ip_address_type'),
       name: resource.field(self._.blocks, 'name'),
       protocol_type: resource.field(self._.blocks, 'protocol_type'),
       route_selection_expression: resource.field(self._.blocks, 'route_selection_expression'),
@@ -40433,6 +40437,15 @@ local provider(rawConfiguration, configuration) = {
       tags: resource.field(self._.blocks, 'tags'),
       virtual_cluster_id: resource.field(self._.blocks, 'virtual_cluster_id'),
     },
+    fis_experiment_templates(name, block): {
+      local resource = blockType.resource('aws_fis_experiment_templates', name),
+      _: resource._(block, {
+        ids: build.template(std.get(block, 'ids', null)),
+        tags: build.template(std.get(block, 'tags', null)),
+      }),
+      ids: resource.field(self._.blocks, 'ids'),
+      tags: resource.field(self._.blocks, 'tags'),
+    },
     fsx_ontap_file_system(name, block): {
       local resource = blockType.resource('aws_fsx_ontap_file_system', name),
       _: resource._(block, {
@@ -40805,17 +40818,21 @@ local provider(rawConfiguration, configuration) = {
     guardduty_detector(name, block): {
       local resource = blockType.resource('aws_guardduty_detector', name),
       _: resource._(block, {
+        arn: build.template(std.get(block, 'arn', null)),
         features: build.template(std.get(block, 'features', null)),
         finding_publishing_frequency: build.template(std.get(block, 'finding_publishing_frequency', null)),
         id: build.template(std.get(block, 'id', null)),
         service_role_arn: build.template(std.get(block, 'service_role_arn', null)),
         status: build.template(std.get(block, 'status', null)),
+        tags: build.template(std.get(block, 'tags', null)),
       }),
+      arn: resource.field(self._.blocks, 'arn'),
       features: resource.field(self._.blocks, 'features'),
       finding_publishing_frequency: resource.field(self._.blocks, 'finding_publishing_frequency'),
       id: resource.field(self._.blocks, 'id'),
       service_role_arn: resource.field(self._.blocks, 'service_role_arn'),
       status: resource.field(self._.blocks, 'status'),
+      tags: resource.field(self._.blocks, 'tags'),
     },
     guardduty_finding_ids(name, block): {
       local resource = blockType.resource('aws_guardduty_finding_ids', name),
@@ -47498,6 +47515,15 @@ local provider(rawConfiguration, configuration) = {
       tags: resource.field(self._.blocks, 'tags'),
       vpc_endpoint_type: resource.field(self._.blocks, 'vpc_endpoint_type'),
       vpc_id: resource.field(self._.blocks, 'vpc_id'),
+    },
+    vpc_endpoint_associations(name, block): {
+      local resource = blockType.resource('aws_vpc_endpoint_associations', name),
+      _: resource._(block, {
+        associations: build.template(std.get(block, 'associations', null)),
+        vpc_endpoint_id: build.template(block.vpc_endpoint_id),
+      }),
+      associations: resource.field(self._.blocks, 'associations'),
+      vpc_endpoint_id: resource.field(self._.blocks, 'vpc_endpoint_id'),
     },
     vpc_endpoint_service(name, block): {
       local resource = blockType.resource('aws_vpc_endpoint_service', name),
