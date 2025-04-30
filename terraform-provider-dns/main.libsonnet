@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/dns',
-    version: '3.4.2',
+    version: '3.4.3',
   },
   local provider = providerTemplate('dns', requirements, rawConfiguration, configuration),
   resource: {
