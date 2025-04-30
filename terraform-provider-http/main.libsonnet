@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/http',
-    version: '3.4.5',
+    version: '3.5.0',
   },
   local provider = providerTemplate('http', requirements, rawConfiguration, configuration),
   data: {
@@ -132,6 +132,8 @@ local provider(rawConfiguration, configuration) = {
       _: resource._(block, {
         body: build.template(std.get(block, 'body', null)),
         ca_cert_pem: build.template(std.get(block, 'ca_cert_pem', null)),
+        client_cert_pem: build.template(std.get(block, 'client_cert_pem', null)),
+        client_key_pem: build.template(std.get(block, 'client_key_pem', null)),
         id: build.template(std.get(block, 'id', null)),
         insecure: build.template(std.get(block, 'insecure', null)),
         method: build.template(std.get(block, 'method', null)),
@@ -146,6 +148,8 @@ local provider(rawConfiguration, configuration) = {
       }),
       body: resource.field(self._.blocks, 'body'),
       ca_cert_pem: resource.field(self._.blocks, 'ca_cert_pem'),
+      client_cert_pem: resource.field(self._.blocks, 'client_cert_pem'),
+      client_key_pem: resource.field(self._.blocks, 'client_key_pem'),
       id: resource.field(self._.blocks, 'id'),
       insecure: resource.field(self._.blocks, 'insecure'),
       method: resource.field(self._.blocks, 'method'),
