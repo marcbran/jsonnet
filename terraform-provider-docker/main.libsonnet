@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/kreuzwerker/docker',
-    version: '3.2.0',
+    version: '3.4.0',
   },
   local provider = providerTemplate('docker', requirements, rawConfiguration, configuration),
   resource: {
@@ -377,11 +377,13 @@ local provider(rawConfiguration, configuration) = {
         id: build.template(std.get(block, 'id', null)),
         source_image: build.template(block.source_image),
         source_image_id: build.template(std.get(block, 'source_image_id', null)),
+        tag_triggers: build.template(std.get(block, 'tag_triggers', null)),
         target_image: build.template(block.target_image),
       }),
       id: resource.field(self._.blocks, 'id'),
       source_image: resource.field(self._.blocks, 'source_image'),
       source_image_id: resource.field(self._.blocks, 'source_image_id'),
+      tag_triggers: resource.field(self._.blocks, 'tag_triggers'),
       target_image: resource.field(self._.blocks, 'target_image'),
     },
     volume(name, block): {
@@ -504,6 +506,8 @@ local providerWithConfiguration = provider(null, null) + {
     ca_material: build.template(std.get(block, 'ca_material', null)),
     cert_material: build.template(std.get(block, 'cert_material', null)),
     cert_path: build.template(std.get(block, 'cert_path', null)),
+    context: build.template(std.get(block, 'context', null)),
+    disable_docker_daemon_check: build.template(std.get(block, 'disable_docker_daemon_check', null)),
     host: build.template(std.get(block, 'host', null)),
     key_material: build.template(std.get(block, 'key_material', null)),
     ssh_opts: build.template(std.get(block, 'ssh_opts', null)),
