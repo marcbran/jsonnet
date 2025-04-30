@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/pagerduty/pagerduty',
-    version: '3.24.0',
+    version: '3.24.2',
   },
   local provider = providerTemplate('pagerduty', requirements, rawConfiguration, configuration),
   resource: {
@@ -903,13 +903,11 @@ local provider(rawConfiguration, configuration) = {
     user_notification_rule(name, block): {
       local resource = blockType.resource('pagerduty_user_notification_rule', name),
       _: resource._(block, {
-        contact_method: build.template(block.contact_method),
         id: build.template(std.get(block, 'id', null)),
         start_delay_in_minutes: build.template(block.start_delay_in_minutes),
         urgency: build.template(block.urgency),
         user_id: build.template(block.user_id),
       }),
-      contact_method: resource.field(self._.blocks, 'contact_method'),
       id: resource.field(self._.blocks, 'id'),
       start_delay_in_minutes: resource.field(self._.blocks, 'start_delay_in_minutes'),
       urgency: resource.field(self._.blocks, 'urgency'),
