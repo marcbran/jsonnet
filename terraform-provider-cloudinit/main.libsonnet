@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/cloudinit',
-    version: '2.3.6',
+    version: '2.3.7',
   },
   local provider = providerTemplate('cloudinit', requirements, rawConfiguration, configuration),
   resource: {
