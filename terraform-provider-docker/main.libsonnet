@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/kreuzwerker/docker',
-    version: '3.4.0',
+    version: '3.5.0',
   },
   local provider = providerTemplate('docker', requirements, rawConfiguration, configuration),
   resource: {
@@ -496,6 +496,19 @@ local provider(rawConfiguration, configuration) = {
       insecure_skip_verify: resource.field(self._.blocks, 'insecure_skip_verify'),
       name: resource.field(self._.blocks, 'name'),
       sha256_digest: resource.field(self._.blocks, 'sha256_digest'),
+    },
+    registry_image_manifests(name, block): {
+      local resource = blockType.resource('docker_registry_image_manifests', name),
+      _: resource._(block, {
+        id: build.template(std.get(block, 'id', null)),
+        insecure_skip_verify: build.template(std.get(block, 'insecure_skip_verify', null)),
+        manifests: build.template(std.get(block, 'manifests', null)),
+        name: build.template(block.name),
+      }),
+      id: resource.field(self._.blocks, 'id'),
+      insecure_skip_verify: resource.field(self._.blocks, 'insecure_skip_verify'),
+      manifests: resource.field(self._.blocks, 'manifests'),
+      name: resource.field(self._.blocks, 'name'),
     },
   },
 };
