@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/aws',
-    version: '5.96.0',
+    version: '5.97.0',
   },
   local provider = providerTemplate('aws', requirements, rawConfiguration, configuration),
   resource: {
@@ -11528,6 +11528,15 @@ local provider(rawConfiguration, configuration) = {
       target_vpc_subnet_id: resource.field(self._.blocks, 'target_vpc_subnet_id'),
       type: resource.field(self._.blocks, 'type'),
     },
+    ec2_default_credit_specification(name, block): {
+      local resource = blockType.resource('aws_ec2_default_credit_specification', name),
+      _: resource._(block, {
+        cpu_credits: build.template(block.cpu_credits),
+        instance_family: build.template(block.instance_family),
+      }),
+      cpu_credits: resource.field(self._.blocks, 'cpu_credits'),
+      instance_family: resource.field(self._.blocks, 'instance_family'),
+    },
     ec2_fleet(name, block): {
       local resource = blockType.resource('aws_ec2_fleet', name),
       _: resource._(block, {
@@ -15355,6 +15364,7 @@ local provider(rawConfiguration, configuration) = {
       local resource = blockType.resource('aws_glue_connection', name),
       _: resource._(block, {
         arn: build.template(std.get(block, 'arn', null)),
+        athena_properties: build.template(std.get(block, 'athena_properties', null)),
         catalog_id: build.template(std.get(block, 'catalog_id', null)),
         connection_properties: build.template(std.get(block, 'connection_properties', null)),
         connection_type: build.template(std.get(block, 'connection_type', null)),
@@ -15366,6 +15376,7 @@ local provider(rawConfiguration, configuration) = {
         tags_all: build.template(std.get(block, 'tags_all', null)),
       }),
       arn: resource.field(self._.blocks, 'arn'),
+      athena_properties: resource.field(self._.blocks, 'athena_properties'),
       catalog_id: resource.field(self._.blocks, 'catalog_id'),
       connection_properties: resource.field(self._.blocks, 'connection_properties'),
       connection_type: resource.field(self._.blocks, 'connection_type'),
@@ -21883,6 +21894,7 @@ local provider(rawConfiguration, configuration) = {
         arn: build.template(std.get(block, 'arn', null)),
         delete_protection: build.template(std.get(block, 'delete_protection', null)),
         description: build.template(std.get(block, 'description', null)),
+        enabled_analysis_types: build.template(std.get(block, 'enabled_analysis_types', null)),
         firewall_policy_arn: build.template(block.firewall_policy_arn),
         firewall_policy_change_protection: build.template(std.get(block, 'firewall_policy_change_protection', null)),
         firewall_status: build.template(std.get(block, 'firewall_status', null)),
@@ -21897,6 +21909,7 @@ local provider(rawConfiguration, configuration) = {
       arn: resource.field(self._.blocks, 'arn'),
       delete_protection: resource.field(self._.blocks, 'delete_protection'),
       description: resource.field(self._.blocks, 'description'),
+      enabled_analysis_types: resource.field(self._.blocks, 'enabled_analysis_types'),
       firewall_policy_arn: resource.field(self._.blocks, 'firewall_policy_arn'),
       firewall_policy_change_protection: resource.field(self._.blocks, 'firewall_policy_change_protection'),
       firewall_status: resource.field(self._.blocks, 'firewall_status'),
@@ -40712,6 +40725,7 @@ local provider(rawConfiguration, configuration) = {
       local resource = blockType.resource('aws_glue_connection', name),
       _: resource._(block, {
         arn: build.template(std.get(block, 'arn', null)),
+        athena_properties: build.template(std.get(block, 'athena_properties', null)),
         catalog_id: build.template(std.get(block, 'catalog_id', null)),
         connection_properties: build.template(std.get(block, 'connection_properties', null)),
         connection_type: build.template(std.get(block, 'connection_type', null)),
@@ -40723,6 +40737,7 @@ local provider(rawConfiguration, configuration) = {
         tags: build.template(std.get(block, 'tags', null)),
       }),
       arn: resource.field(self._.blocks, 'arn'),
+      athena_properties: resource.field(self._.blocks, 'athena_properties'),
       catalog_id: resource.field(self._.blocks, 'catalog_id'),
       connection_properties: resource.field(self._.blocks, 'connection_properties'),
       connection_type: resource.field(self._.blocks, 'connection_type'),
@@ -41546,6 +41561,7 @@ local provider(rawConfiguration, configuration) = {
         key_pair: build.template(std.get(block, 'key_pair', null)),
         logging: build.template(std.get(block, 'logging', null)),
         name: build.template(std.get(block, 'name', null)),
+        placement: build.template(std.get(block, 'placement', null)),
         resource_tags: build.template(std.get(block, 'resource_tags', null)),
         security_group_ids: build.template(std.get(block, 'security_group_ids', null)),
         sns_topic_arn: build.template(std.get(block, 'sns_topic_arn', null)),
@@ -41564,6 +41580,7 @@ local provider(rawConfiguration, configuration) = {
       key_pair: resource.field(self._.blocks, 'key_pair'),
       logging: resource.field(self._.blocks, 'logging'),
       name: resource.field(self._.blocks, 'name'),
+      placement: resource.field(self._.blocks, 'placement'),
       resource_tags: resource.field(self._.blocks, 'resource_tags'),
       security_group_ids: resource.field(self._.blocks, 'security_group_ids'),
       sns_topic_arn: resource.field(self._.blocks, 'sns_topic_arn'),
@@ -43722,6 +43739,7 @@ local provider(rawConfiguration, configuration) = {
         arn: build.template(std.get(block, 'arn', null)),
         delete_protection: build.template(std.get(block, 'delete_protection', null)),
         description: build.template(std.get(block, 'description', null)),
+        enabled_analysis_types: build.template(std.get(block, 'enabled_analysis_types', null)),
         encryption_configuration: build.template(std.get(block, 'encryption_configuration', null)),
         firewall_policy_arn: build.template(std.get(block, 'firewall_policy_arn', null)),
         firewall_policy_change_protection: build.template(std.get(block, 'firewall_policy_change_protection', null)),
@@ -43737,6 +43755,7 @@ local provider(rawConfiguration, configuration) = {
       arn: resource.field(self._.blocks, 'arn'),
       delete_protection: resource.field(self._.blocks, 'delete_protection'),
       description: resource.field(self._.blocks, 'description'),
+      enabled_analysis_types: resource.field(self._.blocks, 'enabled_analysis_types'),
       encryption_configuration: resource.field(self._.blocks, 'encryption_configuration'),
       firewall_policy_arn: resource.field(self._.blocks, 'firewall_policy_arn'),
       firewall_policy_change_protection: resource.field(self._.blocks, 'firewall_policy_change_protection'),
@@ -48108,6 +48127,7 @@ local provider(rawConfiguration, configuration) = {
       local resource = blockType.resource('aws_workspaces_directory', name),
       _: resource._(block, {
         alias: build.template(std.get(block, 'alias', null)),
+        certificate_based_auth_properties: build.template(std.get(block, 'certificate_based_auth_properties', null)),
         customer_user_name: build.template(std.get(block, 'customer_user_name', null)),
         directory_id: build.template(block.directory_id),
         directory_name: build.template(std.get(block, 'directory_name', null)),
@@ -48126,6 +48146,7 @@ local provider(rawConfiguration, configuration) = {
         workspace_security_group_id: build.template(std.get(block, 'workspace_security_group_id', null)),
       }),
       alias: resource.field(self._.blocks, 'alias'),
+      certificate_based_auth_properties: resource.field(self._.blocks, 'certificate_based_auth_properties'),
       customer_user_name: resource.field(self._.blocks, 'customer_user_name'),
       directory_id: resource.field(self._.blocks, 'directory_id'),
       directory_name: resource.field(self._.blocks, 'directory_name'),
