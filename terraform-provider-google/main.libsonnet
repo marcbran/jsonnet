@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/google',
-    version: '6.33.0',
+    version: '6.34.0',
   },
   local provider = providerTemplate('google', requirements, rawConfiguration, configuration),
   resource: {
@@ -1145,6 +1145,25 @@ local provider(rawConfiguration, configuration) = {
       runtime_database_encryption_key_name: resource.field(self._.blocks, 'runtime_database_encryption_key_name'),
       runtime_type: resource.field(self._.blocks, 'runtime_type'),
       subscription_type: resource.field(self._.blocks, 'subscription_type'),
+    },
+    apigee_security_profile_v2(name, block): {
+      local resource = blockType.resource('google_apigee_security_profile_v2', name),
+      _: resource._(block, {
+        create_time: build.template(std.get(block, 'create_time', null)),
+        description: build.template(std.get(block, 'description', null)),
+        id: build.template(std.get(block, 'id', null)),
+        name: build.template(std.get(block, 'name', null)),
+        org_id: build.template(block.org_id),
+        profile_id: build.template(block.profile_id),
+        update_time: build.template(std.get(block, 'update_time', null)),
+      }),
+      create_time: resource.field(self._.blocks, 'create_time'),
+      description: resource.field(self._.blocks, 'description'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      org_id: resource.field(self._.blocks, 'org_id'),
+      profile_id: resource.field(self._.blocks, 'profile_id'),
+      update_time: resource.field(self._.blocks, 'update_time'),
     },
     apigee_sharedflow(name, block): {
       local resource = blockType.resource('google_apigee_sharedflow', name),
@@ -18860,6 +18879,7 @@ local provider(rawConfiguration, configuration) = {
         location: build.template(block.location),
         name: build.template(block.name),
         project: build.template(std.get(block, 'project', null)),
+        reasons: build.template(std.get(block, 'reasons', null)),
         state: build.template(std.get(block, 'state', null)),
         terraform_labels: build.template(std.get(block, 'terraform_labels', null)),
         unique_id: build.template(std.get(block, 'unique_id', null)),
@@ -18875,6 +18895,7 @@ local provider(rawConfiguration, configuration) = {
       location: resource.field(self._.blocks, 'location'),
       name: resource.field(self._.blocks, 'name'),
       project: resource.field(self._.blocks, 'project'),
+      reasons: resource.field(self._.blocks, 'reasons'),
       state: resource.field(self._.blocks, 'state'),
       terraform_labels: resource.field(self._.blocks, 'terraform_labels'),
       unique_id: resource.field(self._.blocks, 'unique_id'),
