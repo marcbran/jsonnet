@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/azurerm',
-    version: '4.27.0',
+    version: '4.28.0',
   },
   local provider = providerTemplate('azurerm', requirements, rawConfiguration, configuration),
   resource: {
@@ -298,6 +298,7 @@ local provider(rawConfiguration, configuration) = {
         id: build.template(std.get(block, 'id', null)),
         location: build.template(block.location),
         name: build.template(block.name),
+        primary_user_assigned_identity: build.template(std.get(block, 'primary_user_assigned_identity', null)),
         project_id: build.template(std.get(block, 'project_id', null)),
         tags: build.template(std.get(block, 'tags', null)),
       }),
@@ -308,6 +309,7 @@ local provider(rawConfiguration, configuration) = {
       id: resource.field(self._.blocks, 'id'),
       location: resource.field(self._.blocks, 'location'),
       name: resource.field(self._.blocks, 'name'),
+      primary_user_assigned_identity: resource.field(self._.blocks, 'primary_user_assigned_identity'),
       project_id: resource.field(self._.blocks, 'project_id'),
       tags: resource.field(self._.blocks, 'tags'),
     },
@@ -16117,6 +16119,23 @@ local provider(rawConfiguration, configuration) = {
       monitor_id: resource.field(self._.blocks, 'monitor_id'),
       subscription_log_enabled: resource.field(self._.blocks, 'subscription_log_enabled'),
     },
+    nginx_api_key(name, block): {
+      local resource = blockType.resource('azurerm_nginx_api_key', name),
+      _: resource._(block, {
+        end_date_time: build.template(block.end_date_time),
+        hint: build.template(std.get(block, 'hint', null)),
+        id: build.template(std.get(block, 'id', null)),
+        name: build.template(block.name),
+        nginx_deployment_id: build.template(block.nginx_deployment_id),
+        secret_text: build.template(block.secret_text),
+      }),
+      end_date_time: resource.field(self._.blocks, 'end_date_time'),
+      hint: resource.field(self._.blocks, 'hint'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      nginx_deployment_id: resource.field(self._.blocks, 'nginx_deployment_id'),
+      secret_text: resource.field(self._.blocks, 'secret_text'),
+    },
     nginx_certificate(name, block): {
       local resource = blockType.resource('azurerm_nginx_certificate', name),
       _: resource._(block, {
@@ -31374,6 +31393,21 @@ local provider(rawConfiguration, configuration) = {
       resource_group_name: resource.field(self._.blocks, 'resource_group_name'),
       tags: resource.field(self._.blocks, 'tags'),
     },
+    nginx_api_key(name, block): {
+      local resource = blockType.resource('azurerm_nginx_api_key', name),
+      _: resource._(block, {
+        end_date_time: build.template(std.get(block, 'end_date_time', null)),
+        hint: build.template(std.get(block, 'hint', null)),
+        id: build.template(std.get(block, 'id', null)),
+        name: build.template(block.name),
+        nginx_deployment_id: build.template(block.nginx_deployment_id),
+      }),
+      end_date_time: resource.field(self._.blocks, 'end_date_time'),
+      hint: resource.field(self._.blocks, 'hint'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      nginx_deployment_id: resource.field(self._.blocks, 'nginx_deployment_id'),
+    },
     nginx_certificate(name, block): {
       local resource = blockType.resource('azurerm_nginx_certificate', name),
       _: resource._(block, {
@@ -31441,6 +31475,7 @@ local provider(rawConfiguration, configuration) = {
         resource_group_name: build.template(block.resource_group_name),
         sku: build.template(std.get(block, 'sku', null)),
         tags: build.template(std.get(block, 'tags', null)),
+        web_application_firewall: build.template(std.get(block, 'web_application_firewall', null)),
       }),
       auto_scale_profile: resource.field(self._.blocks, 'auto_scale_profile'),
       automatic_upgrade_channel: resource.field(self._.blocks, 'automatic_upgrade_channel'),
@@ -31462,6 +31497,7 @@ local provider(rawConfiguration, configuration) = {
       resource_group_name: resource.field(self._.blocks, 'resource_group_name'),
       sku: resource.field(self._.blocks, 'sku'),
       tags: resource.field(self._.blocks, 'tags'),
+      web_application_firewall: resource.field(self._.blocks, 'web_application_firewall'),
     },
     notification_hub(name, block): {
       local resource = blockType.resource('azurerm_notification_hub', name),
