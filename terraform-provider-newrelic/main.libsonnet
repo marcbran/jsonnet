@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/newrelic/newrelic',
-    version: '3.61.0',
+    version: '3.62.0',
   },
   local provider = providerTemplate('newrelic', requirements, rawConfiguration, configuration),
   resource: {
