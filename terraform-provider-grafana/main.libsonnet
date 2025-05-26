@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/grafana/grafana',
-    version: '3.24.1',
+    version: '3.25.1',
   },
   local provider = providerTemplate('grafana', requirements, rawConfiguration, configuration),
   resource: {
@@ -1552,6 +1552,17 @@ local provider(rawConfiguration, configuration) = {
       target: resource.field(self._.blocks, 'target'),
       tenant_id: resource.field(self._.blocks, 'tenant_id'),
       timeout: resource.field(self._.blocks, 'timeout'),
+    },
+    synthetic_monitoring_check_alerts(name, block): {
+      local resource = blockType.resource('grafana_synthetic_monitoring_check_alerts', name),
+      _: resource._(block, {
+        alerts: build.template(block.alerts),
+        check_id: build.template(block.check_id),
+        id: build.template(std.get(block, 'id', null)),
+      }),
+      alerts: resource.field(self._.blocks, 'alerts'),
+      check_id: resource.field(self._.blocks, 'check_id'),
+      id: resource.field(self._.blocks, 'id'),
     },
     synthetic_monitoring_installation(name, block): {
       local resource = blockType.resource('grafana_synthetic_monitoring_installation', name),
