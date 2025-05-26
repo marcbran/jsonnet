@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/tfe',
-    version: '0.65.2',
+    version: '0.66.0',
   },
   local provider = providerTemplate('tfe', requirements, rawConfiguration, configuration),
   resource: {
@@ -859,12 +859,14 @@ local provider(rawConfiguration, configuration) = {
     team_token(name, block): {
       local resource = blockType.resource('tfe_team_token', name),
       _: resource._(block, {
+        description: build.template(std.get(block, 'description', null)),
         expired_at: build.template(std.get(block, 'expired_at', null)),
         force_regenerate: build.template(std.get(block, 'force_regenerate', null)),
         id: build.template(std.get(block, 'id', null)),
         team_id: build.template(block.team_id),
         token: build.template(std.get(block, 'token', null)),
       }),
+      description: resource.field(self._.blocks, 'description'),
       expired_at: resource.field(self._.blocks, 'expired_at'),
       force_regenerate: resource.field(self._.blocks, 'force_regenerate'),
       id: resource.field(self._.blocks, 'id'),
