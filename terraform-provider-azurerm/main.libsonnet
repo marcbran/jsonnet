@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/azurerm',
-    version: '4.28.0',
+    version: '4.30.0',
   },
   local provider = providerTemplate('azurerm', requirements, rawConfiguration, configuration),
   resource: {
@@ -4481,12 +4481,13 @@ local provider(rawConfiguration, configuration) = {
     container_app_environment_storage(name, block): {
       local resource = blockType.resource('azurerm_container_app_environment_storage', name),
       _: resource._(block, {
-        access_key: build.template(block.access_key),
+        access_key: build.template(std.get(block, 'access_key', null)),
         access_mode: build.template(block.access_mode),
-        account_name: build.template(block.account_name),
+        account_name: build.template(std.get(block, 'account_name', null)),
         container_app_environment_id: build.template(block.container_app_environment_id),
         id: build.template(std.get(block, 'id', null)),
         name: build.template(block.name),
+        nfs_server_url: build.template(std.get(block, 'nfs_server_url', null)),
         share_name: build.template(block.share_name),
       }),
       access_key: resource.field(self._.blocks, 'access_key'),
@@ -4495,6 +4496,7 @@ local provider(rawConfiguration, configuration) = {
       container_app_environment_id: resource.field(self._.blocks, 'container_app_environment_id'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
+      nfs_server_url: resource.field(self._.blocks, 'nfs_server_url'),
       share_name: resource.field(self._.blocks, 'share_name'),
     },
     container_app_job(name, block): {
@@ -15357,6 +15359,7 @@ local provider(rawConfiguration, configuration) = {
       local resource = blockType.resource('azurerm_netapp_pool', name),
       _: resource._(block, {
         account_name: build.template(block.account_name),
+        cool_access_enabled: build.template(std.get(block, 'cool_access_enabled', null)),
         encryption_type: build.template(std.get(block, 'encryption_type', null)),
         id: build.template(std.get(block, 'id', null)),
         location: build.template(block.location),
@@ -15368,6 +15371,7 @@ local provider(rawConfiguration, configuration) = {
         tags: build.template(std.get(block, 'tags', null)),
       }),
       account_name: resource.field(self._.blocks, 'account_name'),
+      cool_access_enabled: resource.field(self._.blocks, 'cool_access_enabled'),
       encryption_type: resource.field(self._.blocks, 'encryption_type'),
       id: resource.field(self._.blocks, 'id'),
       location: resource.field(self._.blocks, 'location'),
@@ -23365,6 +23369,21 @@ local provider(rawConfiguration, configuration) = {
       scoped_resource_id: resource.field(self._.blocks, 'scoped_resource_id'),
       system_center_virtual_machine_manager_availability_set_ids: resource.field(self._.blocks, 'system_center_virtual_machine_manager_availability_set_ids'),
     },
+    system_center_virtual_machine_manager_virtual_machine_instance_guest_agent(name, block): {
+      local resource = blockType.resource('azurerm_system_center_virtual_machine_manager_virtual_machine_instance_guest_agent', name),
+      _: resource._(block, {
+        id: build.template(std.get(block, 'id', null)),
+        password: build.template(block.password),
+        provisioning_action: build.template(std.get(block, 'provisioning_action', null)),
+        scoped_resource_id: build.template(block.scoped_resource_id),
+        username: build.template(block.username),
+      }),
+      id: resource.field(self._.blocks, 'id'),
+      password: resource.field(self._.blocks, 'password'),
+      provisioning_action: resource.field(self._.blocks, 'provisioning_action'),
+      scoped_resource_id: resource.field(self._.blocks, 'scoped_resource_id'),
+      username: resource.field(self._.blocks, 'username'),
+    },
     system_center_virtual_machine_manager_virtual_machine_template(name, block): {
       local resource = blockType.resource('azurerm_system_center_virtual_machine_manager_virtual_machine_template', name),
       _: resource._(block, {
@@ -30166,6 +30185,7 @@ local provider(rawConfiguration, configuration) = {
         encryption_settings: build.template(std.get(block, 'encryption_settings', null)),
         id: build.template(std.get(block, 'id', null)),
         image_reference_id: build.template(std.get(block, 'image_reference_id', null)),
+        location: build.template(std.get(block, 'location', null)),
         name: build.template(block.name),
         network_access_policy: build.template(std.get(block, 'network_access_policy', null)),
         os_type: build.template(std.get(block, 'os_type', null)),
@@ -30186,6 +30206,7 @@ local provider(rawConfiguration, configuration) = {
       encryption_settings: resource.field(self._.blocks, 'encryption_settings'),
       id: resource.field(self._.blocks, 'id'),
       image_reference_id: resource.field(self._.blocks, 'image_reference_id'),
+      location: resource.field(self._.blocks, 'location'),
       name: resource.field(self._.blocks, 'name'),
       network_access_policy: resource.field(self._.blocks, 'network_access_policy'),
       os_type: resource.field(self._.blocks, 'os_type'),
@@ -31056,6 +31077,7 @@ local provider(rawConfiguration, configuration) = {
       local resource = blockType.resource('azurerm_netapp_pool', name),
       _: resource._(block, {
         account_name: build.template(block.account_name),
+        cool_access_enabled: build.template(std.get(block, 'cool_access_enabled', null)),
         encryption_type: build.template(std.get(block, 'encryption_type', null)),
         id: build.template(std.get(block, 'id', null)),
         location: build.template(std.get(block, 'location', null)),
@@ -31065,6 +31087,7 @@ local provider(rawConfiguration, configuration) = {
         size_in_tb: build.template(std.get(block, 'size_in_tb', null)),
       }),
       account_name: resource.field(self._.blocks, 'account_name'),
+      cool_access_enabled: resource.field(self._.blocks, 'cool_access_enabled'),
       encryption_type: resource.field(self._.blocks, 'encryption_type'),
       id: resource.field(self._.blocks, 'id'),
       location: resource.field(self._.blocks, 'location'),
