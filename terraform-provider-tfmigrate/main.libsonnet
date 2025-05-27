@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/tfmigrate',
-    version: '1.0.0',
+    version: '1.1.0',
   },
   local provider = providerTemplate('tfmigrate', requirements, rawConfiguration, configuration),
   resource: {
@@ -134,7 +134,7 @@ local provider(rawConfiguration, configuration) = {
         commit_hash: build.template(std.get(block, 'commit_hash', null)),
         commit_message: build.template(block.commit_message),
         directory_path: build.template(block.directory_path),
-        enable_push: build.template(block.enable_push),
+        enable_push: build.template(std.get(block, 'enable_push', null)),
         remote_name: build.template(block.remote_name),
         summary: build.template(std.get(block, 'summary', null)),
       }),
@@ -226,6 +226,8 @@ local provider(rawConfiguration, configuration) = {
 local providerWithConfiguration = provider(null, null) + {
   withConfiguration(alias, block): provider(block, {
     alias: alias,
+    allow_commit_push: build.template(std.get(block, 'allow_commit_push', null)),
+    create_pr: build.template(std.get(block, 'create_pr', null)),
     git_pat_token: build.template(std.get(block, 'git_pat_token', null)),
     hostname: build.template(std.get(block, 'hostname', null)),
   }),
