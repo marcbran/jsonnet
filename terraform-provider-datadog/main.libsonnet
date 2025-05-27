@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/datadog/datadog',
-    version: '3.61.0',
+    version: '3.63.0',
   },
   local provider = providerTemplate('datadog', requirements, rawConfiguration, configuration),
   resource: {
@@ -703,6 +703,7 @@ local provider(rawConfiguration, configuration) = {
         host_filters: build.template(std.get(block, 'host_filters', null)),
         id: build.template(std.get(block, 'id', null)),
         is_cspm_enabled: build.template(std.get(block, 'is_cspm_enabled', null)),
+        is_per_project_quota_enabled: build.template(std.get(block, 'is_per_project_quota_enabled', null)),
         is_resource_change_collection_enabled: build.template(std.get(block, 'is_resource_change_collection_enabled', null)),
         is_security_command_center_enabled: build.template(std.get(block, 'is_security_command_center_enabled', null)),
         metric_namespace_configs: build.template(std.get(block, 'metric_namespace_configs', null)),
@@ -716,6 +717,7 @@ local provider(rawConfiguration, configuration) = {
       host_filters: resource.field(self._.blocks, 'host_filters'),
       id: resource.field(self._.blocks, 'id'),
       is_cspm_enabled: resource.field(self._.blocks, 'is_cspm_enabled'),
+      is_per_project_quota_enabled: resource.field(self._.blocks, 'is_per_project_quota_enabled'),
       is_resource_change_collection_enabled: resource.field(self._.blocks, 'is_resource_change_collection_enabled'),
       is_security_command_center_enabled: resource.field(self._.blocks, 'is_security_command_center_enabled'),
       metric_namespace_configs: resource.field(self._.blocks, 'metric_namespace_configs'),
@@ -1241,6 +1243,15 @@ local provider(rawConfiguration, configuration) = {
       tags: resource.field(self._.blocks, 'tags'),
       type: resource.field(self._.blocks, 'type'),
       validate: resource.field(self._.blocks, 'validate'),
+    },
+    security_monitoring_rule_json(name, block): {
+      local resource = blockType.resource('datadog_security_monitoring_rule_json', name),
+      _: resource._(block, {
+        id: build.template(std.get(block, 'id', null)),
+        json: build.template(block.json),
+      }),
+      id: resource.field(self._.blocks, 'id'),
+      json: resource.field(self._.blocks, 'json'),
     },
     security_monitoring_suppression(name, block): {
       local resource = blockType.resource('datadog_security_monitoring_suppression', name),
