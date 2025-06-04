@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/datadog/datadog',
-    version: '3.63.0',
+    version: '3.65.0',
   },
   local provider = providerTemplate('datadog', requirements, rawConfiguration, configuration),
   resource: {
@@ -322,6 +322,21 @@ local provider(rawConfiguration, configuration) = {
       expression: resource.field(self._.blocks, 'expression'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
+    },
+    compliance_custom_framework(name, block): {
+      local resource = blockType.resource('datadog_compliance_custom_framework', name),
+      _: resource._(block, {
+        handle: build.template(block.handle),
+        icon_url: build.template(std.get(block, 'icon_url', null)),
+        id: build.template(std.get(block, 'id', null)),
+        name: build.template(block.name),
+        version: build.template(block.version),
+      }),
+      handle: resource.field(self._.blocks, 'handle'),
+      icon_url: resource.field(self._.blocks, 'icon_url'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      version: resource.field(self._.blocks, 'version'),
     },
     csm_threats_agent_rule(name, block): {
       local resource = blockType.resource('datadog_csm_threats_agent_rule', name),
@@ -1071,6 +1086,41 @@ local provider(rawConfiguration, configuration) = {
       }),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
+    },
+    on_call_escalation_policy(name, block): {
+      local resource = blockType.resource('datadog_on_call_escalation_policy', name),
+      _: resource._(block, {
+        id: build.template(std.get(block, 'id', null)),
+        name: build.template(block.name),
+        resolve_page_on_policy_end: build.template(std.get(block, 'resolve_page_on_policy_end', null)),
+        retries: build.template(std.get(block, 'retries', null)),
+        teams: build.template(std.get(block, 'teams', null)),
+      }),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      resolve_page_on_policy_end: resource.field(self._.blocks, 'resolve_page_on_policy_end'),
+      retries: resource.field(self._.blocks, 'retries'),
+      teams: resource.field(self._.blocks, 'teams'),
+    },
+    on_call_schedule(name, block): {
+      local resource = blockType.resource('datadog_on_call_schedule', name),
+      _: resource._(block, {
+        id: build.template(std.get(block, 'id', null)),
+        name: build.template(block.name),
+        teams: build.template(std.get(block, 'teams', null)),
+        time_zone: build.template(block.time_zone),
+      }),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      teams: resource.field(self._.blocks, 'teams'),
+      time_zone: resource.field(self._.blocks, 'time_zone'),
+    },
+    on_call_team_routing_rules(name, block): {
+      local resource = blockType.resource('datadog_on_call_team_routing_rules', name),
+      _: resource._(block, {
+        id: build.template(block.id),
+      }),
+      id: resource.field(self._.blocks, 'id'),
     },
     openapi_api(name, block): {
       local resource = blockType.resource('datadog_openapi_api', name),
