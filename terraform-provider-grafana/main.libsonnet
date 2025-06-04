@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/grafana/grafana',
-    version: '3.25.1',
+    version: '3.25.2',
   },
   local provider = providerTemplate('grafana', requirements, rawConfiguration, configuration),
   resource: {
@@ -389,6 +389,7 @@ local provider(rawConfiguration, configuration) = {
         logs_url: build.template(std.get(block, 'logs_url', null)),
         logs_user_id: build.template(std.get(block, 'logs_user_id', null)),
         name: build.template(block.name),
+        oncall_api_url: build.template(std.get(block, 'oncall_api_url', null)),
         org_id: build.template(std.get(block, 'org_id', null)),
         org_name: build.template(std.get(block, 'org_name', null)),
         org_slug: build.template(std.get(block, 'org_slug', null)),
@@ -459,6 +460,7 @@ local provider(rawConfiguration, configuration) = {
       logs_url: resource.field(self._.blocks, 'logs_url'),
       logs_user_id: resource.field(self._.blocks, 'logs_user_id'),
       name: resource.field(self._.blocks, 'name'),
+      oncall_api_url: resource.field(self._.blocks, 'oncall_api_url'),
       org_id: resource.field(self._.blocks, 'org_id'),
       org_name: resource.field(self._.blocks, 'org_name'),
       org_slug: resource.field(self._.blocks, 'org_slug'),
@@ -1135,6 +1137,7 @@ local provider(rawConfiguration, configuration) = {
     oncall_integration(name, block): {
       local resource = blockType.resource('grafana_oncall_integration', name),
       _: resource._(block, {
+        dynamic_labels: build.template(std.get(block, 'dynamic_labels', null)),
         id: build.template(std.get(block, 'id', null)),
         labels: build.template(std.get(block, 'labels', null)),
         link: build.template(std.get(block, 'link', null)),
@@ -1142,6 +1145,7 @@ local provider(rawConfiguration, configuration) = {
         team_id: build.template(std.get(block, 'team_id', null)),
         type: build.template(block.type),
       }),
+      dynamic_labels: resource.field(self._.blocks, 'dynamic_labels'),
       id: resource.field(self._.blocks, 'id'),
       labels: resource.field(self._.blocks, 'labels'),
       link: resource.field(self._.blocks, 'link'),
@@ -1827,6 +1831,7 @@ local provider(rawConfiguration, configuration) = {
         logs_url: build.template(std.get(block, 'logs_url', null)),
         logs_user_id: build.template(std.get(block, 'logs_user_id', null)),
         name: build.template(std.get(block, 'name', null)),
+        oncall_api_url: build.template(std.get(block, 'oncall_api_url', null)),
         org_id: build.template(std.get(block, 'org_id', null)),
         org_name: build.template(std.get(block, 'org_name', null)),
         org_slug: build.template(std.get(block, 'org_slug', null)),
@@ -1895,6 +1900,7 @@ local provider(rawConfiguration, configuration) = {
       logs_url: resource.field(self._.blocks, 'logs_url'),
       logs_user_id: resource.field(self._.blocks, 'logs_user_id'),
       name: resource.field(self._.blocks, 'name'),
+      oncall_api_url: resource.field(self._.blocks, 'oncall_api_url'),
       org_id: resource.field(self._.blocks, 'org_id'),
       org_name: resource.field(self._.blocks, 'org_name'),
       org_slug: resource.field(self._.blocks, 'org_slug'),
@@ -2236,9 +2242,11 @@ local provider(rawConfiguration, configuration) = {
       local resource = blockType.resource('grafana_oncall_integration', name),
       _: resource._(block, {
         id: build.template(block.id),
+        link: build.template(std.get(block, 'link', null)),
         name: build.template(std.get(block, 'name', null)),
       }),
       id: resource.field(self._.blocks, 'id'),
+      link: resource.field(self._.blocks, 'link'),
       name: resource.field(self._.blocks, 'name'),
     },
     oncall_label(name, block): {
