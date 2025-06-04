@@ -122,7 +122,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/pagerduty/pagerduty',
-    version: '3.25.2',
+    version: '3.26.0',
   },
   local provider = providerTemplate('pagerduty', requirements, rawConfiguration, configuration),
   resource: {
@@ -1054,11 +1054,15 @@ local provider(rawConfiguration, configuration) = {
     escalation_policy(name, block): {
       local resource = blockType.resource('pagerduty_escalation_policy', name),
       _: resource._(block, {
+        description: build.template(std.get(block, 'description', null)),
         id: build.template(std.get(block, 'id', null)),
         name: build.template(block.name),
+        teams: build.template(std.get(block, 'teams', null)),
       }),
+      description: resource.field(self._.blocks, 'description'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
+      teams: resource.field(self._.blocks, 'teams'),
     },
     event_orchestration(name, block): {
       local resource = blockType.resource('pagerduty_event_orchestration', name),
