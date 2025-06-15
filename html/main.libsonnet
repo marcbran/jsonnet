@@ -4,7 +4,7 @@ local elem(name, attrOrChildren=[], childrenOrNull=null) =
   local arrayChildren = if std.type(actualChildren) == 'array' then actualChildren else [actualChildren];
   std.prune([name, actualAttr] + arrayChildren);
 
-local h = {
+local elements = {
   html(attrOrChildren=[], childrenOrNull=null): elem('html', attrOrChildren, childrenOrNull),
   base(attrOrChildren=[], childrenOrNull=null): elem('base', attrOrChildren, childrenOrNull),
   head(attrOrChildren=[], childrenOrNull=null): elem('head', attrOrChildren, childrenOrNull),
@@ -109,6 +109,7 @@ local h = {
   output(attrOrChildren=[], childrenOrNull=null): elem('output', attrOrChildren, childrenOrNull),
   progress(attrOrChildren=[], childrenOrNull=null): elem('progress', attrOrChildren, childrenOrNull),
   select(attrOrChildren=[], childrenOrNull=null): elem('select', attrOrChildren, childrenOrNull),
+  selectedcontent(attrOrChildren=[], childrenOrNull=null): elem('selectedcontent', attrOrChildren, childrenOrNull),
   textarea(attrOrChildren=[], childrenOrNull=null): elem('textarea', attrOrChildren, childrenOrNull),
   details(attrOrChildren=[], childrenOrNull=null): elem('details', attrOrChildren, childrenOrNull),
   dialog(attrOrChildren=[], childrenOrNull=null): elem('dialog', attrOrChildren, childrenOrNull),
@@ -139,4 +140,9 @@ local h = {
   xmp(attrOrChildren=[], childrenOrNull=null): elem('xmp', attrOrChildren, childrenOrNull),
 };
 
-h
+local manifest = {
+  manifestElement(elem): std.manifestXmlJsonml(elem),
+  manifestPage(elem): '<!doctype html>' + std.manifestXmlJsonml(elem),
+};
+
+elements + manifest
