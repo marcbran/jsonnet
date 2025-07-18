@@ -1,10 +1,10 @@
 # tppi
 
-[source](https://github.com/marcbran/jsonnet/blob/tppi/tppi/main.libsonnet)
-
 > Test project, please ignore.
 
-[Inlined Package](https://github.com/marcbran/jsonnet/blob/tppi/tppi/main.libsonnet): Contains the reusable, inlined version published for usage in other projects
+- [Source Code](https://github.com/marcbran/devsonnet/tree/main/examples/pkg/tppi): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/tppi/tppi/main.libsonnet): Inlined code published for usage in other projects
 
 ## Installation
 
