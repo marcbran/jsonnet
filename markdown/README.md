@@ -66,6 +66,40 @@ md.Blockquote()
 
 #### Examples
 
+##### JSON format
+
+###### Calling
+
+```jsonnet
+md.Blockquote([
+    [
+        "Paragraph",
+        {
+            "blankPreviousLines": true
+        },
+        "Intelligent quote here"
+    ]
+])
+```
+
+###### yields
+
+```json
+[
+    "Blockquote",
+    {
+        "blankPreviousLines": true
+    },
+    [
+        "Paragraph",
+        {
+            "blankPreviousLines": true
+        },
+        "Intelligent quote here"
+    ]
+]
+```
+
 ##### Markdown format with gensonnet
 
 ###### Running
@@ -74,14 +108,14 @@ md.Blockquote()
 local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
-  md.Heading1('Title')
+  md.Blockquote([md.Paragraph(['Intelligent quote here'])])
 )
 ```
 
 ###### yields
 
 ```
-# Title
+> Intelligent quote here
 ```
 
 ### CodeBlock
@@ -146,6 +180,26 @@ md.Em()
 
 #### Examples
 
+##### JSON format
+
+###### Calling
+
+```jsonnet
+md.Em("Emphasised text")
+```
+
+###### yields
+
+```json
+[
+    "Emphasis",
+    {
+        "level": 1
+    },
+    "Emphasised text"
+]
+```
+
 ##### Markdown format with gensonnet
 
 ###### Running
@@ -154,14 +208,16 @@ md.Em()
 local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
-  md.Heading1('Title')
+  md.Paragraph([
+    md.Em('Emphasised text'),
+  ])
 )
 ```
 
 ###### yields
 
 ```
-# Title
+*Emphasised text*
 ```
 
 ### Emphasis
@@ -175,6 +231,26 @@ md.Emphasis()
 
 #### Examples
 
+##### JSON format
+
+###### Calling
+
+```jsonnet
+md.Emphasis(1, "Emphasised text")
+```
+
+###### yields
+
+```json
+[
+    "Emphasis",
+    {
+        "level": 1
+    },
+    "Emphasised text"
+]
+```
+
 ##### Markdown format with gensonnet
 
 ###### Running
@@ -183,14 +259,16 @@ md.Emphasis()
 local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
-  md.Heading1('Title')
+  md.Paragraph([
+    md.Emphasis(1, 'Emphasised text'),
+  ])
 )
 ```
 
 ###### yields
 
 ```
-# Title
+*Emphasised text*
 ```
 
 ### FencedCodeBlock
@@ -657,6 +735,26 @@ md.Image()
 
 #### Examples
 
+##### JSON format
+
+###### Calling
+
+```jsonnet
+md.Image("illustrative diagram", "./diag.png")
+```
+
+###### yields
+
+```json
+[
+    "Image",
+    {
+        "destination": "./diag.png"
+    },
+    "illustrative diagram"
+]
+```
+
 ##### Markdown format with gensonnet
 
 ###### Running
@@ -665,14 +763,16 @@ md.Image()
 local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
-  md.Heading1('Title')
+  md.Paragraph([
+    md.Image('illustrative diagram', './diag.png'),
+  ])
 )
 ```
 
 ###### yields
 
 ```
-# Title
+![illustrative diagram](./diag.png)
 ```
 
 ### Link
@@ -686,6 +786,26 @@ md.Link()
 
 #### Examples
 
+##### JSON format
+
+###### Calling
+
+```jsonnet
+md.Link("jsonnet", "https://github.com/marcbran/jsonnet")
+```
+
+###### yields
+
+```json
+[
+    "Link",
+    {
+        "destination": "https://github.com/marcbran/jsonnet"
+    },
+    "jsonnet"
+]
+```
+
 ##### Markdown format with gensonnet
 
 ###### Running
@@ -694,14 +814,16 @@ md.Link()
 local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
-  md.Heading1('Title')
+  md.Paragraph([
+    md.Link('jsonnet', 'https://github.com/marcbran/jsonnet'),
+  ])
 )
 ```
 
 ###### yields
 
 ```
-# Title
+[jsonnet](https://github.com/marcbran/jsonnet)
 ```
 
 ### List
@@ -715,22 +837,68 @@ md.List()
 
 #### Examples
 
-##### Markdown format with gensonnet
+##### JSON format
 
-###### Running
+###### Calling
 
 ```jsonnet
-local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
-  md.Heading1('Title')
-)
+md.List("-", 0, [
+    [
+        "ListItem",
+        {
+            "blankPreviousLines": true
+        },
+        "Do this"
+    ],
+    [
+        "ListItem",
+        {
+            "blankPreviousLines": true
+        },
+        "Do that"
+    ],
+    [
+        "ListItem",
+        {
+            "blankPreviousLines": true
+        },
+        "Do this again"
+    ]
+])
 ```
 
 ###### yields
 
-```
-# Title
+```json
+[
+    "List",
+    {
+        "blankPreviousLines": true,
+        "marker": "-",
+        "start": 0
+    },
+    [
+        "ListItem",
+        {
+            "blankPreviousLines": true
+        },
+        "Do this"
+    ],
+    [
+        "ListItem",
+        {
+            "blankPreviousLines": true
+        },
+        "Do that"
+    ],
+    [
+        "ListItem",
+        {
+            "blankPreviousLines": true
+        },
+        "Do this again"
+    ]
+]
 ```
 
 ### ListItem
@@ -744,22 +912,38 @@ md.ListItem()
 
 #### Examples
 
-##### Markdown format with gensonnet
+##### JSON format
 
-###### Running
+###### Calling
 
 ```jsonnet
-local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
-  md.Heading1('Title')
-)
+md.ListItem([
+    [
+        "Paragraph",
+        {
+            "blankPreviousLines": true
+        },
+        "Do dishes"
+    ]
+])
 ```
 
 ###### yields
 
-```
-# Title
+```json
+[
+    "ListItem",
+    {
+        "blankPreviousLines": true
+    },
+    [
+        "Paragraph",
+        {
+            "blankPreviousLines": true
+        },
+        "Do dishes"
+    ]
+]
 ```
 
 ### Paragraph
@@ -824,6 +1008,26 @@ md.Strong()
 
 #### Examples
 
+##### JSON format
+
+###### Calling
+
+```jsonnet
+md.Strong("Bold text")
+```
+
+###### yields
+
+```json
+[
+    "Emphasis",
+    {
+        "level": 2
+    },
+    "Bold text"
+]
+```
+
 ##### Markdown format with gensonnet
 
 ###### Running
@@ -832,14 +1036,16 @@ md.Strong()
 local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
-  md.Heading1('Title')
+  md.Paragraph([
+    md.Strong('Bold text'),
+  ])
 )
 ```
 
 ###### yields
 
 ```
-# Title
+**Bold text**
 ```
 
 ### ThematicBreak
@@ -851,15 +1057,17 @@ md.ThematicBreak()
 ```
 
 
-#### Example
+#### Examples
 
-##### Calling
+##### JSON format
+
+###### Calling
 
 ```jsonnet
 md.ThematicBreak()
 ```
 
-##### yields
+###### yields
 
 ```json
 [
@@ -868,4 +1076,22 @@ md.ThematicBreak()
         "blankPreviousLines": true
     }
 ]
+```
+
+##### Markdown format with gensonnet
+
+###### Running
+
+```jsonnet
+local md = import 'markdown/main.libsonnet';
+local g = import 'gensonnet/main.libsonnet';
+g.manifestMarkdown(
+  md.ThematicBreak()
+)
+```
+
+###### yields
+
+```
+---
 ```
