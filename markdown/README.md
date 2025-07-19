@@ -303,28 +303,6 @@ md.FencedCodeBlock("func main() {\n  fmt.Println(\"Hello World!\")\n}\n", "go")
 ]
 ```
 
-##### Markdown format with gensonnet
-
-###### Running
-
-```jsonnet
-local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
-  md.FencedCodeBlock('func main() {\n  fmt.Println("Hello World!")\n}\n', 'go')
-)
-```
-
-###### yields
-
-```
-```go
-func main() {
-  fmt.Println("Hello World!")
-}
-```
-```
-
 ### HTMLBlock
 
 https://spec.commonmark.org/0.31.2/#html-blocks
