@@ -10,10 +10,13 @@
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-md.Document([
-  md.Heading1('Title'),
-  md.Paragraph(['Hello World!']),
-])
+local g = import 'gensonnet/main.libsonnet';
+g.manifestMarkdown(
+  md.Document([
+    md.Heading1('Title'),
+    md.Paragraph(['Hello World!']),
+  ])
+)
 ```
 
 ### yields
