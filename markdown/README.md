@@ -18,7 +18,7 @@ md.Document([
 
 ### yields
 
-```json
+```
 # Title
 Hello World!
 ```
@@ -77,8 +77,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"# Title\n"
+```
+# Title
 ```
 
 ### CodeBlock
@@ -126,8 +126,10 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"    func main() {\n      fmt.Println(\"Hello World!\")\n    }\n"
+```
+    func main() {
+      fmt.Println("Hello World!")
+    }
 ```
 
 ### Em
@@ -155,8 +157,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"# Title\n"
+```
+# Title
 ```
 
 ### Emphasis
@@ -184,8 +186,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"# Title\n"
+```
+# Title
 ```
 
 ### FencedCodeBlock
@@ -234,8 +236,12 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"```go\nfunc main() {\n  fmt.Println(\"Hello World!\")\n}\n```\n"
+```
+```go
+func main() {
+  fmt.Println("Hello World!")
+}
+```
 ```
 
 ### HTMLBlock
@@ -283,8 +289,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"<marquee>Welcome to my website</marquee>\n"
+```
+<marquee>Welcome to my website</marquee>
 ```
 
 ### Heading
@@ -333,8 +339,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"# Title\n"
+```
+# Title
 ```
 
 ### Heading1
@@ -383,8 +389,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"# Title\n"
+```
+# Title
 ```
 
 ### Heading2
@@ -433,8 +439,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"## Title\n"
+```
+## Title
 ```
 
 ### Heading3
@@ -483,8 +489,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"### Title\n"
+```
+### Title
 ```
 
 ### Heading4
@@ -533,8 +539,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"#### Title\n"
+```
+#### Title
 ```
 
 ### Heading5
@@ -583,8 +589,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"##### Title\n"
+```
+##### Title
 ```
 
 ### Heading6
@@ -633,8 +639,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"###### Title\n"
+```
+###### Title
 ```
 
 ### Image
@@ -662,8 +668,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"# Title\n"
+```
+# Title
 ```
 
 ### Link
@@ -691,8 +697,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"# Title\n"
+```
+# Title
 ```
 
 ### List
@@ -720,8 +726,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"# Title\n"
+```
+# Title
 ```
 
 ### ListItem
@@ -749,8 +755,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"# Title\n"
+```
+# Title
 ```
 
 ### Paragraph
@@ -800,8 +806,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"Hello World!\n"
+```
+Hello World!
 ```
 
 ### Strong
@@ -829,8 +835,8 @@ g.manifestMarkdown(
 
 ###### yields
 
-```json
-"# Title\n"
+```
+# Title
 ```
 
 ### ThematicBreak
