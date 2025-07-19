@@ -68,7 +68,7 @@ md.Blockquote()
 ###### Running
 
 ```jsonnet
-local md = import 'Blockquote/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
@@ -117,7 +117,7 @@ md.CodeBlock("func main() {\n  fmt.Println(\"Hello World!\")\n}\n")
 ###### Running
 
 ```jsonnet
-local md = import 'CodeBlock/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.CodeBlock('func main() {\n  fmt.Println("Hello World!")\n}\n')
@@ -146,7 +146,7 @@ md.Em()
 ###### Running
 
 ```jsonnet
-local md = import 'Em/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
@@ -175,7 +175,7 @@ md.Emphasis()
 ###### Running
 
 ```jsonnet
-local md = import 'Emphasis/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
@@ -225,7 +225,7 @@ md.FencedCodeBlock("func main() {\n  fmt.Println(\"Hello World!\")\n}\n", "go")
 ###### Running
 
 ```jsonnet
-local md = import 'FencedCodeBlock/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.FencedCodeBlock('func main() {\n  fmt.Println("Hello World!")\n}\n', 'go')
@@ -274,7 +274,7 @@ md.HTMLBlock("<marquee>Welcome to my website</marquee>\n")
 ###### Running
 
 ```jsonnet
-local md = import 'HTMLBlock/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.HTMLBlock('<marquee>Welcome to my website</marquee>\n')
@@ -324,7 +324,7 @@ md.Heading(1, "Title")
 ###### Running
 
 ```jsonnet
-local md = import 'Heading/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading(1, 'Title')
@@ -374,7 +374,7 @@ md.Heading1("Title")
 ###### Running
 
 ```jsonnet
-local md = import 'Heading1/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
@@ -424,7 +424,7 @@ md.Heading2("Title")
 ###### Running
 
 ```jsonnet
-local md = import 'Heading2/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading2('Title')
@@ -474,7 +474,7 @@ md.Heading3("Title")
 ###### Running
 
 ```jsonnet
-local md = import 'Heading3/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading3('Title')
@@ -524,7 +524,7 @@ md.Heading4("Title")
 ###### Running
 
 ```jsonnet
-local md = import 'Heading4/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading4('Title')
@@ -574,7 +574,7 @@ md.Heading5("Title")
 ###### Running
 
 ```jsonnet
-local md = import 'Heading5/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading5('Title')
@@ -624,7 +624,7 @@ md.Heading6("Title")
 ###### Running
 
 ```jsonnet
-local md = import 'Heading6/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading6('Title')
@@ -653,7 +653,7 @@ md.Image()
 ###### Running
 
 ```jsonnet
-local md = import 'Image/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
@@ -682,7 +682,7 @@ md.Link()
 ###### Running
 
 ```jsonnet
-local md = import 'Link/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
@@ -711,7 +711,7 @@ md.List()
 ###### Running
 
 ```jsonnet
-local md = import 'List/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
@@ -740,7 +740,7 @@ md.ListItem()
 ###### Running
 
 ```jsonnet
-local md = import 'ListItem/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
@@ -791,7 +791,7 @@ md.Paragraph([
 ###### Running
 
 ```jsonnet
-local md = import 'Paragraph/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Paragraph(['Hello World!']),
@@ -820,7 +820,7 @@ md.Strong()
 ###### Running
 
 ```jsonnet
-local md = import 'Strong/main.libsonnet';
+local md = import 'markdown/main.libsonnet';
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
