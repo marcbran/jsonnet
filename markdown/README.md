@@ -6,18 +6,17 @@
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/markdown/markdown/main.libsonnet): Inlined code published for usage in other projects
 
-**Running**
+### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-&nbsp;
 md.Document([
   md.Heading1('Title'),
   md.Paragraph(['Hello World!']),
 ])
 ```
 
-**yields**
+### yields
 
 ```json
 # Title
@@ -66,18 +65,17 @@ md.Blockquote()
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'Blockquote/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "# Title\n"
@@ -96,13 +94,13 @@ md.CodeBlock()
 
 ##### JSON format
 
-**Calling**
+###### Calling
 
 ```jsonnet
 md.CodeBlock("func main() {\n  fmt.Println(\"Hello World!\")\n}\n")
 ```
 
-**yields**
+###### yields
 
 ```json
 [
@@ -116,18 +114,17 @@ md.CodeBlock("func main() {\n  fmt.Println(\"Hello World!\")\n}\n")
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'CodeBlock/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.CodeBlock('func main() {\n  fmt.Println("Hello World!")\n}\n')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "    func main() {\n      fmt.Println(\"Hello World!\")\n    }\n"
@@ -146,18 +143,17 @@ md.Em()
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'Em/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "# Title\n"
@@ -176,18 +172,17 @@ md.Emphasis()
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'Emphasis/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "# Title\n"
@@ -206,13 +201,13 @@ md.FencedCodeBlock()
 
 ##### JSON format
 
-**Calling**
+###### Calling
 
 ```jsonnet
 md.FencedCodeBlock("func main() {\n  fmt.Println(\"Hello World!\")\n}\n", "go")
 ```
 
-**yields**
+###### yields
 
 ```json
 [
@@ -227,18 +222,17 @@ md.FencedCodeBlock("func main() {\n  fmt.Println(\"Hello World!\")\n}\n", "go")
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'FencedCodeBlock/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.FencedCodeBlock('func main() {\n  fmt.Println("Hello World!")\n}\n', 'go')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "```go\nfunc main() {\n  fmt.Println(\"Hello World!\")\n}\n```\n"
@@ -257,13 +251,13 @@ md.HTMLBlock()
 
 ##### JSON format
 
-**Calling**
+###### Calling
 
 ```jsonnet
 md.HTMLBlock("<marquee>Welcome to my website</marquee>\n")
 ```
 
-**yields**
+###### yields
 
 ```json
 [
@@ -277,18 +271,17 @@ md.HTMLBlock("<marquee>Welcome to my website</marquee>\n")
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'HTMLBlock/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.HTMLBlock('<marquee>Welcome to my website</marquee>\n')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "<marquee>Welcome to my website</marquee>\n"
@@ -307,13 +300,13 @@ md.Heading()
 
 ##### JSON format
 
-**Calling**
+###### Calling
 
 ```jsonnet
 md.Heading(1, "Title")
 ```
 
-**yields**
+###### yields
 
 ```json
 [
@@ -328,18 +321,17 @@ md.Heading(1, "Title")
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'Heading/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading(1, 'Title')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "# Title\n"
@@ -358,13 +350,13 @@ md.Heading1()
 
 ##### JSON format
 
-**Calling**
+###### Calling
 
 ```jsonnet
 md.Heading1("Title")
 ```
 
-**yields**
+###### yields
 
 ```json
 [
@@ -379,18 +371,17 @@ md.Heading1("Title")
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'Heading1/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "# Title\n"
@@ -409,13 +400,13 @@ md.Heading2()
 
 ##### JSON format
 
-**Calling**
+###### Calling
 
 ```jsonnet
 md.Heading2("Title")
 ```
 
-**yields**
+###### yields
 
 ```json
 [
@@ -430,18 +421,17 @@ md.Heading2("Title")
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'Heading2/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading2('Title')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "## Title\n"
@@ -460,13 +450,13 @@ md.Heading3()
 
 ##### JSON format
 
-**Calling**
+###### Calling
 
 ```jsonnet
 md.Heading3("Title")
 ```
 
-**yields**
+###### yields
 
 ```json
 [
@@ -481,18 +471,17 @@ md.Heading3("Title")
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'Heading3/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading3('Title')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "### Title\n"
@@ -511,13 +500,13 @@ md.Heading4()
 
 ##### JSON format
 
-**Calling**
+###### Calling
 
 ```jsonnet
 md.Heading4("Title")
 ```
 
-**yields**
+###### yields
 
 ```json
 [
@@ -532,18 +521,17 @@ md.Heading4("Title")
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'Heading4/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading4('Title')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "#### Title\n"
@@ -562,13 +550,13 @@ md.Heading5()
 
 ##### JSON format
 
-**Calling**
+###### Calling
 
 ```jsonnet
 md.Heading5("Title")
 ```
 
-**yields**
+###### yields
 
 ```json
 [
@@ -583,18 +571,17 @@ md.Heading5("Title")
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'Heading5/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading5('Title')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "##### Title\n"
@@ -613,13 +600,13 @@ md.Heading6()
 
 ##### JSON format
 
-**Calling**
+###### Calling
 
 ```jsonnet
 md.Heading6("Title")
 ```
 
-**yields**
+###### yields
 
 ```json
 [
@@ -634,18 +621,17 @@ md.Heading6("Title")
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'Heading6/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading6('Title')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "###### Title\n"
@@ -664,18 +650,17 @@ md.Image()
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'Image/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "# Title\n"
@@ -694,18 +679,17 @@ md.Link()
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'Link/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "# Title\n"
@@ -724,18 +708,17 @@ md.List()
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'List/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "# Title\n"
@@ -754,18 +737,17 @@ md.ListItem()
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'ListItem/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "# Title\n"
@@ -784,7 +766,7 @@ md.Paragraph()
 
 ##### JSON format
 
-**Calling**
+###### Calling
 
 ```jsonnet
 md.Paragraph([
@@ -792,7 +774,7 @@ md.Paragraph([
 ])
 ```
 
-**yields**
+###### yields
 
 ```json
 [
@@ -806,18 +788,17 @@ md.Paragraph([
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'Paragraph/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Paragraph(['Hello World!']),
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "Hello World!\n"
@@ -836,18 +817,17 @@ md.Strong()
 
 ##### Markdown format with gensonnet
 
-**Running**
+###### Running
 
 ```jsonnet
 local md = import 'Strong/main.libsonnet';
-&nbsp;
 local g = import 'gensonnet/main.libsonnet';
 g.manifestMarkdown(
   md.Heading1('Title')
 )
 ```
 
-**yields**
+###### yields
 
 ```json
 "# Title\n"
@@ -864,13 +844,13 @@ md.ThematicBreak()
 
 #### Example
 
-**Calling**
+##### Calling
 
 ```jsonnet
 md.ThematicBreak()
 ```
 
-**yields**
+##### yields
 
 ```json
 [
