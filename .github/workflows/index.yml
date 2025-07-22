@@ -25,3 +25,5 @@ jobs:
       - name: Index Jsonnet repo
         run: |
           devsonnet repo index https://github.com/marcbran/jsonnet.git
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
