@@ -13,3 +13,12 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/gensonnet/tree/main/pkg/markdown/lib): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/markdown/markdown/main.libsonnet): Inlined code published for usage in other projects
+## pkg
+
+> Jsonnet package definitions.
+
+- [Readme](pkg/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/devsonnet/tree/main/pkg/pkg/lib): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/pkg/pkg/main.libsonnet): Inlined code published for usage in other projects
