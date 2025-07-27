@@ -2,7 +2,7 @@
 
 > Jsonnet package definitions.
 
-- [Source Code](https://github.com/marcbran/devsonnet/tree/main/pkg/pkg/lib): Original source code
+- [Source Code](https://github.com/marcbran/jpoet/tree/main/pkg/pkg/lib): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/pkg/pkg/main.libsonnet): Inlined code published for usage in other projects
 
