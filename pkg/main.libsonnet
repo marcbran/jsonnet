@@ -22,4 +22,12 @@
     example: if std.type(examples) == 'object' then examples else {},
     children: children,
   },
+  plugin: {
+    github(repo, version): {
+      github: {
+        repo: repo,
+        version: version,
+      },
+    },
+  },
 }
