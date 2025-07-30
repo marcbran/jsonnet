@@ -26,4 +26,7 @@ local elem(name, attrOrChildren=[], childrenOrNull=null) =
   Strong(children): self.Emphasis(2, children),
   Link(text, destination): elem('Link', { destination: destination }, text),
   Image(text, destination): elem('Image', { destination: destination }, text),
+
+  manifestMarkdown(): std.native('invoke:markdown')('manifestMarkdown', []),
+  parseMarkdown(): std.native('invoke:markdown')('parseMarkdown', []),
 }
