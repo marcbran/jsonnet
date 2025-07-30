@@ -2,7 +2,7 @@
 
 > DSL for creating Markdown documents.
 
-- [Source Code](https://github.com/marcbran/gensonnet/tree/main/pkg/markdown/lib): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-markdown): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/markdown/markdown/main.libsonnet): Inlined code published for usage in other projects
 
@@ -10,8 +10,7 @@
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.Document([
     md.Heading1('Title'),
     md.Paragraph(['Hello World!']),
@@ -47,11 +46,9 @@ This library itself doesn't output any Markdown strings.
 Instead, it outputs a format that is similar to [JsonML](http://www.jsonml.org/), but for Markdown elements.
 The unofficial name for this format is "JsonMD".
 
-The second step, creating actual Markdown documents, will require the usage of [gensonnet](https://github.com/marcbran/gensonnet) itself.
-The gensonnet project's `manifestMarkdown` native function takes any value that is valid JsonMD and outputs a string in Markdown format.
+The second step, creating actual Markdown documents, will require the usage of [jpoet](https://github.com/marcbran/jpoet).
+This plugin's `manifestMarkdown` native function takes any value that is valid JsonMD and outputs a string in Markdown format.
 It does so by relying on another Go library ([goldmark](https://github.com/yuin/goldmark)), converting the JsonMD value to a goldmark AST before rendering out the final string.
-
-So strictly speaking this here Jsonnet library is nothing but syntactic sugar on top of what is provided by gensonnet.
 
 ## Fields
 
@@ -100,14 +97,13 @@ md.Blockquote([
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.Blockquote([md.Paragraph(['Intelligent quote here'])])
 )
 ```
@@ -149,14 +145,13 @@ md.CodeBlock("func main() {\n  fmt.Println(\"Hello World!\")\n}\n")
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.CodeBlock('func main() {\n  fmt.Println("Hello World!")\n}\n')
 )
 ```
@@ -164,9 +159,9 @@ g.manifestMarkdown(
 ###### yields
 
 ```
-    func main() {
-      fmt.Println("Hello World!")
-    }
+func main() {
+  fmt.Println("Hello World!")
+}
 ```
 
 ### Em
@@ -200,14 +195,13 @@ md.Em("Emphasised text")
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.Paragraph([
     md.Em('Emphasised text'),
   ])
@@ -251,14 +245,13 @@ md.Emphasis(1, "Emphasised text")
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.Paragraph([
     md.Emphasis(1, 'Emphasised text'),
   ])
@@ -334,14 +327,13 @@ md.HTMLBlock("<marquee>Welcome to my website</marquee>\n")
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.HTMLBlock('<marquee>Welcome to my website</marquee>\n')
 )
 ```
@@ -384,14 +376,13 @@ md.Heading(1, "Title")
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.Heading(1, 'Title')
 )
 ```
@@ -434,14 +425,13 @@ md.Heading1("Title")
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.Heading1('Title')
 )
 ```
@@ -484,14 +474,13 @@ md.Heading2("Title")
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.Heading2('Title')
 )
 ```
@@ -534,14 +523,13 @@ md.Heading3("Title")
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.Heading3('Title')
 )
 ```
@@ -584,14 +572,13 @@ md.Heading4("Title")
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.Heading4('Title')
 )
 ```
@@ -634,14 +621,13 @@ md.Heading5("Title")
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.Heading5('Title')
 )
 ```
@@ -684,14 +670,13 @@ md.Heading6("Title")
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.Heading6('Title')
 )
 ```
@@ -733,14 +718,13 @@ md.Image("illustrative diagram", "./diag.png")
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.Paragraph([
     md.Image('illustrative diagram', './diag.png'),
   ])
@@ -784,14 +768,13 @@ md.Link("jsonnet", "https://github.com/marcbran/jsonnet")
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.Paragraph([
     md.Link('jsonnet', 'https://github.com/marcbran/jsonnet'),
   ])
@@ -957,14 +940,13 @@ md.Paragraph([
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.Paragraph(['Hello World!']),
 )
 ```
@@ -1006,14 +988,13 @@ md.Strong("Bold text")
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.Paragraph([
     md.Strong('Bold text'),
   ])
@@ -1056,14 +1037,13 @@ md.ThematicBreak()
 ]
 ```
 
-##### Markdown format with gensonnet
+##### Markdown format with jpoet
 
 ###### Running
 
 ```jsonnet
 local md = import 'markdown/main.libsonnet';
-local g = import 'gensonnet/main.libsonnet';
-g.manifestMarkdown(
+md.manifestMarkdown(
   md.ThematicBreak()
 )
 ```
