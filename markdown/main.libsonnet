@@ -27,6 +27,6 @@ local elem(name, attrOrChildren=[], childrenOrNull=null) =
   Link(text, destination): elem('Link', { destination: destination }, text),
   Image(text, destination): elem('Image', { destination: destination }, text),
 
-  manifestMarkdown(): std.native('invoke:markdown')('manifestMarkdown', []),
-  parseMarkdown(): std.native('invoke:markdown')('parseMarkdown', []),
+  manifestMarkdown(markdown): std.native('invoke:markdown')('manifestMarkdown', [markdown]),
+  parseMarkdown(markdown): std.native('invoke:markdown')('parseMarkdown', [markdown]),
 }
