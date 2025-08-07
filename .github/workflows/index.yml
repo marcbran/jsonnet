@@ -17,13 +17,13 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: jaxxstorm/action-install-gh-release@v1.10.0
         with:
-          repo: marcbran/jsonnet-kit
+          repo: marcbran/jpoet
       - name: Set Git config
         run: |
           git config --global user.name "${{ github.actor }}"
           git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
       - name: Index Jsonnet repo
         run: |
-          devsonnet repo index https://github.com/marcbran/jsonnet.git
+          jpoet repo index https://github.com/marcbran/jsonnet.git
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
