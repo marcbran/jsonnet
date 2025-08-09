@@ -1192,9 +1192,11 @@ j.String()
 ```
 
 
-#### Example
+#### Examples
 
-##### Running
+##### simple
+
+###### Running
 
 ```jsonnet
 local j = import 'jsonnet/main.libsonnet';
@@ -1203,10 +1205,44 @@ j.manifestJsonnet(
 )
 ```
 
-##### yields
+###### yields
 
 ```
 'foobar'
+```
+
+##### format
+
+###### Running
+
+```jsonnet
+local j = import 'jsonnet/main.libsonnet';
+j.manifestJsonnet(
+  j.String('foo bar %s', j.String('baz')),
+)
+```
+
+###### yields
+
+```
+'foo bar %s' % 'baz'
+```
+
+##### format list
+
+###### Running
+
+```jsonnet
+local j = import 'jsonnet/main.libsonnet';
+j.manifestJsonnet(
+  j.String('foo %s %s', j.Array([j.String('bar'), j.String('baz')])),
+)
+```
+
+###### yields
+
+```
+'foo %s %s' % ['bar', 'baz']
 ```
 
 ### SuperIndex
