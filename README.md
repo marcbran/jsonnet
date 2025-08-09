@@ -31,3 +31,12 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/jpoet/tree/main/pkg/pkg/lib): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/pkg/pkg/main.libsonnet): Inlined code published for usage in other projects
+## terraform
+
+> DSL for creating Terraform modules.
+
+- [Readme](terraform/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/terraform/pkg/terraform): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform/terraform/main.libsonnet): Inlined code published for usage in other projects
