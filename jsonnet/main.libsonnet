@@ -16,10 +16,16 @@
   Dollar: {
     __kind__: 'Dollar',
   },
-  String(value): {
-    __kind__: 'LiteralString',
-    value: value,
-  },
+  String(value, format=null):
+    if format == null
+    then {
+      __kind__: 'LiteralString',
+      value: value,
+    }
+    else $.Percent({
+      __kind__: 'LiteralString',
+      value: value,
+    }, format),
   Number(value): {
     __kind__: 'LiteralNumber',
     originalString: value,
@@ -224,7 +230,7 @@
   },
   Mul(left, right): self.Binary(left, 0, right),
   Div(left, right): self.Binary(left, 1, right),
-  Mod(left, right): self.Binary(left, 2, right),
+  Percent(left, right): self.Binary(left, 2, right),
   Add(left, right): self.Binary(left, 3, right),
   Sub(left, right): self.Binary(left, 4, right),
   LShift(left, right): self.Binary(left, 5, right),
