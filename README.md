@@ -38,6 +38,13 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Readme](terraform-provider/registry.terraform.io/hashicorp/assert/README.md): Documentation of installation and usage
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/hashicorp/assert/terraform-provider-assert/main.libsonnet): Inlined code published for usage in other projects
+## terraform-provider-dns
+
+> Terraform provider dns
+
+- [Readme](terraform-provider/registry.terraform.io/hashicorp/dns/README.md): Documentation of installation and usage
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/hashicorp/dns/terraform-provider-dns/main.libsonnet): Inlined code published for usage in other projects
 ## terraform-provider-external
 
 > Terraform provider external
@@ -45,6 +52,13 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Readme](terraform-provider/registry.terraform.io/hashicorp/external/README.md): Documentation of installation and usage
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/hashicorp/external/terraform-provider-external/main.libsonnet): Inlined code published for usage in other projects
+## terraform-provider-http
+
+> Terraform provider http
+
+- [Readme](terraform-provider/registry.terraform.io/hashicorp/http/README.md): Documentation of installation and usage
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/hashicorp/http/terraform-provider-http/main.libsonnet): Inlined code published for usage in other projects
 ## terraform-provider-local
 
 > Terraform provider local
@@ -66,6 +80,13 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Readme](terraform-provider/registry.terraform.io/hashicorp/time/README.md): Documentation of installation and usage
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/hashicorp/time/terraform-provider-time/main.libsonnet): Inlined code published for usage in other projects
+## terraform-provider-tls
+
+> Terraform provider tls
+
+- [Readme](terraform-provider/registry.terraform.io/hashicorp/tls/README.md): Documentation of installation and usage
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/hashicorp/tls/terraform-provider-tls/main.libsonnet): Inlined code published for usage in other projects
 ## terraform-provider-jsonnet
 
 > Terraform provider jsonnet
