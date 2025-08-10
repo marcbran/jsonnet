@@ -1,8 +1,7 @@
 local build = {
   expression(val):
     if std.type(val) == 'object' then
-      if std.objectHas(val, '_')
-      then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'ref')
         then val._.ref
         else '"%s"' % [val._.str]
@@ -12,8 +11,7 @@ local build = {
     else '"%s"' % [val],
   template(val):
     if std.type(val) == 'object' then
-      if std.objectHas(val, '_')
-      then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'ref')
         then std.strReplace(self.string(val), '\n', '\\n')
         else val._.str
@@ -23,8 +21,7 @@ local build = {
     else val,
   string(val):
     if std.type(val) == 'object' then
-      if std.objectHas(val, '_')
-      then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'ref')
         then '${%s}' % [val._.ref]
         else val._.str
@@ -33,45 +30,47 @@ local build = {
     else if std.type(val) == 'string' then val
     else val,
   blocks(val):
-    if std.type(val) == 'object'
-    then
-      if std.objectHas(val, '_')
-      then
+    if std.type(val) == 'object' then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'blocks')
         then val._.blocks
         else
           if std.objectHas(val._, 'block')
           then { [val._.ref]: val._.block }
           else {}
-      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.blocks(val[key]), std.objectFields(val)), {})
-    else if std.type(val) == 'array'
-    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.blocks(element), val), {})
-    else {},
+      else std.foldl(
+        function(acc, val) std.mergePatch(acc, val),
+        std.map(function(key) build.blocks(val[key]), std.objectFields(val)),
+        {}
+      )
+    else
+      if std.type(val) == 'array' then std.foldl(
+        function(acc, val) std.mergePatch(acc, val),
+        std.map(function(element) build.blocks(element), val),
+        {}
+      )
+      else {},
 };
-
 local providerTemplate(provider, requirements, rawConfiguration, configuration) = {
-  local providerRequirements = {
-    ['terraform.required_providers.%s' % [provider]]: requirements,
-  },
+  local providerRequirements = { ['terraform.required_providers.%s' % [provider]]: requirements },
   local providerAlias = if configuration == null then null else std.get(configuration, 'alias', null),
-  local providerConfiguration =
-    if configuration == null then { _: { refBlock: {}, blocks: [] } } else {
-      _: {
-        local _ = self,
-        ref: '%s.%s' % [provider, configuration.alias],
-        refBlock: {
-          provider: _.ref,
-        },
-        block: {
-          provider: {
-            [provider]: std.prune(configuration),
-          },
-        },
-        blocks: build.blocks(rawConfiguration) + {
-          [_.ref]: _.block,
+  local providerConfiguration = if configuration == null then { _: { refBlock: {}, blocks: [] } } else {
+    _: {
+      local _ = self,
+      ref: '%s.%s' % [provider, configuration.alias],
+      refBlock: {
+        provider: _.ref,
+      },
+      block: {
+        provider: {
+          provider: std.prune(configuration),
         },
       },
+      blocks: build.blocks(rawConfiguration) + {
+        [_.ref]: _.block,
+      },
     },
+  },
   blockType(blockType): {
     local blockTypePath = if blockType == 'resource' then [] else ['data'],
     resource(type, name): {
@@ -97,9 +96,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
             },
           },
         },
-        blocks: build.blocks([providerConfiguration] + [rawBlock]) + providerRequirements + {
-          [_.ref]: _.block,
-        },
+        blocks: build.blocks([providerConfiguration] + [rawBlock]) + providerRequirements + { [_.ref]: _.block },
       },
       field(blocks, fieldName): {
         local fieldPath = resourcePath + [fieldName],
@@ -118,11 +115,10 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
     },
   },
 };
-
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/kreuzwerker/docker',
-    version: '3.6.0',
+    version: '3.6.2',
   },
   local provider = providerTemplate('docker', requirements, rawConfiguration, configuration),
   resource: {
@@ -136,6 +132,7 @@ local provider(rawConfiguration, configuration) = {
         buildkit_flags: build.template(std.get(block, 'buildkit_flags', null)),
         driver: build.template(std.get(block, 'driver', null)),
         driver_options: build.template(std.get(block, 'driver_options', null)),
+        endpoint: build.template(std.get(block, 'endpoint', null)),
         id: build.template(std.get(block, 'id', null)),
         name: build.template(std.get(block, 'name', null)),
         node: build.template(std.get(block, 'node', null)),
@@ -148,6 +145,7 @@ local provider(rawConfiguration, configuration) = {
       buildkit_flags: resource.field(self._.blocks, 'buildkit_flags'),
       driver: resource.field(self._.blocks, 'driver'),
       driver_options: resource.field(self._.blocks, 'driver_options'),
+      endpoint: resource.field(self._.blocks, 'endpoint'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
       node: resource.field(self._.blocks, 'node'),
@@ -170,6 +168,7 @@ local provider(rawConfiguration, configuration) = {
       _: resource._(block, {
         attach: build.template(std.get(block, 'attach', null)),
         bridge: build.template(std.get(block, 'bridge', null)),
+        cgroup_parent: build.template(std.get(block, 'cgroup_parent', null)),
         cgroupns_mode: build.template(std.get(block, 'cgroupns_mode', null)),
         command: build.template(std.get(block, 'command', null)),
         container_logs: build.template(std.get(block, 'container_logs', null)),
@@ -230,6 +229,7 @@ local provider(rawConfiguration, configuration) = {
       }),
       attach: resource.field(self._.blocks, 'attach'),
       bridge: resource.field(self._.blocks, 'bridge'),
+      cgroup_parent: resource.field(self._.blocks, 'cgroup_parent'),
       cgroupns_mode: resource.field(self._.blocks, 'cgroupns_mode'),
       command: resource.field(self._.blocks, 'command'),
       container_logs: resource.field(self._.blocks, 'container_logs'),
@@ -543,7 +543,6 @@ local provider(rawConfiguration, configuration) = {
     },
   },
 };
-
 local providerWithConfiguration = provider(null, null) + {
   withConfiguration(alias, block): provider(block, {
     alias: alias,
@@ -557,5 +556,4 @@ local providerWithConfiguration = provider(null, null) + {
     ssh_opts: build.template(std.get(block, 'ssh_opts', null)),
   }),
 };
-
 providerWithConfiguration
