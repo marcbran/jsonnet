@@ -1017,6 +1017,47 @@ j.manifestJsonnet(
 { a(): 1 }
 ```
 
+##### local
+
+###### Running
+
+```jsonnet
+local j = import 'jsonnet/main.libsonnet';
+j.manifestJsonnet(
+  j.Object([
+    j.FieldLocal('a', j.Number('1')),
+    j.Field('b', j.Var('a')),
+  ]),
+)
+```
+
+###### yields
+
+```
+{ local a = 1, b: a }
+```
+
+##### assert
+
+###### Running
+
+```jsonnet
+local j = import 'jsonnet/main.libsonnet';
+j.manifestJsonnet(
+  j.Object([
+    j.FieldLocal('a', j.Number('1')),
+    j.FieldAssert(j.Eq(j.Var('a'), j.Number('1')), j.String('a must be 1')),
+    j.Field('b', j.Var('a')),
+  ]),
+)
+```
+
+###### yields
+
+```
+{ local a = 1, assert a == 1 : 'a must be 1', b: a }
+```
+
 ### ObjectComp
 
 ObjectComp
