@@ -107,6 +107,20 @@
     kind: if std.type(id) == 'string' then 1 else 2,
     Hide: 1,
   },
+  FieldLocal(id, expr): {
+    __kind__: 'ObjectField',
+    id: id,
+    expr2: expr,
+    kind: 4,
+    Hide: 2,
+  },
+  FieldAssert(cond, message): {
+    __kind__: 'ObjectField',
+    expr2: cond,
+    expr3: message,
+    kind: 0,
+    Hide: 2,
+  },
   FieldFunction(id, parameters, body): {
     __kind__: 'ObjectField',
     id: if std.type(id) == 'string' then id else null,
