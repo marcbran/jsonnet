@@ -716,6 +716,23 @@ j.manifestJsonnet(
 local a = 1; a
 ```
 
+##### single non-array bind
+
+###### Running
+
+```jsonnet
+local j = import 'jsonnet/main.libsonnet';
+j.manifestJsonnet(
+  j.Local(j.LocalBind('a', j.Number('1')), j.Var('a')),
+)
+```
+
+###### yields
+
+```
+local a = 1; a
+```
+
 ##### two binds
 
 ###### Running
@@ -784,6 +801,63 @@ j.manifestJsonnet(
 
 ```
 local a(b) = b; a(1)
+```
+
+### Locals
+
+Locals
+
+```jsonnet
+j.Locals()
+```
+
+
+#### Examples
+
+##### two locals
+
+###### Running
+
+```jsonnet
+local j = import 'jsonnet/main.libsonnet';
+j.manifestJsonnet(
+  j.Locals(
+    [
+      [j.LocalBind('a', j.Number('1'))],
+      [j.LocalBind('b', j.Var('a'))],
+    ],
+    j.Var('b')
+  ),
+)
+```
+
+###### yields
+
+```
+local a = 1; local b = a; b
+```
+
+##### two non-array locals
+
+###### Running
+
+```jsonnet
+local j = import 'jsonnet/main.libsonnet';
+j.manifestJsonnet(
+  j.Locals(
+    [
+      j.LocalBind('a', j.Number('1')),
+      j.LocalBind('b', j.Var('a')),
+    ],
+    j.Var('b')
+  ),
+)
+```
+
+###### yields
+
+```
+local a = 1; local b = a; b
 ```
 
 ### Member
