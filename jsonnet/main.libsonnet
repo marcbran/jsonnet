@@ -178,9 +178,10 @@
 
   Local(binds, body): {
     __kind__: 'Local',
-    binds: binds,
+    binds: if std.type(binds) == 'array' then binds else [binds],
     body: body,
   },
+  Locals(localBinds, body): std.foldr(function(curr, acc) $.Local(curr, acc), localBinds, body),
   LocalBind(variable, body): {
     __kind__: 'LocalBind',
     variable: variable,
