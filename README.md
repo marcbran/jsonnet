@@ -31,6 +31,34 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/jpoet/tree/main/pkg/pkg/lib): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/pkg/pkg/main.libsonnet): Inlined code published for usage in other projects
+## terraform-provider-assert
+
+> Terraform provider assert
+
+- [Readme](terraform-provider/registry.terraform.io/hashicorp/assert/README.md): Documentation of installation and usage
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/hashicorp/assert/terraform-provider-assert/main.libsonnet): Inlined code published for usage in other projects
+## terraform-provider-external
+
+> Terraform provider external
+
+- [Readme](terraform-provider/registry.terraform.io/hashicorp/external/README.md): Documentation of installation and usage
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/hashicorp/external/terraform-provider-external/main.libsonnet): Inlined code published for usage in other projects
+## terraform-provider-tfmigrate
+
+> Terraform provider tfmigrate
+
+- [Readme](terraform-provider/registry.terraform.io/hashicorp/tfmigrate/README.md): Documentation of installation and usage
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/hashicorp/tfmigrate/terraform-provider-tfmigrate/main.libsonnet): Inlined code published for usage in other projects
+## terraform-provider-jsonnet
+
+> Terraform provider jsonnet
+
+- [Readme](terraform-provider/registry.terraform.io/marcbran/jsonnet/README.md): Documentation of installation and usage
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/marcbran/jsonnet/terraform-provider-jsonnet/main.libsonnet): Inlined code published for usage in other projects
 ## terraform
 
 > DSL for creating Terraform modules.
