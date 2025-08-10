@@ -87,6 +87,13 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Readme](terraform-provider/registry.terraform.io/hashicorp/tls/README.md): Documentation of installation and usage
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/hashicorp/tls/terraform-provider-tls/main.libsonnet): Inlined code published for usage in other projects
+## terraform-provider-docker
+
+> Terraform provider docker
+
+- [Readme](terraform-provider/registry.terraform.io/kreuzwerker/docker/README.md): Documentation of installation and usage
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/kreuzwerker/docker/terraform-provider-docker/main.libsonnet): Inlined code published for usage in other projects
 ## terraform-provider-jsonnet
 
 > Terraform provider jsonnet
