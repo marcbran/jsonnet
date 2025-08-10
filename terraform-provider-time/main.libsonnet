@@ -1,8 +1,7 @@
 local build = {
   expression(val):
     if std.type(val) == 'object' then
-      if std.objectHas(val, '_')
-      then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'ref')
         then val._.ref
         else '"%s"' % [val._.str]
@@ -12,8 +11,7 @@ local build = {
     else '"%s"' % [val],
   template(val):
     if std.type(val) == 'object' then
-      if std.objectHas(val, '_')
-      then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'ref')
         then std.strReplace(self.string(val), '\n', '\\n')
         else val._.str
@@ -23,8 +21,7 @@ local build = {
     else val,
   string(val):
     if std.type(val) == 'object' then
-      if std.objectHas(val, '_')
-      then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'ref')
         then '${%s}' % [val._.ref]
         else val._.str
@@ -33,45 +30,47 @@ local build = {
     else if std.type(val) == 'string' then val
     else val,
   blocks(val):
-    if std.type(val) == 'object'
-    then
-      if std.objectHas(val, '_')
-      then
+    if std.type(val) == 'object' then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'blocks')
         then val._.blocks
         else
           if std.objectHas(val._, 'block')
           then { [val._.ref]: val._.block }
           else {}
-      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.blocks(val[key]), std.objectFields(val)), {})
-    else if std.type(val) == 'array'
-    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.blocks(element), val), {})
-    else {},
+      else std.foldl(
+        function(acc, val) std.mergePatch(acc, val),
+        std.map(function(key) build.blocks(val[key]), std.objectFields(val)),
+        {}
+      )
+    else
+      if std.type(val) == 'array' then std.foldl(
+        function(acc, val) std.mergePatch(acc, val),
+        std.map(function(element) build.blocks(element), val),
+        {}
+      )
+      else {},
 };
-
 local providerTemplate(provider, requirements, rawConfiguration, configuration) = {
-  local providerRequirements = {
-    ['terraform.required_providers.%s' % [provider]]: requirements,
-  },
+  local providerRequirements = { ['terraform.required_providers.%s' % [provider]]: requirements },
   local providerAlias = if configuration == null then null else std.get(configuration, 'alias', null),
-  local providerConfiguration =
-    if configuration == null then { _: { refBlock: {}, blocks: [] } } else {
-      _: {
-        local _ = self,
-        ref: '%s.%s' % [provider, configuration.alias],
-        refBlock: {
-          provider: _.ref,
-        },
-        block: {
-          provider: {
-            [provider]: std.prune(configuration),
-          },
-        },
-        blocks: build.blocks(rawConfiguration) + {
-          [_.ref]: _.block,
+  local providerConfiguration = if configuration == null then { _: { refBlock: {}, blocks: [] } } else {
+    _: {
+      local _ = self,
+      ref: '%s.%s' % [provider, configuration.alias],
+      refBlock: {
+        provider: _.ref,
+      },
+      block: {
+        provider: {
+          provider: std.prune(configuration),
         },
       },
+      blocks: build.blocks(rawConfiguration) + {
+        [_.ref]: _.block,
+      },
     },
+  },
   blockType(blockType): {
     local blockTypePath = if blockType == 'resource' then [] else ['data'],
     resource(type, name): {
@@ -97,9 +96,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
             },
           },
         },
-        blocks: build.blocks([providerConfiguration] + [rawBlock]) + providerRequirements + {
-          [_.ref]: _.block,
-        },
+        blocks: build.blocks([providerConfiguration] + [rawBlock]) + providerRequirements + { [_.ref]: _.block },
       },
       field(blocks, fieldName): {
         local fieldPath = resourcePath + [fieldName],
@@ -118,7 +115,6 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
     },
   },
 };
-
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/time',
@@ -242,17 +238,15 @@ local provider(rawConfiguration, configuration) = {
       year: resource.field(self._.blocks, 'year'),
     },
   },
-  func: {
-    duration_parse(duration): provider.func('duration_parse', [duration]),
-    rfc3339_parse(timestamp): provider.func('rfc3339_parse', [timestamp]),
-    unix_timestamp_parse(unix_timestamp): provider.func('unix_timestamp_parse', [unix_timestamp]),
+  Function: {
+    duration_parse(duration): provider.Function('duration_parse', [duration]),
+    rfc3339_parse(timestamp): provider.Function('rfc3339_parse', [timestamp]),
+    unix_timestamp_parse(unix_timestamp): provider.Function('unix_timestamp_parse', [unix_timestamp]),
   },
 };
-
 local providerWithConfiguration = provider(null, null) + {
   withConfiguration(alias, block): provider(block, {
     alias: alias,
   }),
 };
-
 providerWithConfiguration
