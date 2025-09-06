@@ -52,6 +52,13 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Readme](terraform-provider/registry.terraform.io/hashicorp/assert/README.md): Documentation of installation and usage
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/hashicorp/assert/terraform-provider-assert/main.libsonnet): Inlined code published for usage in other projects
+## terraform-provider-azurerm
+
+> Terraform provider azurerm
+
+- [Readme](terraform-provider/registry.terraform.io/hashicorp/azurerm/README.md): Documentation of installation and usage
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/hashicorp/azurerm/terraform-provider-azurerm/main.libsonnet): Inlined code published for usage in other projects
 ## terraform-provider-dns
 
 > Terraform provider dns
@@ -115,6 +122,13 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Readme](terraform-provider/registry.terraform.io/kreuzwerker/docker/README.md): Documentation of installation and usage
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/kreuzwerker/docker/terraform-provider-docker/main.libsonnet): Inlined code published for usage in other projects
+## terraform-provider-logzio
+
+> Terraform provider logzio
+
+- [Readme](terraform-provider/registry.terraform.io/logzio/logzio/README.md): Documentation of installation and usage
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/logzio/logzio/terraform-provider-logzio/main.libsonnet): Inlined code published for usage in other projects
 ## terraform-provider-dolt
 
 > Terraform provider dolt
@@ -129,6 +143,13 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Readme](terraform-provider/registry.terraform.io/marcbran/jsonnet/README.md): Documentation of installation and usage
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/marcbran/jsonnet/terraform-provider-jsonnet/main.libsonnet): Inlined code published for usage in other projects
+## terraform-provider-newrelic
+
+> Terraform provider newrelic
+
+- [Readme](terraform-provider/registry.terraform.io/newrelic/newrelic/README.md): Documentation of installation and usage
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/newrelic/newrelic/terraform-provider-newrelic/main.libsonnet): Inlined code published for usage in other projects
 ## terraform
 
 > DSL for creating Terraform modules.
