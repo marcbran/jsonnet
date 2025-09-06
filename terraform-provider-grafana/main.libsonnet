@@ -1,8 +1,7 @@
 local build = {
   expression(val):
     if std.type(val) == 'object' then
-      if std.objectHas(val, '_')
-      then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'ref')
         then val._.ref
         else '"%s"' % [val._.str]
@@ -12,8 +11,7 @@ local build = {
     else '"%s"' % [val],
   template(val):
     if std.type(val) == 'object' then
-      if std.objectHas(val, '_')
-      then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'ref')
         then std.strReplace(self.string(val), '\n', '\\n')
         else val._.str
@@ -23,8 +21,7 @@ local build = {
     else val,
   string(val):
     if std.type(val) == 'object' then
-      if std.objectHas(val, '_')
-      then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'ref')
         then '${%s}' % [val._.ref]
         else val._.str
@@ -33,45 +30,47 @@ local build = {
     else if std.type(val) == 'string' then val
     else val,
   blocks(val):
-    if std.type(val) == 'object'
-    then
-      if std.objectHas(val, '_')
-      then
+    if std.type(val) == 'object' then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'blocks')
         then val._.blocks
         else
           if std.objectHas(val._, 'block')
           then { [val._.ref]: val._.block }
           else {}
-      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.blocks(val[key]), std.objectFields(val)), {})
-    else if std.type(val) == 'array'
-    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.blocks(element), val), {})
-    else {},
+      else std.foldl(
+        function(acc, val) std.mergePatch(acc, val),
+        std.map(function(key) build.blocks(val[key]), std.objectFields(val)),
+        {}
+      )
+    else
+      if std.type(val) == 'array' then std.foldl(
+        function(acc, val) std.mergePatch(acc, val),
+        std.map(function(element) build.blocks(element), val),
+        {}
+      )
+      else {},
 };
-
 local providerTemplate(provider, requirements, rawConfiguration, configuration) = {
-  local providerRequirements = {
-    ['terraform.required_providers.%s' % [provider]]: requirements,
-  },
+  local providerRequirements = { ['terraform.required_providers.%s' % [provider]]: requirements },
   local providerAlias = if configuration == null then null else std.get(configuration, 'alias', null),
-  local providerConfiguration =
-    if configuration == null then { _: { refBlock: {}, blocks: [] } } else {
-      _: {
-        local _ = self,
-        ref: '%s.%s' % [provider, configuration.alias],
-        refBlock: {
-          provider: _.ref,
-        },
-        block: {
-          provider: {
-            [provider]: std.prune(configuration),
-          },
-        },
-        blocks: build.blocks(rawConfiguration) + {
-          [_.ref]: _.block,
+  local providerConfiguration = if configuration == null then { _: { refBlock: {}, blocks: [] } } else {
+    _: {
+      local _ = self,
+      ref: '%s.%s' % [provider, configuration.alias],
+      refBlock: {
+        provider: _.ref,
+      },
+      block: {
+        provider: {
+          provider: std.prune(configuration),
         },
       },
+      blocks: build.blocks(rawConfiguration) + {
+        [_.ref]: _.block,
+      },
     },
+  },
   blockType(blockType): {
     local blockTypePath = if blockType == 'resource' then [] else ['data'],
     resource(type, name): {
@@ -97,9 +96,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
             },
           },
         },
-        blocks: build.blocks([providerConfiguration] + [rawBlock]) + providerRequirements + {
-          [_.ref]: _.block,
-        },
+        blocks: build.blocks([providerConfiguration] + [rawBlock]) + providerRequirements + { [_.ref]: _.block },
       },
       field(blocks, fieldName): {
         local fieldPath = resourcePath + [fieldName],
@@ -118,11 +115,10 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
     },
   },
 };
-
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/grafana/grafana',
-    version: '3.25.2',
+    version: '4.5.3',
   },
   local provider = providerTemplate('grafana', requirements, rawConfiguration, configuration),
   resource: {
@@ -157,6 +153,34 @@ local provider(rawConfiguration, configuration) = {
       local resource = blockType.resource('grafana_apps_playlist_playlist_v0alpha1', name),
       _: resource._(block, {
       }),
+    },
+    asserts_notification_alerts_config(name, block): {
+      local resource = blockType.resource('grafana_asserts_notification_alerts_config', name),
+      _: resource._(block, {
+        alert_labels: build.template(std.get(block, 'alert_labels', null)),
+        duration: build.template(std.get(block, 'duration', null)),
+        id: build.template(std.get(block, 'id', null)),
+        match_labels: build.template(std.get(block, 'match_labels', null)),
+        name: build.template(block.name),
+        silenced: build.template(std.get(block, 'silenced', null)),
+      }),
+      alert_labels: resource.field(self._.blocks, 'alert_labels'),
+      duration: resource.field(self._.blocks, 'duration'),
+      id: resource.field(self._.blocks, 'id'),
+      match_labels: resource.field(self._.blocks, 'match_labels'),
+      name: resource.field(self._.blocks, 'name'),
+      silenced: resource.field(self._.blocks, 'silenced'),
+    },
+    asserts_suppressed_assertions_config(name, block): {
+      local resource = blockType.resource('grafana_asserts_suppressed_assertions_config', name),
+      _: resource._(block, {
+        id: build.template(std.get(block, 'id', null)),
+        match_labels: build.template(std.get(block, 'match_labels', null)),
+        name: build.template(block.name),
+      }),
+      id: resource.field(self._.blocks, 'id'),
+      match_labels: resource.field(self._.blocks, 'match_labels'),
+      name: resource.field(self._.blocks, 'name'),
     },
     cloud_access_policy(name, block): {
       local resource = blockType.resource('grafana_cloud_access_policy', name),
@@ -223,7 +247,7 @@ local provider(rawConfiguration, configuration) = {
         id: build.template(std.get(block, 'id', null)),
         slug: build.template(block.slug),
         stack_slug: build.template(block.stack_slug),
-        version: build.template(block.version),
+        version: build.template(std.get(block, 'version', null)),
       }),
       id: resource.field(self._.blocks, 'id'),
       slug: resource.field(self._.blocks, 'slug'),
@@ -365,8 +389,11 @@ local provider(rawConfiguration, configuration) = {
         alertmanager_url: build.template(std.get(block, 'alertmanager_url', null)),
         alertmanager_user_id: build.template(std.get(block, 'alertmanager_user_id', null)),
         cluster_slug: build.template(std.get(block, 'cluster_slug', null)),
+        delete_protection: build.template(std.get(block, 'delete_protection', null)),
         description: build.template(std.get(block, 'description', null)),
         fleet_management_name: build.template(std.get(block, 'fleet_management_name', null)),
+        fleet_management_private_connectivity_info_private_dns: build.template(std.get(block, 'fleet_management_private_connectivity_info_private_dns', null)),
+        fleet_management_private_connectivity_info_service_name: build.template(std.get(block, 'fleet_management_private_connectivity_info_service_name', null)),
         fleet_management_status: build.template(std.get(block, 'fleet_management_status', null)),
         fleet_management_url: build.template(std.get(block, 'fleet_management_url', null)),
         fleet_management_user_id: build.template(std.get(block, 'fleet_management_user_id', null)),
@@ -436,8 +463,11 @@ local provider(rawConfiguration, configuration) = {
       alertmanager_url: resource.field(self._.blocks, 'alertmanager_url'),
       alertmanager_user_id: resource.field(self._.blocks, 'alertmanager_user_id'),
       cluster_slug: resource.field(self._.blocks, 'cluster_slug'),
+      delete_protection: resource.field(self._.blocks, 'delete_protection'),
       description: resource.field(self._.blocks, 'description'),
       fleet_management_name: resource.field(self._.blocks, 'fleet_management_name'),
+      fleet_management_private_connectivity_info_private_dns: resource.field(self._.blocks, 'fleet_management_private_connectivity_info_private_dns'),
+      fleet_management_private_connectivity_info_service_name: resource.field(self._.blocks, 'fleet_management_private_connectivity_info_service_name'),
       fleet_management_status: resource.field(self._.blocks, 'fleet_management_status'),
       fleet_management_url: resource.field(self._.blocks, 'fleet_management_url'),
       fleet_management_user_id: resource.field(self._.blocks, 'fleet_management_user_id'),
@@ -897,6 +927,17 @@ local provider(rawConfiguration, configuration) = {
       name: resource.field(self._.blocks, 'name'),
       updated: resource.field(self._.blocks, 'updated'),
     },
+    k6_project_allowed_load_zones(name, block): {
+      local resource = blockType.resource('grafana_k6_project_allowed_load_zones', name),
+      _: resource._(block, {
+        allowed_load_zones: build.template(block.allowed_load_zones),
+        id: build.template(std.get(block, 'id', null)),
+        project_id: build.template(block.project_id),
+      }),
+      allowed_load_zones: resource.field(self._.blocks, 'allowed_load_zones'),
+      id: resource.field(self._.blocks, 'id'),
+      project_id: resource.field(self._.blocks, 'project_id'),
+    },
     k6_project_limits(name, block): {
       local resource = blockType.resource('grafana_k6_project_limits', name),
       _: resource._(block, {
@@ -913,6 +954,23 @@ local provider(rawConfiguration, configuration) = {
       vu_browser_max_per_test: resource.field(self._.blocks, 'vu_browser_max_per_test'),
       vu_max_per_test: resource.field(self._.blocks, 'vu_max_per_test'),
       vuh_max_per_month: resource.field(self._.blocks, 'vuh_max_per_month'),
+    },
+    k6_schedule(name, block): {
+      local resource = blockType.resource('grafana_k6_schedule', name),
+      _: resource._(block, {
+        created_by: build.template(std.get(block, 'created_by', null)),
+        deactivated: build.template(std.get(block, 'deactivated', null)),
+        id: build.template(std.get(block, 'id', null)),
+        load_test_id: build.template(block.load_test_id),
+        next_run: build.template(std.get(block, 'next_run', null)),
+        starts: build.template(block.starts),
+      }),
+      created_by: resource.field(self._.blocks, 'created_by'),
+      deactivated: resource.field(self._.blocks, 'deactivated'),
+      id: resource.field(self._.blocks, 'id'),
+      load_test_id: resource.field(self._.blocks, 'load_test_id'),
+      next_run: resource.field(self._.blocks, 'next_run'),
+      starts: resource.field(self._.blocks, 'starts'),
     },
     library_panel(name, block): {
       local resource = blockType.resource('grafana_library_panel', name),
@@ -1207,10 +1265,11 @@ local provider(rawConfiguration, configuration) = {
         is_webhook_enabled: build.template(std.get(block, 'is_webhook_enabled', null)),
         name: build.template(block.name),
         password: build.template(std.get(block, 'password', null)),
+        preset: build.template(std.get(block, 'preset', null)),
         team_id: build.template(std.get(block, 'team_id', null)),
         trigger_template: build.template(std.get(block, 'trigger_template', null)),
         trigger_type: build.template(std.get(block, 'trigger_type', null)),
-        url: build.template(block.url),
+        url: build.template(std.get(block, 'url', null)),
         user: build.template(std.get(block, 'user', null)),
       }),
       authorization_header: resource.field(self._.blocks, 'authorization_header'),
@@ -1223,6 +1282,7 @@ local provider(rawConfiguration, configuration) = {
       is_webhook_enabled: resource.field(self._.blocks, 'is_webhook_enabled'),
       name: resource.field(self._.blocks, 'name'),
       password: resource.field(self._.blocks, 'password'),
+      preset: resource.field(self._.blocks, 'preset'),
       team_id: resource.field(self._.blocks, 'team_id'),
       trigger_template: resource.field(self._.blocks, 'trigger_template'),
       trigger_type: resource.field(self._.blocks, 'trigger_type'),
@@ -1443,6 +1503,21 @@ local provider(rawConfiguration, configuration) = {
       interval_seconds: resource.field(self._.blocks, 'interval_seconds'),
       name: resource.field(self._.blocks, 'name'),
       org_id: resource.field(self._.blocks, 'org_id'),
+    },
+    scim_config(name, block): {
+      local resource = blockType.resource('grafana_scim_config', name),
+      _: resource._(block, {
+        enable_group_sync: build.template(block.enable_group_sync),
+        enable_user_sync: build.template(block.enable_user_sync),
+        id: build.template(std.get(block, 'id', null)),
+        org_id: build.template(std.get(block, 'org_id', null)),
+        reject_non_provisioned_users: build.template(block.reject_non_provisioned_users),
+      }),
+      enable_group_sync: resource.field(self._.blocks, 'enable_group_sync'),
+      enable_user_sync: resource.field(self._.blocks, 'enable_user_sync'),
+      id: resource.field(self._.blocks, 'id'),
+      org_id: resource.field(self._.blocks, 'org_id'),
+      reject_non_provisioned_users: resource.field(self._.blocks, 'reject_non_provisioned_users'),
     },
     service_account(name, block): {
       local resource = blockType.resource('grafana_service_account', name),
@@ -1807,8 +1882,11 @@ local provider(rawConfiguration, configuration) = {
         alertmanager_url: build.template(std.get(block, 'alertmanager_url', null)),
         alertmanager_user_id: build.template(std.get(block, 'alertmanager_user_id', null)),
         cluster_slug: build.template(std.get(block, 'cluster_slug', null)),
+        delete_protection: build.template(std.get(block, 'delete_protection', null)),
         description: build.template(std.get(block, 'description', null)),
         fleet_management_name: build.template(std.get(block, 'fleet_management_name', null)),
+        fleet_management_private_connectivity_info_private_dns: build.template(std.get(block, 'fleet_management_private_connectivity_info_private_dns', null)),
+        fleet_management_private_connectivity_info_service_name: build.template(std.get(block, 'fleet_management_private_connectivity_info_service_name', null)),
         fleet_management_status: build.template(std.get(block, 'fleet_management_status', null)),
         fleet_management_url: build.template(std.get(block, 'fleet_management_url', null)),
         fleet_management_user_id: build.template(std.get(block, 'fleet_management_user_id', null)),
@@ -1876,8 +1954,11 @@ local provider(rawConfiguration, configuration) = {
       alertmanager_url: resource.field(self._.blocks, 'alertmanager_url'),
       alertmanager_user_id: resource.field(self._.blocks, 'alertmanager_user_id'),
       cluster_slug: resource.field(self._.blocks, 'cluster_slug'),
+      delete_protection: resource.field(self._.blocks, 'delete_protection'),
       description: resource.field(self._.blocks, 'description'),
       fleet_management_name: resource.field(self._.blocks, 'fleet_management_name'),
+      fleet_management_private_connectivity_info_private_dns: resource.field(self._.blocks, 'fleet_management_private_connectivity_info_private_dns'),
+      fleet_management_private_connectivity_info_service_name: resource.field(self._.blocks, 'fleet_management_private_connectivity_info_service_name'),
       fleet_management_status: resource.field(self._.blocks, 'fleet_management_status'),
       fleet_management_url: resource.field(self._.blocks, 'fleet_management_url'),
       fleet_management_user_id: resource.field(self._.blocks, 'fleet_management_user_id'),
@@ -2067,7 +2148,7 @@ local provider(rawConfiguration, configuration) = {
         id: build.template(std.get(block, 'id', null)),
         org_id: build.template(std.get(block, 'org_id', null)),
         parent_folder_uid: build.template(std.get(block, 'parent_folder_uid', null)),
-        title: build.template(block.title),
+        title: build.template(std.get(block, 'title', null)),
         uid: build.template(std.get(block, 'uid', null)),
         url: build.template(std.get(block, 'url', null)),
       }),
@@ -2157,6 +2238,17 @@ local provider(rawConfiguration, configuration) = {
       name: resource.field(self._.blocks, 'name'),
       updated: resource.field(self._.blocks, 'updated'),
     },
+    k6_project_allowed_load_zones(name, block): {
+      local resource = blockType.resource('grafana_k6_project_allowed_load_zones', name),
+      _: resource._(block, {
+        allowed_load_zones: build.template(std.get(block, 'allowed_load_zones', null)),
+        id: build.template(std.get(block, 'id', null)),
+        project_id: build.template(block.project_id),
+      }),
+      allowed_load_zones: resource.field(self._.blocks, 'allowed_load_zones'),
+      id: resource.field(self._.blocks, 'id'),
+      project_id: resource.field(self._.blocks, 'project_id'),
+    },
     k6_project_limits(name, block): {
       local resource = blockType.resource('grafana_k6_project_limits', name),
       _: resource._(block, {
@@ -2184,6 +2276,32 @@ local provider(rawConfiguration, configuration) = {
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
       projects: resource.field(self._.blocks, 'projects'),
+    },
+    k6_schedule(name, block): {
+      local resource = blockType.resource('grafana_k6_schedule', name),
+      _: resource._(block, {
+        created_by: build.template(std.get(block, 'created_by', null)),
+        deactivated: build.template(std.get(block, 'deactivated', null)),
+        id: build.template(std.get(block, 'id', null)),
+        load_test_id: build.template(block.load_test_id),
+        next_run: build.template(std.get(block, 'next_run', null)),
+        starts: build.template(std.get(block, 'starts', null)),
+      }),
+      created_by: resource.field(self._.blocks, 'created_by'),
+      deactivated: resource.field(self._.blocks, 'deactivated'),
+      id: resource.field(self._.blocks, 'id'),
+      load_test_id: resource.field(self._.blocks, 'load_test_id'),
+      next_run: resource.field(self._.blocks, 'next_run'),
+      starts: resource.field(self._.blocks, 'starts'),
+    },
+    k6_schedules(name, block): {
+      local resource = blockType.resource('grafana_k6_schedules', name),
+      _: resource._(block, {
+        id: build.template(std.get(block, 'id', null)),
+        schedules: build.template(std.get(block, 'schedules', null)),
+      }),
+      id: resource.field(self._.blocks, 'id'),
+      schedules: resource.field(self._.blocks, 'schedules'),
     },
     library_panel(name, block): {
       local resource = blockType.resource('grafana_library_panel', name),
@@ -2524,7 +2642,6 @@ local provider(rawConfiguration, configuration) = {
     },
   },
 };
-
 local providerWithConfiguration = provider(null, null) + {
   withConfiguration(alias, block): provider(block, {
     alias: alias,
@@ -2558,5 +2675,4 @@ local providerWithConfiguration = provider(null, null) + {
     url: build.template(std.get(block, 'url', null)),
   }),
 };
-
 providerWithConfiguration
