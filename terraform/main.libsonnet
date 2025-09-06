@@ -400,6 +400,10 @@ local Cfg(resources) =
   ];
   terraformBlocks + regularBlocks;
 
+local CfgDir(resources) = {
+  'main.tf.json': std.manifestJson(Cfg(resources)),
+};
+
 local terraform = functions + operators + {
   build: build,
   Format: Format,
@@ -408,6 +412,7 @@ local terraform = functions + operators + {
   Output: Output,
   Module: Module,
   Cfg: Cfg,
+  CfgDir: CfgDir,
   Each: Each,
   If: If,
   For: For,
