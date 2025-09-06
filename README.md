@@ -101,6 +101,13 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Readme](terraform-provider/registry.terraform.io/kreuzwerker/docker/README.md): Documentation of installation and usage
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/kreuzwerker/docker/terraform-provider-docker/main.libsonnet): Inlined code published for usage in other projects
+## terraform-provider-dolt
+
+> Terraform provider dolt
+
+- [Readme](terraform-provider/registry.terraform.io/marcbran/dolt/README.md): Documentation of installation and usage
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/marcbran/dolt/terraform-provider-dolt/main.libsonnet): Inlined code published for usage in other projects
 ## terraform-provider-jsonnet
 
 > Terraform provider jsonnet
