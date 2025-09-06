@@ -118,7 +118,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/tfmigrate',
-    version: '1.1.0',
+    version: '1.2.0',
   },
   local provider = providerTemplate('tfmigrate', requirements, rawConfiguration, configuration),
   resource: {
@@ -142,15 +142,8 @@ local provider(rawConfiguration, configuration) = {
       remote_name: resource.field(self._.blocks, 'remote_name'),
       summary: resource.field(self._.blocks, 'summary'),
     },
-    git_reset(name, block): {
-      local resource = blockType.resource('tfmigrate_git_reset', name),
-      _: resource._(block, {
-        directory_path: build.template(block.directory_path),
-      }),
-      directory_path: resource.field(self._.blocks, 'directory_path'),
-    },
-    github_pr(name, block): {
-      local resource = blockType.resource('tfmigrate_github_pr', name),
+    git_pr(name, block): {
+      local resource = blockType.resource('tfmigrate_git_pr', name),
       _: resource._(block, {
         destin_branch: build.template(block.destin_branch),
         pr_body: build.template(block.pr_body),
@@ -167,6 +160,13 @@ local provider(rawConfiguration, configuration) = {
       repo_identifier: resource.field(self._.blocks, 'repo_identifier'),
       source_branch: resource.field(self._.blocks, 'source_branch'),
       summary: resource.field(self._.blocks, 'summary'),
+    },
+    git_reset(name, block): {
+      local resource = blockType.resource('tfmigrate_git_reset', name),
+      _: resource._(block, {
+        directory_path: build.template(block.directory_path),
+      }),
+      directory_path: resource.field(self._.blocks, 'directory_path'),
     },
     state_migration(name, block): {
       local resource = blockType.resource('tfmigrate_state_migration', name),
