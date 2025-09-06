@@ -1,8 +1,7 @@
 local build = {
   expression(val):
     if std.type(val) == 'object' then
-      if std.objectHas(val, '_')
-      then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'ref')
         then val._.ref
         else '"%s"' % [val._.str]
@@ -12,8 +11,7 @@ local build = {
     else '"%s"' % [val],
   template(val):
     if std.type(val) == 'object' then
-      if std.objectHas(val, '_')
-      then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'ref')
         then std.strReplace(self.string(val), '\n', '\\n')
         else val._.str
@@ -23,8 +21,7 @@ local build = {
     else val,
   string(val):
     if std.type(val) == 'object' then
-      if std.objectHas(val, '_')
-      then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'ref')
         then '${%s}' % [val._.ref]
         else val._.str
@@ -33,45 +30,47 @@ local build = {
     else if std.type(val) == 'string' then val
     else val,
   blocks(val):
-    if std.type(val) == 'object'
-    then
-      if std.objectHas(val, '_')
-      then
+    if std.type(val) == 'object' then
+      if std.objectHas(val, '_') then
         if std.objectHas(val._, 'blocks')
         then val._.blocks
         else
           if std.objectHas(val._, 'block')
           then { [val._.ref]: val._.block }
           else {}
-      else std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(key) build.blocks(val[key]), std.objectFields(val)), {})
-    else if std.type(val) == 'array'
-    then std.foldl(function(acc, val) std.mergePatch(acc, val), std.map(function(element) build.blocks(element), val), {})
-    else {},
+      else std.foldl(
+        function(acc, val) std.mergePatch(acc, val),
+        std.map(function(key) build.blocks(val[key]), std.objectFields(val)),
+        {}
+      )
+    else
+      if std.type(val) == 'array' then std.foldl(
+        function(acc, val) std.mergePatch(acc, val),
+        std.map(function(element) build.blocks(element), val),
+        {}
+      )
+      else {},
 };
-
 local providerTemplate(provider, requirements, rawConfiguration, configuration) = {
-  local providerRequirements = {
-    ['terraform.required_providers.%s' % [provider]]: requirements,
-  },
+  local providerRequirements = { ['terraform.required_providers.%s' % [provider]]: requirements },
   local providerAlias = if configuration == null then null else std.get(configuration, 'alias', null),
-  local providerConfiguration =
-    if configuration == null then { _: { refBlock: {}, blocks: [] } } else {
-      _: {
-        local _ = self,
-        ref: '%s.%s' % [provider, configuration.alias],
-        refBlock: {
-          provider: _.ref,
-        },
-        block: {
-          provider: {
-            [provider]: std.prune(configuration),
-          },
-        },
-        blocks: build.blocks(rawConfiguration) + {
-          [_.ref]: _.block,
+  local providerConfiguration = if configuration == null then { _: { refBlock: {}, blocks: [] } } else {
+    _: {
+      local _ = self,
+      ref: '%s.%s' % [provider, configuration.alias],
+      refBlock: {
+        provider: _.ref,
+      },
+      block: {
+        provider: {
+          provider: std.prune(configuration),
         },
       },
+      blocks: build.blocks(rawConfiguration) + {
+        [_.ref]: _.block,
+      },
     },
+  },
   blockType(blockType): {
     local blockTypePath = if blockType == 'resource' then [] else ['data'],
     resource(type, name): {
@@ -97,9 +96,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
             },
           },
         },
-        blocks: build.blocks([providerConfiguration] + [rawBlock]) + providerRequirements + {
-          [_.ref]: _.block,
-        },
+        blocks: build.blocks([providerConfiguration] + [rawBlock]) + providerRequirements + { [_.ref]: _.block },
       },
       field(blocks, fieldName): {
         local fieldPath = resourcePath + [fieldName],
@@ -118,11 +115,10 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
     },
   },
 };
-
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/goauthentik/authentik',
-    version: '2025.4.0',
+    version: '2025.8.0',
   },
   local provider = providerTemplate('authentik', requirements, rawConfiguration, configuration),
   resource: {
@@ -197,6 +193,7 @@ local provider(rawConfiguration, configuration) = {
         branding_favicon: build.template(std.get(block, 'branding_favicon', null)),
         branding_logo: build.template(std.get(block, 'branding_logo', null)),
         branding_title: build.template(std.get(block, 'branding_title', null)),
+        client_certificates: build.template(std.get(block, 'client_certificates', null)),
         default: build.template(std.get(block, 'default', null)),
         default_application: build.template(std.get(block, 'default_application', null)),
         domain: build.template(block.domain),
@@ -215,6 +212,7 @@ local provider(rawConfiguration, configuration) = {
       branding_favicon: resource.field(self._.blocks, 'branding_favicon'),
       branding_logo: resource.field(self._.blocks, 'branding_logo'),
       branding_title: resource.field(self._.blocks, 'branding_title'),
+      client_certificates: resource.field(self._.blocks, 'client_certificates'),
       default: resource.field(self._.blocks, 'default'),
       default_application: resource.field(self._.blocks, 'default_application'),
       domain: resource.field(self._.blocks, 'domain'),
@@ -260,23 +258,25 @@ local provider(rawConfiguration, configuration) = {
     event_rule(name, block): {
       local resource = blockType.resource('authentik_event_rule', name),
       _: resource._(block, {
-        group: build.template(std.get(block, 'group', null)),
+        destination_event_user: build.template(std.get(block, 'destination_event_user', null)),
+        destination_group: build.template(std.get(block, 'destination_group', null)),
         id: build.template(std.get(block, 'id', null)),
         name: build.template(block.name),
         severity: build.template(std.get(block, 'severity', null)),
         transports: build.template(block.transports),
-        webhook_mapping: build.template(std.get(block, 'webhook_mapping', null)),
       }),
-      group: resource.field(self._.blocks, 'group'),
+      destination_event_user: resource.field(self._.blocks, 'destination_event_user'),
+      destination_group: resource.field(self._.blocks, 'destination_group'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
       severity: resource.field(self._.blocks, 'severity'),
       transports: resource.field(self._.blocks, 'transports'),
-      webhook_mapping: resource.field(self._.blocks, 'webhook_mapping'),
     },
     event_transport(name, block): {
       local resource = blockType.resource('authentik_event_transport', name),
       _: resource._(block, {
+        email_subject_prefix: build.template(std.get(block, 'email_subject_prefix', null)),
+        email_template: build.template(std.get(block, 'email_template', null)),
         id: build.template(std.get(block, 'id', null)),
         mode: build.template(block.mode),
         name: build.template(block.name),
@@ -285,6 +285,8 @@ local provider(rawConfiguration, configuration) = {
         webhook_mapping_headers: build.template(std.get(block, 'webhook_mapping_headers', null)),
         webhook_url: build.template(std.get(block, 'webhook_url', null)),
       }),
+      email_subject_prefix: resource.field(self._.blocks, 'email_subject_prefix'),
+      email_template: resource.field(self._.blocks, 'email_template'),
       id: resource.field(self._.blocks, 'id'),
       mode: resource.field(self._.blocks, 'mode'),
       name: resource.field(self._.blocks, 'name'),
@@ -906,6 +908,7 @@ local provider(rawConfiguration, configuration) = {
         allowed_redirect_uris: build.template(std.get(block, 'allowed_redirect_uris', null)),
         authentication_flow: build.template(std.get(block, 'authentication_flow', null)),
         authorization_flow: build.template(block.authorization_flow),
+        backchannel_logout_uri: build.template(std.get(block, 'backchannel_logout_uri', null)),
         client_id: build.template(block.client_id),
         client_secret: build.template(std.get(block, 'client_secret', null)),
         client_type: build.template(std.get(block, 'client_type', null)),
@@ -928,6 +931,7 @@ local provider(rawConfiguration, configuration) = {
       allowed_redirect_uris: resource.field(self._.blocks, 'allowed_redirect_uris'),
       authentication_flow: resource.field(self._.blocks, 'authentication_flow'),
       authorization_flow: resource.field(self._.blocks, 'authorization_flow'),
+      backchannel_logout_uri: resource.field(self._.blocks, 'backchannel_logout_uri'),
       client_id: resource.field(self._.blocks, 'client_id'),
       client_secret: resource.field(self._.blocks, 'client_secret'),
       client_type: resource.field(self._.blocks, 'client_type'),
@@ -1316,6 +1320,7 @@ local provider(rawConfiguration, configuration) = {
         base_dn: build.template(block.base_dn),
         bind_cn: build.template(block.bind_cn),
         bind_password: build.template(block.bind_password),
+        delete_not_found_objects: build.template(std.get(block, 'delete_not_found_objects', null)),
         enabled: build.template(std.get(block, 'enabled', null)),
         group_membership_field: build.template(std.get(block, 'group_membership_field', null)),
         group_object_filter: build.template(std.get(block, 'group_object_filter', null)),
@@ -1334,6 +1339,7 @@ local provider(rawConfiguration, configuration) = {
         sync_parent_group: build.template(std.get(block, 'sync_parent_group', null)),
         sync_users: build.template(std.get(block, 'sync_users', null)),
         sync_users_password: build.template(std.get(block, 'sync_users_password', null)),
+        user_membership_attribute: build.template(std.get(block, 'user_membership_attribute', null)),
         user_object_filter: build.template(std.get(block, 'user_object_filter', null)),
         user_path_template: build.template(std.get(block, 'user_path_template', null)),
         uuid: build.template(std.get(block, 'uuid', null)),
@@ -1343,6 +1349,7 @@ local provider(rawConfiguration, configuration) = {
       base_dn: resource.field(self._.blocks, 'base_dn'),
       bind_cn: resource.field(self._.blocks, 'bind_cn'),
       bind_password: resource.field(self._.blocks, 'bind_password'),
+      delete_not_found_objects: resource.field(self._.blocks, 'delete_not_found_objects'),
       enabled: resource.field(self._.blocks, 'enabled'),
       group_membership_field: resource.field(self._.blocks, 'group_membership_field'),
       group_object_filter: resource.field(self._.blocks, 'group_object_filter'),
@@ -1361,6 +1368,7 @@ local provider(rawConfiguration, configuration) = {
       sync_parent_group: resource.field(self._.blocks, 'sync_parent_group'),
       sync_users: resource.field(self._.blocks, 'sync_users'),
       sync_users_password: resource.field(self._.blocks, 'sync_users_password'),
+      user_membership_attribute: resource.field(self._.blocks, 'user_membership_attribute'),
       user_object_filter: resource.field(self._.blocks, 'user_object_filter'),
       user_path_template: resource.field(self._.blocks, 'user_path_template'),
       uuid: resource.field(self._.blocks, 'uuid'),
@@ -1677,6 +1685,7 @@ local provider(rawConfiguration, configuration) = {
         device_type_restrictions: build.template(std.get(block, 'device_type_restrictions', null)),
         friendly_name: build.template(std.get(block, 'friendly_name', null)),
         id: build.template(std.get(block, 'id', null)),
+        max_attempts: build.template(std.get(block, 'max_attempts', null)),
         name: build.template(block.name),
         resident_key_requirement: build.template(std.get(block, 'resident_key_requirement', null)),
         user_verification: build.template(std.get(block, 'user_verification', null)),
@@ -1686,6 +1695,7 @@ local provider(rawConfiguration, configuration) = {
       device_type_restrictions: resource.field(self._.blocks, 'device_type_restrictions'),
       friendly_name: resource.field(self._.blocks, 'friendly_name'),
       id: resource.field(self._.blocks, 'id'),
+      max_attempts: resource.field(self._.blocks, 'max_attempts'),
       name: resource.field(self._.blocks, 'name'),
       resident_key_requirement: resource.field(self._.blocks, 'resident_key_requirement'),
       user_verification: resource.field(self._.blocks, 'user_verification'),
@@ -1758,6 +1768,8 @@ local provider(rawConfiguration, configuration) = {
         name: build.template(block.name),
         password: build.template(std.get(block, 'password', null)),
         port: build.template(std.get(block, 'port', null)),
+        recovery_cache_timeout: build.template(std.get(block, 'recovery_cache_timeout', null)),
+        recovery_max_attempts: build.template(std.get(block, 'recovery_max_attempts', null)),
         subject: build.template(std.get(block, 'subject', null)),
         template: build.template(std.get(block, 'template', null)),
         timeout: build.template(std.get(block, 'timeout', null)),
@@ -1774,6 +1786,8 @@ local provider(rawConfiguration, configuration) = {
       name: resource.field(self._.blocks, 'name'),
       password: resource.field(self._.blocks, 'password'),
       port: resource.field(self._.blocks, 'port'),
+      recovery_cache_timeout: resource.field(self._.blocks, 'recovery_cache_timeout'),
+      recovery_max_attempts: resource.field(self._.blocks, 'recovery_max_attempts'),
       subject: resource.field(self._.blocks, 'subject'),
       template: resource.field(self._.blocks, 'template'),
       timeout: resource.field(self._.blocks, 'timeout'),
@@ -1826,6 +1840,23 @@ local provider(rawConfiguration, configuration) = {
       continue_flow_without_invitation: resource.field(self._.blocks, 'continue_flow_without_invitation'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
+    },
+    stage_mutual_tls(name, block): {
+      local resource = blockType.resource('authentik_stage_mutual_tls', name),
+      _: resource._(block, {
+        cert_attribute: build.template(std.get(block, 'cert_attribute', null)),
+        certificate_authorities: build.template(std.get(block, 'certificate_authorities', null)),
+        id: build.template(std.get(block, 'id', null)),
+        mode: build.template(std.get(block, 'mode', null)),
+        name: build.template(block.name),
+        user_attribute: build.template(std.get(block, 'user_attribute', null)),
+      }),
+      cert_attribute: resource.field(self._.blocks, 'cert_attribute'),
+      certificate_authorities: resource.field(self._.blocks, 'certificate_authorities'),
+      id: resource.field(self._.blocks, 'id'),
+      mode: resource.field(self._.blocks, 'mode'),
+      name: resource.field(self._.blocks, 'name'),
+      user_attribute: resource.field(self._.blocks, 'user_attribute'),
     },
     stage_password(name, block): {
       local resource = blockType.resource('authentik_stage_password', name),
@@ -1932,6 +1963,7 @@ local provider(rawConfiguration, configuration) = {
         id: build.template(std.get(block, 'id', null)),
         name: build.template(block.name),
         network_binding: build.template(std.get(block, 'network_binding', null)),
+        remember_device: build.template(std.get(block, 'remember_device', null)),
         remember_me_offset: build.template(std.get(block, 'remember_me_offset', null)),
         session_duration: build.template(std.get(block, 'session_duration', null)),
         terminate_other_sessions: build.template(std.get(block, 'terminate_other_sessions', null)),
@@ -1940,6 +1972,7 @@ local provider(rawConfiguration, configuration) = {
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
       network_binding: resource.field(self._.blocks, 'network_binding'),
+      remember_device: resource.field(self._.blocks, 'remember_device'),
       remember_me_offset: resource.field(self._.blocks, 'remember_me_offset'),
       session_duration: resource.field(self._.blocks, 'session_duration'),
       terminate_other_sessions: resource.field(self._.blocks, 'terminate_other_sessions'),
@@ -1982,6 +2015,7 @@ local provider(rawConfiguration, configuration) = {
         default_user_change_name: build.template(std.get(block, 'default_user_change_name', null)),
         default_user_change_username: build.template(std.get(block, 'default_user_change_username', null)),
         event_retention: build.template(std.get(block, 'event_retention', null)),
+        flags: build.template(std.get(block, 'flags', null)),
         footer_links: build.template(std.get(block, 'footer_links', null)),
         gdpr_compliance: build.template(std.get(block, 'gdpr_compliance', null)),
         id: build.template(std.get(block, 'id', null)),
@@ -1996,6 +2030,7 @@ local provider(rawConfiguration, configuration) = {
       default_user_change_name: resource.field(self._.blocks, 'default_user_change_name'),
       default_user_change_username: resource.field(self._.blocks, 'default_user_change_username'),
       event_retention: resource.field(self._.blocks, 'event_retention'),
+      flags: resource.field(self._.blocks, 'flags'),
       footer_links: resource.field(self._.blocks, 'footer_links'),
       gdpr_compliance: resource.field(self._.blocks, 'gdpr_compliance'),
       id: resource.field(self._.blocks, 'id'),
@@ -2064,6 +2099,7 @@ local provider(rawConfiguration, configuration) = {
         branding_favicon: build.template(std.get(block, 'branding_favicon', null)),
         branding_logo: build.template(std.get(block, 'branding_logo', null)),
         branding_title: build.template(std.get(block, 'branding_title', null)),
+        client_certificates: build.template(std.get(block, 'client_certificates', null)),
         default: build.template(std.get(block, 'default', null)),
         default_application: build.template(std.get(block, 'default_application', null)),
         domain: build.template(std.get(block, 'domain', null)),
@@ -2081,6 +2117,7 @@ local provider(rawConfiguration, configuration) = {
       branding_favicon: resource.field(self._.blocks, 'branding_favicon'),
       branding_logo: resource.field(self._.blocks, 'branding_logo'),
       branding_title: resource.field(self._.blocks, 'branding_title'),
+      client_certificates: resource.field(self._.blocks, 'client_certificates'),
       default: resource.field(self._.blocks, 'default'),
       default_application: resource.field(self._.blocks, 'default_application'),
       domain: resource.field(self._.blocks, 'domain'),
@@ -2350,6 +2387,21 @@ local provider(rawConfiguration, configuration) = {
       id: resource.field(self._.blocks, 'id'),
       model: resource.field(self._.blocks, 'model'),
     },
+    service_connection_kubernetes(name, block): {
+      local resource = blockType.resource('authentik_service_connection_kubernetes', name),
+      _: resource._(block, {
+        id: build.template(std.get(block, 'id', null)),
+        kubeconfig: build.template(std.get(block, 'kubeconfig', null)),
+        'local': build.template(std.get(block, 'local', null)),
+        name: build.template(block.name),
+        verify_ssl: build.template(std.get(block, 'verify_ssl', null)),
+      }),
+      id: resource.field(self._.blocks, 'id'),
+      kubeconfig: resource.field(self._.blocks, 'kubeconfig'),
+      'local': resource.field(self._.blocks, 'local'),
+      name: resource.field(self._.blocks, 'name'),
+      verify_ssl: resource.field(self._.blocks, 'verify_ssl'),
+    },
     source(name, block): {
       local resource = blockType.resource('authentik_source', name),
       _: resource._(block, {
@@ -2459,7 +2511,6 @@ local provider(rawConfiguration, configuration) = {
     },
   },
 };
-
 local providerWithConfiguration = provider(null, null) + {
   withConfiguration(alias, block): provider(block, {
     alias: alias,
@@ -2469,5 +2520,4 @@ local providerWithConfiguration = provider(null, null) + {
     url: build.template(block.url),
   }),
 };
-
 providerWithConfiguration
