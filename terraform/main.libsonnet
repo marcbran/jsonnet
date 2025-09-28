@@ -143,6 +143,56 @@ local Module(name, block) = {
   },
 };
 
+local Import(name, block) = {
+  _: {
+    local _ = self,
+    block: {
+      'import': std.prune({
+        to: build.expression(std.get(block, 'to', null)),
+        id: std.get(block, 'id', null),
+        identity: std.get(block, 'identity', null),
+        for_each: std.get(block, 'for_each', null),
+        provider: std.get(block, 'provider', null),
+      }),
+    },
+    blocks: build.blocks(block) + {
+      ['import.%s' % [name]]: _.block,
+    },
+  },
+};
+
+local Moved(name, block) = {
+  _: {
+    local _ = self,
+    block: {
+      moved: std.prune({
+        from: build.expression(std.get(block, 'from', null)),
+        to: build.expression(std.get(block, 'to', null)),
+      }),
+    },
+    blocks: build.blocks(block) + {
+      ['moved.%s' % [name]]: _.block,
+    },
+  },
+};
+
+local Removed(name, block) = {
+  _: {
+    local _ = self,
+    block: {
+      removed: std.prune({
+        from: build.expression(std.get(block, 'from', null)),
+        // TODO lifecycle
+        // TODO connection
+        // TODO provisioner
+      }),
+    },
+    blocks: build.blocks(block) + {
+      ['removed.%s' % [name]]: _.block,
+    },
+  },
+};
+
 local Each = {
   key: {
     _: {
@@ -411,6 +461,9 @@ local terraform = functions + operators + {
   Local: Local,
   Output: Output,
   Module: Module,
+  Import: Import,
+  Moved: Moved,
+  Removed: Removed,
   Cfg: Cfg,
   CfgDir: CfgDir,
   Each: Each,
