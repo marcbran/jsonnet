@@ -92,7 +92,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
         block: {
           [blockType]: {
             [type]: {
-              [name]: std.prune(providerConfiguration._.refBlock + metaBlock + block),
+              [name]: providerConfiguration._.refBlock + metaBlock + block,
             },
           },
         },
@@ -115,6 +115,12 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
     },
   },
 };
+local attribute(block, name, required=false) = if !required && !std.objectHas(block, name) then {} else {
+  [name]: build.template(block[name]),
+};
+local blockObj(block, name, body, nestingMode, required=false) = if !required && !std.objectHas(block, name) then {} else {
+  [name]: if nestingMode == 'list' then [body(block) for block in block[name]] else body(block[name]),
+};
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/integrations/github',
@@ -125,16 +131,17 @@ local provider(rawConfiguration, configuration) = {
     local blockType = provider.blockType('resource'),
     actions_environment_secret(name, block): {
       local resource = blockType.resource('github_actions_environment_secret', name),
-      _: resource._(block, {
-        created_at: build.template(std.get(block, 'created_at', null)),
-        encrypted_value: build.template(std.get(block, 'encrypted_value', null)),
-        environment: build.template(block.environment),
-        id: build.template(std.get(block, 'id', null)),
-        plaintext_value: build.template(std.get(block, 'plaintext_value', null)),
-        repository: build.template(block.repository),
-        secret_name: build.template(block.secret_name),
-        updated_at: build.template(std.get(block, 'updated_at', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'created_at') +
+        attribute(block, 'encrypted_value') +
+        attribute(block, 'environment', true) +
+        attribute(block, 'id') +
+        attribute(block, 'plaintext_value') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'secret_name', true) +
+        attribute(block, 'updated_at')
+      ),
       created_at: resource.field(self._.blocks, 'created_at'),
       encrypted_value: resource.field(self._.blocks, 'encrypted_value'),
       environment: resource.field(self._.blocks, 'environment'),
@@ -146,15 +153,16 @@ local provider(rawConfiguration, configuration) = {
     },
     actions_environment_variable(name, block): {
       local resource = blockType.resource('github_actions_environment_variable', name),
-      _: resource._(block, {
-        created_at: build.template(std.get(block, 'created_at', null)),
-        environment: build.template(block.environment),
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-        updated_at: build.template(std.get(block, 'updated_at', null)),
-        value: build.template(block.value),
-        variable_name: build.template(block.variable_name),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'created_at') +
+        attribute(block, 'environment', true) +
+        attribute(block, 'id') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'updated_at') +
+        attribute(block, 'value', true) +
+        attribute(block, 'variable_name', true)
+      ),
       created_at: resource.field(self._.blocks, 'created_at'),
       environment: resource.field(self._.blocks, 'environment'),
       id: resource.field(self._.blocks, 'id'),
@@ -165,36 +173,45 @@ local provider(rawConfiguration, configuration) = {
     },
     actions_organization_oidc_subject_claim_customization_template(name, block): {
       local resource = blockType.resource('github_actions_organization_oidc_subject_claim_customization_template', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        include_claim_keys: build.template(block.include_claim_keys),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'include_claim_keys', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       include_claim_keys: resource.field(self._.blocks, 'include_claim_keys'),
     },
     actions_organization_permissions(name, block): {
       local resource = blockType.resource('github_actions_organization_permissions', name),
-      _: resource._(block, {
-        allowed_actions: build.template(std.get(block, 'allowed_actions', null)),
-        enabled_repositories: build.template(block.enabled_repositories),
-        id: build.template(std.get(block, 'id', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'allowed_actions') +
+        attribute(block, 'enabled_repositories', true) +
+        attribute(block, 'id') +
+        blockObj(block, 'allowed_actions_config', function(block)
+          attribute(block, 'github_owned_allowed', true) +
+          attribute(block, 'patterns_allowed') +
+          attribute(block, 'verified_allowed'), 'list') +
+        blockObj(block, 'enabled_repositories_config', function(block)
+          attribute(block, 'repository_ids', true), 'list')
+      ),
       allowed_actions: resource.field(self._.blocks, 'allowed_actions'),
       enabled_repositories: resource.field(self._.blocks, 'enabled_repositories'),
       id: resource.field(self._.blocks, 'id'),
     },
     actions_organization_secret(name, block): {
       local resource = blockType.resource('github_actions_organization_secret', name),
-      _: resource._(block, {
-        created_at: build.template(std.get(block, 'created_at', null)),
-        encrypted_value: build.template(std.get(block, 'encrypted_value', null)),
-        id: build.template(std.get(block, 'id', null)),
-        plaintext_value: build.template(std.get(block, 'plaintext_value', null)),
-        secret_name: build.template(block.secret_name),
-        selected_repository_ids: build.template(std.get(block, 'selected_repository_ids', null)),
-        updated_at: build.template(std.get(block, 'updated_at', null)),
-        visibility: build.template(block.visibility),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'created_at') +
+        attribute(block, 'encrypted_value') +
+        attribute(block, 'id') +
+        attribute(block, 'plaintext_value') +
+        attribute(block, 'secret_name', true) +
+        attribute(block, 'selected_repository_ids') +
+        attribute(block, 'updated_at') +
+        attribute(block, 'visibility', true)
+      ),
       created_at: resource.field(self._.blocks, 'created_at'),
       encrypted_value: resource.field(self._.blocks, 'encrypted_value'),
       id: resource.field(self._.blocks, 'id'),
@@ -206,26 +223,28 @@ local provider(rawConfiguration, configuration) = {
     },
     actions_organization_secret_repositories(name, block): {
       local resource = blockType.resource('github_actions_organization_secret_repositories', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        secret_name: build.template(block.secret_name),
-        selected_repository_ids: build.template(block.selected_repository_ids),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'secret_name', true) +
+        attribute(block, 'selected_repository_ids', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       secret_name: resource.field(self._.blocks, 'secret_name'),
       selected_repository_ids: resource.field(self._.blocks, 'selected_repository_ids'),
     },
     actions_organization_variable(name, block): {
       local resource = blockType.resource('github_actions_organization_variable', name),
-      _: resource._(block, {
-        created_at: build.template(std.get(block, 'created_at', null)),
-        id: build.template(std.get(block, 'id', null)),
-        selected_repository_ids: build.template(std.get(block, 'selected_repository_ids', null)),
-        updated_at: build.template(std.get(block, 'updated_at', null)),
-        value: build.template(block.value),
-        variable_name: build.template(block.variable_name),
-        visibility: build.template(block.visibility),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'created_at') +
+        attribute(block, 'id') +
+        attribute(block, 'selected_repository_ids') +
+        attribute(block, 'updated_at') +
+        attribute(block, 'value', true) +
+        attribute(block, 'variable_name', true) +
+        attribute(block, 'visibility', true)
+      ),
       created_at: resource.field(self._.blocks, 'created_at'),
       id: resource.field(self._.blocks, 'id'),
       selected_repository_ids: resource.field(self._.blocks, 'selected_repository_ids'),
@@ -236,23 +255,25 @@ local provider(rawConfiguration, configuration) = {
     },
     actions_repository_access_level(name, block): {
       local resource = blockType.resource('github_actions_repository_access_level', name),
-      _: resource._(block, {
-        access_level: build.template(block.access_level),
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'access_level', true) +
+        attribute(block, 'id') +
+        attribute(block, 'repository', true)
+      ),
       access_level: resource.field(self._.blocks, 'access_level'),
       id: resource.field(self._.blocks, 'id'),
       repository: resource.field(self._.blocks, 'repository'),
     },
     actions_repository_oidc_subject_claim_customization_template(name, block): {
       local resource = blockType.resource('github_actions_repository_oidc_subject_claim_customization_template', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        include_claim_keys: build.template(std.get(block, 'include_claim_keys', null)),
-        repository: build.template(block.repository),
-        use_default: build.template(block.use_default),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'include_claim_keys') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'use_default', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       include_claim_keys: resource.field(self._.blocks, 'include_claim_keys'),
       repository: resource.field(self._.blocks, 'repository'),
@@ -260,12 +281,17 @@ local provider(rawConfiguration, configuration) = {
     },
     actions_repository_permissions(name, block): {
       local resource = blockType.resource('github_actions_repository_permissions', name),
-      _: resource._(block, {
-        allowed_actions: build.template(std.get(block, 'allowed_actions', null)),
-        enabled: build.template(std.get(block, 'enabled', null)),
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'allowed_actions') +
+        attribute(block, 'enabled') +
+        attribute(block, 'id') +
+        attribute(block, 'repository', true) +
+        blockObj(block, 'allowed_actions_config', function(block)
+          attribute(block, 'github_owned_allowed', true) +
+          attribute(block, 'patterns_allowed') +
+          attribute(block, 'verified_allowed'), 'list')
+      ),
       allowed_actions: resource.field(self._.blocks, 'allowed_actions'),
       enabled: resource.field(self._.blocks, 'enabled'),
       id: resource.field(self._.blocks, 'id'),
@@ -273,20 +299,21 @@ local provider(rawConfiguration, configuration) = {
     },
     actions_runner_group(name, block): {
       local resource = blockType.resource('github_actions_runner_group', name),
-      _: resource._(block, {
-        allows_public_repositories: build.template(std.get(block, 'allows_public_repositories', null)),
-        default: build.template(std.get(block, 'default', null)),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        inherited: build.template(std.get(block, 'inherited', null)),
-        name: build.template(block.name),
-        restricted_to_workflows: build.template(std.get(block, 'restricted_to_workflows', null)),
-        runners_url: build.template(std.get(block, 'runners_url', null)),
-        selected_repositories_url: build.template(std.get(block, 'selected_repositories_url', null)),
-        selected_repository_ids: build.template(std.get(block, 'selected_repository_ids', null)),
-        selected_workflows: build.template(std.get(block, 'selected_workflows', null)),
-        visibility: build.template(block.visibility),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'allows_public_repositories') +
+        attribute(block, 'default') +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'inherited') +
+        attribute(block, 'name', true) +
+        attribute(block, 'restricted_to_workflows') +
+        attribute(block, 'runners_url') +
+        attribute(block, 'selected_repositories_url') +
+        attribute(block, 'selected_repository_ids') +
+        attribute(block, 'selected_workflows') +
+        attribute(block, 'visibility', true)
+      ),
       allows_public_repositories: resource.field(self._.blocks, 'allows_public_repositories'),
       default: resource.field(self._.blocks, 'default'),
       etag: resource.field(self._.blocks, 'etag'),
@@ -302,15 +329,16 @@ local provider(rawConfiguration, configuration) = {
     },
     actions_secret(name, block): {
       local resource = blockType.resource('github_actions_secret', name),
-      _: resource._(block, {
-        created_at: build.template(std.get(block, 'created_at', null)),
-        encrypted_value: build.template(std.get(block, 'encrypted_value', null)),
-        id: build.template(std.get(block, 'id', null)),
-        plaintext_value: build.template(std.get(block, 'plaintext_value', null)),
-        repository: build.template(block.repository),
-        secret_name: build.template(block.secret_name),
-        updated_at: build.template(std.get(block, 'updated_at', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'created_at') +
+        attribute(block, 'encrypted_value') +
+        attribute(block, 'id') +
+        attribute(block, 'plaintext_value') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'secret_name', true) +
+        attribute(block, 'updated_at')
+      ),
       created_at: resource.field(self._.blocks, 'created_at'),
       encrypted_value: resource.field(self._.blocks, 'encrypted_value'),
       id: resource.field(self._.blocks, 'id'),
@@ -321,14 +349,15 @@ local provider(rawConfiguration, configuration) = {
     },
     actions_variable(name, block): {
       local resource = blockType.resource('github_actions_variable', name),
-      _: resource._(block, {
-        created_at: build.template(std.get(block, 'created_at', null)),
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-        updated_at: build.template(std.get(block, 'updated_at', null)),
-        value: build.template(block.value),
-        variable_name: build.template(block.variable_name),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'created_at') +
+        attribute(block, 'id') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'updated_at') +
+        attribute(block, 'value', true) +
+        attribute(block, 'variable_name', true)
+      ),
       created_at: resource.field(self._.blocks, 'created_at'),
       id: resource.field(self._.blocks, 'id'),
       repository: resource.field(self._.blocks, 'repository'),
@@ -338,23 +367,25 @@ local provider(rawConfiguration, configuration) = {
     },
     app_installation_repositories(name, block): {
       local resource = blockType.resource('github_app_installation_repositories', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        installation_id: build.template(block.installation_id),
-        selected_repositories: build.template(block.selected_repositories),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'installation_id', true) +
+        attribute(block, 'selected_repositories', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       installation_id: resource.field(self._.blocks, 'installation_id'),
       selected_repositories: resource.field(self._.blocks, 'selected_repositories'),
     },
     app_installation_repository(name, block): {
       local resource = blockType.resource('github_app_installation_repository', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        installation_id: build.template(block.installation_id),
-        repo_id: build.template(std.get(block, 'repo_id', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'installation_id', true) +
+        attribute(block, 'repo_id') +
+        attribute(block, 'repository', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       installation_id: resource.field(self._.blocks, 'installation_id'),
       repo_id: resource.field(self._.blocks, 'repo_id'),
@@ -362,16 +393,17 @@ local provider(rawConfiguration, configuration) = {
     },
     branch(name, block): {
       local resource = blockType.resource('github_branch', name),
-      _: resource._(block, {
-        branch: build.template(block.branch),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        ref: build.template(std.get(block, 'ref', null)),
-        repository: build.template(block.repository),
-        sha: build.template(std.get(block, 'sha', null)),
-        source_branch: build.template(std.get(block, 'source_branch', null)),
-        source_sha: build.template(std.get(block, 'source_sha', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'branch', true) +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'ref') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'sha') +
+        attribute(block, 'source_branch') +
+        attribute(block, 'source_sha')
+      ),
       branch: resource.field(self._.blocks, 'branch'),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
@@ -383,13 +415,14 @@ local provider(rawConfiguration, configuration) = {
     },
     branch_default(name, block): {
       local resource = blockType.resource('github_branch_default', name),
-      _: resource._(block, {
-        branch: build.template(block.branch),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        rename: build.template(std.get(block, 'rename', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'branch', true) +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'rename') +
+        attribute(block, 'repository', true)
+      ),
       branch: resource.field(self._.blocks, 'branch'),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
@@ -398,19 +431,34 @@ local provider(rawConfiguration, configuration) = {
     },
     branch_protection(name, block): {
       local resource = blockType.resource('github_branch_protection', name),
-      _: resource._(block, {
-        allows_deletions: build.template(std.get(block, 'allows_deletions', null)),
-        allows_force_pushes: build.template(std.get(block, 'allows_force_pushes', null)),
-        enforce_admins: build.template(std.get(block, 'enforce_admins', null)),
-        force_push_bypassers: build.template(std.get(block, 'force_push_bypassers', null)),
-        id: build.template(std.get(block, 'id', null)),
-        lock_branch: build.template(std.get(block, 'lock_branch', null)),
-        pattern: build.template(block.pattern),
-        repository_id: build.template(block.repository_id),
-        require_conversation_resolution: build.template(std.get(block, 'require_conversation_resolution', null)),
-        require_signed_commits: build.template(std.get(block, 'require_signed_commits', null)),
-        required_linear_history: build.template(std.get(block, 'required_linear_history', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'allows_deletions') +
+        attribute(block, 'allows_force_pushes') +
+        attribute(block, 'enforce_admins') +
+        attribute(block, 'force_push_bypassers') +
+        attribute(block, 'id') +
+        attribute(block, 'lock_branch') +
+        attribute(block, 'pattern', true) +
+        attribute(block, 'repository_id', true) +
+        attribute(block, 'require_conversation_resolution') +
+        attribute(block, 'require_signed_commits') +
+        attribute(block, 'required_linear_history') +
+        blockObj(block, 'required_pull_request_reviews', function(block)
+          attribute(block, 'dismiss_stale_reviews') +
+          attribute(block, 'dismissal_restrictions') +
+          attribute(block, 'pull_request_bypassers') +
+          attribute(block, 'require_code_owner_reviews') +
+          attribute(block, 'require_last_push_approval') +
+          attribute(block, 'required_approving_review_count') +
+          attribute(block, 'restrict_dismissals'), 'list') +
+        blockObj(block, 'required_status_checks', function(block)
+          attribute(block, 'contexts') +
+          attribute(block, 'strict'), 'list') +
+        blockObj(block, 'restrict_pushes', function(block)
+          attribute(block, 'blocks_creations') +
+          attribute(block, 'push_allowances'), 'list')
+      ),
       allows_deletions: resource.field(self._.blocks, 'allows_deletions'),
       allows_force_pushes: resource.field(self._.blocks, 'allows_force_pushes'),
       enforce_admins: resource.field(self._.blocks, 'enforce_admins'),
@@ -425,15 +473,38 @@ local provider(rawConfiguration, configuration) = {
     },
     branch_protection_v3(name, block): {
       local resource = blockType.resource('github_branch_protection_v3', name),
-      _: resource._(block, {
-        branch: build.template(block.branch),
-        enforce_admins: build.template(std.get(block, 'enforce_admins', null)),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-        require_conversation_resolution: build.template(std.get(block, 'require_conversation_resolution', null)),
-        require_signed_commits: build.template(std.get(block, 'require_signed_commits', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'branch', true) +
+        attribute(block, 'enforce_admins') +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'require_conversation_resolution') +
+        attribute(block, 'require_signed_commits') +
+        blockObj(block, 'required_pull_request_reviews', function(block)
+          attribute(block, 'dismiss_stale_reviews') +
+          attribute(block, 'dismissal_apps') +
+          attribute(block, 'dismissal_teams') +
+          attribute(block, 'dismissal_users') +
+          attribute(block, 'include_admins') +
+          attribute(block, 'require_code_owner_reviews') +
+          attribute(block, 'require_last_push_approval') +
+          attribute(block, 'required_approving_review_count') +
+          blockObj(block, 'bypass_pull_request_allowances', function(block)
+            attribute(block, 'apps') +
+            attribute(block, 'teams') +
+            attribute(block, 'users'), 'list'), 'list') +
+        blockObj(block, 'required_status_checks', function(block)
+          attribute(block, 'checks') +
+          attribute(block, 'contexts') +
+          attribute(block, 'include_admins') +
+          attribute(block, 'strict'), 'list') +
+        blockObj(block, 'restrictions', function(block)
+          attribute(block, 'apps') +
+          attribute(block, 'teams') +
+          attribute(block, 'users'), 'list')
+      ),
       branch: resource.field(self._.blocks, 'branch'),
       enforce_admins: resource.field(self._.blocks, 'enforce_admins'),
       etag: resource.field(self._.blocks, 'etag'),
@@ -444,16 +515,17 @@ local provider(rawConfiguration, configuration) = {
     },
     codespaces_organization_secret(name, block): {
       local resource = blockType.resource('github_codespaces_organization_secret', name),
-      _: resource._(block, {
-        created_at: build.template(std.get(block, 'created_at', null)),
-        encrypted_value: build.template(std.get(block, 'encrypted_value', null)),
-        id: build.template(std.get(block, 'id', null)),
-        plaintext_value: build.template(std.get(block, 'plaintext_value', null)),
-        secret_name: build.template(block.secret_name),
-        selected_repository_ids: build.template(std.get(block, 'selected_repository_ids', null)),
-        updated_at: build.template(std.get(block, 'updated_at', null)),
-        visibility: build.template(block.visibility),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'created_at') +
+        attribute(block, 'encrypted_value') +
+        attribute(block, 'id') +
+        attribute(block, 'plaintext_value') +
+        attribute(block, 'secret_name', true) +
+        attribute(block, 'selected_repository_ids') +
+        attribute(block, 'updated_at') +
+        attribute(block, 'visibility', true)
+      ),
       created_at: resource.field(self._.blocks, 'created_at'),
       encrypted_value: resource.field(self._.blocks, 'encrypted_value'),
       id: resource.field(self._.blocks, 'id'),
@@ -465,26 +537,28 @@ local provider(rawConfiguration, configuration) = {
     },
     codespaces_organization_secret_repositories(name, block): {
       local resource = blockType.resource('github_codespaces_organization_secret_repositories', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        secret_name: build.template(block.secret_name),
-        selected_repository_ids: build.template(block.selected_repository_ids),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'secret_name', true) +
+        attribute(block, 'selected_repository_ids', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       secret_name: resource.field(self._.blocks, 'secret_name'),
       selected_repository_ids: resource.field(self._.blocks, 'selected_repository_ids'),
     },
     codespaces_secret(name, block): {
       local resource = blockType.resource('github_codespaces_secret', name),
-      _: resource._(block, {
-        created_at: build.template(std.get(block, 'created_at', null)),
-        encrypted_value: build.template(std.get(block, 'encrypted_value', null)),
-        id: build.template(std.get(block, 'id', null)),
-        plaintext_value: build.template(std.get(block, 'plaintext_value', null)),
-        repository: build.template(block.repository),
-        secret_name: build.template(block.secret_name),
-        updated_at: build.template(std.get(block, 'updated_at', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'created_at') +
+        attribute(block, 'encrypted_value') +
+        attribute(block, 'id') +
+        attribute(block, 'plaintext_value') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'secret_name', true) +
+        attribute(block, 'updated_at')
+      ),
       created_at: resource.field(self._.blocks, 'created_at'),
       encrypted_value: resource.field(self._.blocks, 'encrypted_value'),
       id: resource.field(self._.blocks, 'id'),
@@ -495,15 +569,16 @@ local provider(rawConfiguration, configuration) = {
     },
     codespaces_user_secret(name, block): {
       local resource = blockType.resource('github_codespaces_user_secret', name),
-      _: resource._(block, {
-        created_at: build.template(std.get(block, 'created_at', null)),
-        encrypted_value: build.template(std.get(block, 'encrypted_value', null)),
-        id: build.template(std.get(block, 'id', null)),
-        plaintext_value: build.template(std.get(block, 'plaintext_value', null)),
-        secret_name: build.template(block.secret_name),
-        selected_repository_ids: build.template(std.get(block, 'selected_repository_ids', null)),
-        updated_at: build.template(std.get(block, 'updated_at', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'created_at') +
+        attribute(block, 'encrypted_value') +
+        attribute(block, 'id') +
+        attribute(block, 'plaintext_value') +
+        attribute(block, 'secret_name', true) +
+        attribute(block, 'selected_repository_ids') +
+        attribute(block, 'updated_at')
+      ),
       created_at: resource.field(self._.blocks, 'created_at'),
       encrypted_value: resource.field(self._.blocks, 'encrypted_value'),
       id: resource.field(self._.blocks, 'id'),
@@ -514,16 +589,17 @@ local provider(rawConfiguration, configuration) = {
     },
     dependabot_organization_secret(name, block): {
       local resource = blockType.resource('github_dependabot_organization_secret', name),
-      _: resource._(block, {
-        created_at: build.template(std.get(block, 'created_at', null)),
-        encrypted_value: build.template(std.get(block, 'encrypted_value', null)),
-        id: build.template(std.get(block, 'id', null)),
-        plaintext_value: build.template(std.get(block, 'plaintext_value', null)),
-        secret_name: build.template(block.secret_name),
-        selected_repository_ids: build.template(std.get(block, 'selected_repository_ids', null)),
-        updated_at: build.template(std.get(block, 'updated_at', null)),
-        visibility: build.template(block.visibility),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'created_at') +
+        attribute(block, 'encrypted_value') +
+        attribute(block, 'id') +
+        attribute(block, 'plaintext_value') +
+        attribute(block, 'secret_name', true) +
+        attribute(block, 'selected_repository_ids') +
+        attribute(block, 'updated_at') +
+        attribute(block, 'visibility', true)
+      ),
       created_at: resource.field(self._.blocks, 'created_at'),
       encrypted_value: resource.field(self._.blocks, 'encrypted_value'),
       id: resource.field(self._.blocks, 'id'),
@@ -535,26 +611,28 @@ local provider(rawConfiguration, configuration) = {
     },
     dependabot_organization_secret_repositories(name, block): {
       local resource = blockType.resource('github_dependabot_organization_secret_repositories', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        secret_name: build.template(block.secret_name),
-        selected_repository_ids: build.template(block.selected_repository_ids),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'secret_name', true) +
+        attribute(block, 'selected_repository_ids', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       secret_name: resource.field(self._.blocks, 'secret_name'),
       selected_repository_ids: resource.field(self._.blocks, 'selected_repository_ids'),
     },
     dependabot_secret(name, block): {
       local resource = blockType.resource('github_dependabot_secret', name),
-      _: resource._(block, {
-        created_at: build.template(std.get(block, 'created_at', null)),
-        encrypted_value: build.template(std.get(block, 'encrypted_value', null)),
-        id: build.template(std.get(block, 'id', null)),
-        plaintext_value: build.template(std.get(block, 'plaintext_value', null)),
-        repository: build.template(block.repository),
-        secret_name: build.template(block.secret_name),
-        updated_at: build.template(std.get(block, 'updated_at', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'created_at') +
+        attribute(block, 'encrypted_value') +
+        attribute(block, 'id') +
+        attribute(block, 'plaintext_value') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'secret_name', true) +
+        attribute(block, 'updated_at')
+      ),
       created_at: resource.field(self._.blocks, 'created_at'),
       encrypted_value: resource.field(self._.blocks, 'encrypted_value'),
       id: resource.field(self._.blocks, 'id'),
@@ -565,12 +643,13 @@ local provider(rawConfiguration, configuration) = {
     },
     emu_group_mapping(name, block): {
       local resource = blockType.resource('github_emu_group_mapping', name),
-      _: resource._(block, {
-        etag: build.template(std.get(block, 'etag', null)),
-        group_id: build.template(block.group_id),
-        id: build.template(std.get(block, 'id', null)),
-        team_slug: build.template(block.team_slug),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'etag') +
+        attribute(block, 'group_id', true) +
+        attribute(block, 'id') +
+        attribute(block, 'team_slug', true)
+      ),
       etag: resource.field(self._.blocks, 'etag'),
       group_id: resource.field(self._.blocks, 'group_id'),
       id: resource.field(self._.blocks, 'id'),
@@ -578,12 +657,19 @@ local provider(rawConfiguration, configuration) = {
     },
     enterprise_actions_permissions(name, block): {
       local resource = blockType.resource('github_enterprise_actions_permissions', name),
-      _: resource._(block, {
-        allowed_actions: build.template(std.get(block, 'allowed_actions', null)),
-        enabled_organizations: build.template(block.enabled_organizations),
-        enterprise_slug: build.template(block.enterprise_slug),
-        id: build.template(std.get(block, 'id', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'allowed_actions') +
+        attribute(block, 'enabled_organizations', true) +
+        attribute(block, 'enterprise_slug', true) +
+        attribute(block, 'id') +
+        blockObj(block, 'allowed_actions_config', function(block)
+          attribute(block, 'github_owned_allowed', true) +
+          attribute(block, 'patterns_allowed') +
+          attribute(block, 'verified_allowed'), 'list') +
+        blockObj(block, 'enabled_organizations_config', function(block)
+          attribute(block, 'organization_ids', true), 'list')
+      ),
       allowed_actions: resource.field(self._.blocks, 'allowed_actions'),
       enabled_organizations: resource.field(self._.blocks, 'enabled_organizations'),
       enterprise_slug: resource.field(self._.blocks, 'enterprise_slug'),
@@ -591,20 +677,21 @@ local provider(rawConfiguration, configuration) = {
     },
     enterprise_actions_runner_group(name, block): {
       local resource = blockType.resource('github_enterprise_actions_runner_group', name),
-      _: resource._(block, {
-        allows_public_repositories: build.template(std.get(block, 'allows_public_repositories', null)),
-        default: build.template(std.get(block, 'default', null)),
-        enterprise_slug: build.template(block.enterprise_slug),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(block.name),
-        restricted_to_workflows: build.template(std.get(block, 'restricted_to_workflows', null)),
-        runners_url: build.template(std.get(block, 'runners_url', null)),
-        selected_organization_ids: build.template(std.get(block, 'selected_organization_ids', null)),
-        selected_organizations_url: build.template(std.get(block, 'selected_organizations_url', null)),
-        selected_workflows: build.template(std.get(block, 'selected_workflows', null)),
-        visibility: build.template(block.visibility),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'allows_public_repositories') +
+        attribute(block, 'default') +
+        attribute(block, 'enterprise_slug', true) +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'name', true) +
+        attribute(block, 'restricted_to_workflows') +
+        attribute(block, 'runners_url') +
+        attribute(block, 'selected_organization_ids') +
+        attribute(block, 'selected_organizations_url') +
+        attribute(block, 'selected_workflows') +
+        attribute(block, 'visibility', true)
+      ),
       allows_public_repositories: resource.field(self._.blocks, 'allows_public_repositories'),
       default: resource.field(self._.blocks, 'default'),
       enterprise_slug: resource.field(self._.blocks, 'enterprise_slug'),
@@ -620,16 +707,17 @@ local provider(rawConfiguration, configuration) = {
     },
     enterprise_organization(name, block): {
       local resource = blockType.resource('github_enterprise_organization', name),
-      _: resource._(block, {
-        admin_logins: build.template(block.admin_logins),
-        billing_email: build.template(block.billing_email),
-        database_id: build.template(std.get(block, 'database_id', null)),
-        description: build.template(std.get(block, 'description', null)),
-        display_name: build.template(std.get(block, 'display_name', null)),
-        enterprise_id: build.template(block.enterprise_id),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(block.name),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'admin_logins', true) +
+        attribute(block, 'billing_email', true) +
+        attribute(block, 'database_id') +
+        attribute(block, 'description') +
+        attribute(block, 'display_name') +
+        attribute(block, 'enterprise_id', true) +
+        attribute(block, 'id') +
+        attribute(block, 'name', true)
+      ),
       admin_logins: resource.field(self._.blocks, 'admin_logins'),
       billing_email: resource.field(self._.blocks, 'billing_email'),
       database_id: resource.field(self._.blocks, 'database_id'),
@@ -641,18 +729,19 @@ local provider(rawConfiguration, configuration) = {
     },
     issue(name, block): {
       local resource = blockType.resource('github_issue', name),
-      _: resource._(block, {
-        assignees: build.template(std.get(block, 'assignees', null)),
-        body: build.template(std.get(block, 'body', null)),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        issue_id: build.template(std.get(block, 'issue_id', null)),
-        labels: build.template(std.get(block, 'labels', null)),
-        milestone_number: build.template(std.get(block, 'milestone_number', null)),
-        number: build.template(std.get(block, 'number', null)),
-        repository: build.template(block.repository),
-        title: build.template(block.title),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'assignees') +
+        attribute(block, 'body') +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'issue_id') +
+        attribute(block, 'labels') +
+        attribute(block, 'milestone_number') +
+        attribute(block, 'number') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'title', true)
+      ),
       assignees: resource.field(self._.blocks, 'assignees'),
       body: resource.field(self._.blocks, 'body'),
       etag: resource.field(self._.blocks, 'etag'),
@@ -666,15 +755,16 @@ local provider(rawConfiguration, configuration) = {
     },
     issue_label(name, block): {
       local resource = blockType.resource('github_issue_label', name),
-      _: resource._(block, {
-        color: build.template(block.color),
-        description: build.template(std.get(block, 'description', null)),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(block.name),
-        repository: build.template(block.repository),
-        url: build.template(std.get(block, 'url', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'color', true) +
+        attribute(block, 'description') +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'name', true) +
+        attribute(block, 'repository', true) +
+        attribute(block, 'url')
+      ),
       color: resource.field(self._.blocks, 'color'),
       description: resource.field(self._.blocks, 'description'),
       etag: resource.field(self._.blocks, 'etag'),
@@ -685,22 +775,29 @@ local provider(rawConfiguration, configuration) = {
     },
     issue_labels(name, block): {
       local resource = blockType.resource('github_issue_labels', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'repository', true) +
+        blockObj(block, 'label', function(block)
+          attribute(block, 'color', true) +
+          attribute(block, 'description') +
+          attribute(block, 'name', true) +
+          attribute(block, 'url'), 'set')
+      ),
       id: resource.field(self._.blocks, 'id'),
       repository: resource.field(self._.blocks, 'repository'),
     },
     membership(name, block): {
       local resource = blockType.resource('github_membership', name),
-      _: resource._(block, {
-        downgrade_on_destroy: build.template(std.get(block, 'downgrade_on_destroy', null)),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        role: build.template(std.get(block, 'role', null)),
-        username: build.template(block.username),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'downgrade_on_destroy') +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'role') +
+        attribute(block, 'username', true)
+      ),
       downgrade_on_destroy: resource.field(self._.blocks, 'downgrade_on_destroy'),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
@@ -709,24 +806,26 @@ local provider(rawConfiguration, configuration) = {
     },
     organization_block(name, block): {
       local resource = blockType.resource('github_organization_block', name),
-      _: resource._(block, {
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        username: build.template(block.username),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'username', true)
+      ),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
       username: resource.field(self._.blocks, 'username'),
     },
     organization_custom_role(name, block): {
       local resource = blockType.resource('github_organization_custom_role', name),
-      _: resource._(block, {
-        base_role: build.template(block.base_role),
-        description: build.template(std.get(block, 'description', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(block.name),
-        permissions: build.template(block.permissions),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'base_role', true) +
+        attribute(block, 'description') +
+        attribute(block, 'id') +
+        attribute(block, 'name', true) +
+        attribute(block, 'permissions', true)
+      ),
       base_role: resource.field(self._.blocks, 'base_role'),
       description: resource.field(self._.blocks, 'description'),
       id: resource.field(self._.blocks, 'id'),
@@ -735,13 +834,14 @@ local provider(rawConfiguration, configuration) = {
     },
     organization_project(name, block): {
       local resource = blockType.resource('github_organization_project', name),
-      _: resource._(block, {
-        body: build.template(std.get(block, 'body', null)),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(block.name),
-        url: build.template(std.get(block, 'url', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'body') +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'name', true) +
+        attribute(block, 'url')
+      ),
       body: resource.field(self._.blocks, 'body'),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
@@ -750,15 +850,82 @@ local provider(rawConfiguration, configuration) = {
     },
     organization_ruleset(name, block): {
       local resource = blockType.resource('github_organization_ruleset', name),
-      _: resource._(block, {
-        enforcement: build.template(block.enforcement),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(block.name),
-        node_id: build.template(std.get(block, 'node_id', null)),
-        ruleset_id: build.template(std.get(block, 'ruleset_id', null)),
-        target: build.template(block.target),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'enforcement', true) +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'name', true) +
+        attribute(block, 'node_id') +
+        attribute(block, 'ruleset_id') +
+        attribute(block, 'target', true) +
+        blockObj(block, 'bypass_actors', function(block)
+          attribute(block, 'actor_id', true) +
+          attribute(block, 'actor_type', true) +
+          attribute(block, 'bypass_mode', true), 'list') +
+        blockObj(block, 'conditions', function(block)
+          attribute(block, 'repository_id') +
+          blockObj(block, 'ref_name', function(block)
+            attribute(block, 'exclude', true) +
+            attribute(block, 'include', true), 'list') +
+          blockObj(block, 'repository_name', function(block)
+            attribute(block, 'exclude', true) +
+            attribute(block, 'include', true) +
+            attribute(block, 'protected'), 'list'), 'list') +
+        blockObj(block, 'rules', function(block)
+          attribute(block, 'creation') +
+          attribute(block, 'deletion') +
+          attribute(block, 'non_fast_forward') +
+          attribute(block, 'required_linear_history') +
+          attribute(block, 'required_signatures') +
+          attribute(block, 'update') +
+          blockObj(block, 'branch_name_pattern', function(block)
+            attribute(block, 'name') +
+            attribute(block, 'negate') +
+            attribute(block, 'operator', true) +
+            attribute(block, 'pattern', true), 'list') +
+          blockObj(block, 'commit_author_email_pattern', function(block)
+            attribute(block, 'name') +
+            attribute(block, 'negate') +
+            attribute(block, 'operator', true) +
+            attribute(block, 'pattern', true), 'list') +
+          blockObj(block, 'commit_message_pattern', function(block)
+            attribute(block, 'name') +
+            attribute(block, 'negate') +
+            attribute(block, 'operator', true) +
+            attribute(block, 'pattern', true), 'list') +
+          blockObj(block, 'committer_email_pattern', function(block)
+            attribute(block, 'name') +
+            attribute(block, 'negate') +
+            attribute(block, 'operator', true) +
+            attribute(block, 'pattern', true), 'list') +
+          blockObj(block, 'pull_request', function(block)
+            attribute(block, 'dismiss_stale_reviews_on_push') +
+            attribute(block, 'require_code_owner_review') +
+            attribute(block, 'require_last_push_approval') +
+            attribute(block, 'required_approving_review_count') +
+            attribute(block, 'required_review_thread_resolution'), 'list') +
+          blockObj(block, 'required_code_scanning', function(block)
+            blockObj(block, 'required_code_scanning_tool', function(block)
+              attribute(block, 'alerts_threshold', true) +
+              attribute(block, 'security_alerts_threshold', true) +
+              attribute(block, 'tool', true), 'set'), 'list') +
+          blockObj(block, 'required_status_checks', function(block)
+            attribute(block, 'strict_required_status_checks_policy') +
+            blockObj(block, 'required_check', function(block)
+              attribute(block, 'context', true) +
+              attribute(block, 'integration_id'), 'set'), 'list') +
+          blockObj(block, 'required_workflows', function(block)
+            blockObj(block, 'required_workflow', function(block)
+              attribute(block, 'path', true) +
+              attribute(block, 'ref') +
+              attribute(block, 'repository_id', true), 'set'), 'list') +
+          blockObj(block, 'tag_name_pattern', function(block)
+            attribute(block, 'name') +
+            attribute(block, 'negate') +
+            attribute(block, 'operator', true) +
+            attribute(block, 'pattern', true), 'list'), 'list')
+      ),
       enforcement: resource.field(self._.blocks, 'enforcement'),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
@@ -769,44 +936,46 @@ local provider(rawConfiguration, configuration) = {
     },
     organization_security_manager(name, block): {
       local resource = blockType.resource('github_organization_security_manager', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        team_slug: build.template(block.team_slug),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'team_slug', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       team_slug: resource.field(self._.blocks, 'team_slug'),
     },
     organization_settings(name, block): {
       local resource = blockType.resource('github_organization_settings', name),
-      _: resource._(block, {
-        advanced_security_enabled_for_new_repositories: build.template(std.get(block, 'advanced_security_enabled_for_new_repositories', null)),
-        billing_email: build.template(block.billing_email),
-        blog: build.template(std.get(block, 'blog', null)),
-        company: build.template(std.get(block, 'company', null)),
-        default_repository_permission: build.template(std.get(block, 'default_repository_permission', null)),
-        dependabot_alerts_enabled_for_new_repositories: build.template(std.get(block, 'dependabot_alerts_enabled_for_new_repositories', null)),
-        dependabot_security_updates_enabled_for_new_repositories: build.template(std.get(block, 'dependabot_security_updates_enabled_for_new_repositories', null)),
-        dependency_graph_enabled_for_new_repositories: build.template(std.get(block, 'dependency_graph_enabled_for_new_repositories', null)),
-        description: build.template(std.get(block, 'description', null)),
-        email: build.template(std.get(block, 'email', null)),
-        has_organization_projects: build.template(std.get(block, 'has_organization_projects', null)),
-        has_repository_projects: build.template(std.get(block, 'has_repository_projects', null)),
-        id: build.template(std.get(block, 'id', null)),
-        location: build.template(std.get(block, 'location', null)),
-        members_can_create_internal_repositories: build.template(std.get(block, 'members_can_create_internal_repositories', null)),
-        members_can_create_pages: build.template(std.get(block, 'members_can_create_pages', null)),
-        members_can_create_private_pages: build.template(std.get(block, 'members_can_create_private_pages', null)),
-        members_can_create_private_repositories: build.template(std.get(block, 'members_can_create_private_repositories', null)),
-        members_can_create_public_pages: build.template(std.get(block, 'members_can_create_public_pages', null)),
-        members_can_create_public_repositories: build.template(std.get(block, 'members_can_create_public_repositories', null)),
-        members_can_create_repositories: build.template(std.get(block, 'members_can_create_repositories', null)),
-        members_can_fork_private_repositories: build.template(std.get(block, 'members_can_fork_private_repositories', null)),
-        name: build.template(std.get(block, 'name', null)),
-        secret_scanning_enabled_for_new_repositories: build.template(std.get(block, 'secret_scanning_enabled_for_new_repositories', null)),
-        secret_scanning_push_protection_enabled_for_new_repositories: build.template(std.get(block, 'secret_scanning_push_protection_enabled_for_new_repositories', null)),
-        twitter_username: build.template(std.get(block, 'twitter_username', null)),
-        web_commit_signoff_required: build.template(std.get(block, 'web_commit_signoff_required', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'advanced_security_enabled_for_new_repositories') +
+        attribute(block, 'billing_email', true) +
+        attribute(block, 'blog') +
+        attribute(block, 'company') +
+        attribute(block, 'default_repository_permission') +
+        attribute(block, 'dependabot_alerts_enabled_for_new_repositories') +
+        attribute(block, 'dependabot_security_updates_enabled_for_new_repositories') +
+        attribute(block, 'dependency_graph_enabled_for_new_repositories') +
+        attribute(block, 'description') +
+        attribute(block, 'email') +
+        attribute(block, 'has_organization_projects') +
+        attribute(block, 'has_repository_projects') +
+        attribute(block, 'id') +
+        attribute(block, 'location') +
+        attribute(block, 'members_can_create_internal_repositories') +
+        attribute(block, 'members_can_create_pages') +
+        attribute(block, 'members_can_create_private_pages') +
+        attribute(block, 'members_can_create_private_repositories') +
+        attribute(block, 'members_can_create_public_pages') +
+        attribute(block, 'members_can_create_public_repositories') +
+        attribute(block, 'members_can_create_repositories') +
+        attribute(block, 'members_can_fork_private_repositories') +
+        attribute(block, 'name') +
+        attribute(block, 'secret_scanning_enabled_for_new_repositories') +
+        attribute(block, 'secret_scanning_push_protection_enabled_for_new_repositories') +
+        attribute(block, 'twitter_username') +
+        attribute(block, 'web_commit_signoff_required')
+      ),
       advanced_security_enabled_for_new_repositories: resource.field(self._.blocks, 'advanced_security_enabled_for_new_repositories'),
       billing_email: resource.field(self._.blocks, 'billing_email'),
       blog: resource.field(self._.blocks, 'blog'),
@@ -837,13 +1006,19 @@ local provider(rawConfiguration, configuration) = {
     },
     organization_webhook(name, block): {
       local resource = blockType.resource('github_organization_webhook', name),
-      _: resource._(block, {
-        active: build.template(std.get(block, 'active', null)),
-        etag: build.template(std.get(block, 'etag', null)),
-        events: build.template(block.events),
-        id: build.template(std.get(block, 'id', null)),
-        url: build.template(std.get(block, 'url', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'active') +
+        attribute(block, 'etag') +
+        attribute(block, 'events', true) +
+        attribute(block, 'id') +
+        attribute(block, 'url') +
+        blockObj(block, 'configuration', function(block)
+          attribute(block, 'content_type') +
+          attribute(block, 'insecure_ssl') +
+          attribute(block, 'secret') +
+          attribute(block, 'url', true), 'list')
+      ),
       active: resource.field(self._.blocks, 'active'),
       etag: resource.field(self._.blocks, 'etag'),
       events: resource.field(self._.blocks, 'events'),
@@ -852,15 +1027,16 @@ local provider(rawConfiguration, configuration) = {
     },
     project_card(name, block): {
       local resource = blockType.resource('github_project_card', name),
-      _: resource._(block, {
-        card_id: build.template(std.get(block, 'card_id', null)),
-        column_id: build.template(block.column_id),
-        content_id: build.template(std.get(block, 'content_id', null)),
-        content_type: build.template(std.get(block, 'content_type', null)),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        note: build.template(std.get(block, 'note', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'card_id') +
+        attribute(block, 'column_id', true) +
+        attribute(block, 'content_id') +
+        attribute(block, 'content_type') +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'note')
+      ),
       card_id: resource.field(self._.blocks, 'card_id'),
       column_id: resource.field(self._.blocks, 'column_id'),
       content_id: resource.field(self._.blocks, 'content_id'),
@@ -871,13 +1047,14 @@ local provider(rawConfiguration, configuration) = {
     },
     project_column(name, block): {
       local resource = blockType.resource('github_project_column', name),
-      _: resource._(block, {
-        column_id: build.template(std.get(block, 'column_id', null)),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(block.name),
-        project_id: build.template(block.project_id),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'column_id') +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'name', true) +
+        attribute(block, 'project_id', true)
+      ),
       column_id: resource.field(self._.blocks, 'column_id'),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
@@ -886,29 +1063,30 @@ local provider(rawConfiguration, configuration) = {
     },
     release(name, block): {
       local resource = blockType.resource('github_release', name),
-      _: resource._(block, {
-        assets_url: build.template(std.get(block, 'assets_url', null)),
-        body: build.template(std.get(block, 'body', null)),
-        created_at: build.template(std.get(block, 'created_at', null)),
-        discussion_category_name: build.template(std.get(block, 'discussion_category_name', null)),
-        draft: build.template(std.get(block, 'draft', null)),
-        etag: build.template(std.get(block, 'etag', null)),
-        generate_release_notes: build.template(std.get(block, 'generate_release_notes', null)),
-        html_url: build.template(std.get(block, 'html_url', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(std.get(block, 'name', null)),
-        node_id: build.template(std.get(block, 'node_id', null)),
-        prerelease: build.template(std.get(block, 'prerelease', null)),
-        published_at: build.template(std.get(block, 'published_at', null)),
-        release_id: build.template(std.get(block, 'release_id', null)),
-        repository: build.template(block.repository),
-        tag_name: build.template(block.tag_name),
-        tarball_url: build.template(std.get(block, 'tarball_url', null)),
-        target_commitish: build.template(std.get(block, 'target_commitish', null)),
-        upload_url: build.template(std.get(block, 'upload_url', null)),
-        url: build.template(std.get(block, 'url', null)),
-        zipball_url: build.template(std.get(block, 'zipball_url', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'assets_url') +
+        attribute(block, 'body') +
+        attribute(block, 'created_at') +
+        attribute(block, 'discussion_category_name') +
+        attribute(block, 'draft') +
+        attribute(block, 'etag') +
+        attribute(block, 'generate_release_notes') +
+        attribute(block, 'html_url') +
+        attribute(block, 'id') +
+        attribute(block, 'name') +
+        attribute(block, 'node_id') +
+        attribute(block, 'prerelease') +
+        attribute(block, 'published_at') +
+        attribute(block, 'release_id') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'tag_name', true) +
+        attribute(block, 'tarball_url') +
+        attribute(block, 'target_commitish') +
+        attribute(block, 'upload_url') +
+        attribute(block, 'url') +
+        attribute(block, 'zipball_url')
+      ),
       assets_url: resource.field(self._.blocks, 'assets_url'),
       body: resource.field(self._.blocks, 'body'),
       created_at: resource.field(self._.blocks, 'created_at'),
@@ -933,50 +1111,72 @@ local provider(rawConfiguration, configuration) = {
     },
     repository(name, block): {
       local resource = blockType.resource('github_repository', name),
-      _: resource._(block, {
-        allow_auto_merge: build.template(std.get(block, 'allow_auto_merge', null)),
-        allow_merge_commit: build.template(std.get(block, 'allow_merge_commit', null)),
-        allow_rebase_merge: build.template(std.get(block, 'allow_rebase_merge', null)),
-        allow_squash_merge: build.template(std.get(block, 'allow_squash_merge', null)),
-        allow_update_branch: build.template(std.get(block, 'allow_update_branch', null)),
-        archive_on_destroy: build.template(std.get(block, 'archive_on_destroy', null)),
-        archived: build.template(std.get(block, 'archived', null)),
-        auto_init: build.template(std.get(block, 'auto_init', null)),
-        default_branch: build.template(std.get(block, 'default_branch', null)),
-        delete_branch_on_merge: build.template(std.get(block, 'delete_branch_on_merge', null)),
-        description: build.template(std.get(block, 'description', null)),
-        etag: build.template(std.get(block, 'etag', null)),
-        full_name: build.template(std.get(block, 'full_name', null)),
-        git_clone_url: build.template(std.get(block, 'git_clone_url', null)),
-        gitignore_template: build.template(std.get(block, 'gitignore_template', null)),
-        has_discussions: build.template(std.get(block, 'has_discussions', null)),
-        has_downloads: build.template(std.get(block, 'has_downloads', null)),
-        has_issues: build.template(std.get(block, 'has_issues', null)),
-        has_projects: build.template(std.get(block, 'has_projects', null)),
-        has_wiki: build.template(std.get(block, 'has_wiki', null)),
-        homepage_url: build.template(std.get(block, 'homepage_url', null)),
-        html_url: build.template(std.get(block, 'html_url', null)),
-        http_clone_url: build.template(std.get(block, 'http_clone_url', null)),
-        id: build.template(std.get(block, 'id', null)),
-        ignore_vulnerability_alerts_during_read: build.template(std.get(block, 'ignore_vulnerability_alerts_during_read', null)),
-        is_template: build.template(std.get(block, 'is_template', null)),
-        license_template: build.template(std.get(block, 'license_template', null)),
-        merge_commit_message: build.template(std.get(block, 'merge_commit_message', null)),
-        merge_commit_title: build.template(std.get(block, 'merge_commit_title', null)),
-        name: build.template(block.name),
-        node_id: build.template(std.get(block, 'node_id', null)),
-        primary_language: build.template(std.get(block, 'primary_language', null)),
-        private: build.template(std.get(block, 'private', null)),
-        repo_id: build.template(std.get(block, 'repo_id', null)),
-        squash_merge_commit_message: build.template(std.get(block, 'squash_merge_commit_message', null)),
-        squash_merge_commit_title: build.template(std.get(block, 'squash_merge_commit_title', null)),
-        ssh_clone_url: build.template(std.get(block, 'ssh_clone_url', null)),
-        svn_url: build.template(std.get(block, 'svn_url', null)),
-        topics: build.template(std.get(block, 'topics', null)),
-        visibility: build.template(std.get(block, 'visibility', null)),
-        vulnerability_alerts: build.template(std.get(block, 'vulnerability_alerts', null)),
-        web_commit_signoff_required: build.template(std.get(block, 'web_commit_signoff_required', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'allow_auto_merge') +
+        attribute(block, 'allow_merge_commit') +
+        attribute(block, 'allow_rebase_merge') +
+        attribute(block, 'allow_squash_merge') +
+        attribute(block, 'allow_update_branch') +
+        attribute(block, 'archive_on_destroy') +
+        attribute(block, 'archived') +
+        attribute(block, 'auto_init') +
+        attribute(block, 'default_branch') +
+        attribute(block, 'delete_branch_on_merge') +
+        attribute(block, 'description') +
+        attribute(block, 'etag') +
+        attribute(block, 'full_name') +
+        attribute(block, 'git_clone_url') +
+        attribute(block, 'gitignore_template') +
+        attribute(block, 'has_discussions') +
+        attribute(block, 'has_downloads') +
+        attribute(block, 'has_issues') +
+        attribute(block, 'has_projects') +
+        attribute(block, 'has_wiki') +
+        attribute(block, 'homepage_url') +
+        attribute(block, 'html_url') +
+        attribute(block, 'http_clone_url') +
+        attribute(block, 'id') +
+        attribute(block, 'ignore_vulnerability_alerts_during_read') +
+        attribute(block, 'is_template') +
+        attribute(block, 'license_template') +
+        attribute(block, 'merge_commit_message') +
+        attribute(block, 'merge_commit_title') +
+        attribute(block, 'name', true) +
+        attribute(block, 'node_id') +
+        attribute(block, 'primary_language') +
+        attribute(block, 'private') +
+        attribute(block, 'repo_id') +
+        attribute(block, 'squash_merge_commit_message') +
+        attribute(block, 'squash_merge_commit_title') +
+        attribute(block, 'ssh_clone_url') +
+        attribute(block, 'svn_url') +
+        attribute(block, 'topics') +
+        attribute(block, 'visibility') +
+        attribute(block, 'vulnerability_alerts') +
+        attribute(block, 'web_commit_signoff_required') +
+        blockObj(block, 'pages', function(block)
+          attribute(block, 'build_type') +
+          attribute(block, 'cname') +
+          attribute(block, 'custom_404') +
+          attribute(block, 'html_url') +
+          attribute(block, 'status') +
+          attribute(block, 'url') +
+          blockObj(block, 'source', function(block)
+            attribute(block, 'branch', true) +
+            attribute(block, 'path'), 'list'), 'list') +
+        blockObj(block, 'security_and_analysis', function(block)
+          blockObj(block, 'advanced_security', function(block)
+            attribute(block, 'status', true), 'list') +
+          blockObj(block, 'secret_scanning', function(block)
+            attribute(block, 'status', true), 'list') +
+          blockObj(block, 'secret_scanning_push_protection', function(block)
+            attribute(block, 'status', true), 'list'), 'list') +
+        blockObj(block, 'template', function(block)
+          attribute(block, 'include_all_branches') +
+          attribute(block, 'owner', true) +
+          attribute(block, 'repository', true), 'list')
+      ),
       allow_auto_merge: resource.field(self._.blocks, 'allow_auto_merge'),
       allow_merge_commit: resource.field(self._.blocks, 'allow_merge_commit'),
       allow_rebase_merge: resource.field(self._.blocks, 'allow_rebase_merge'),
@@ -1022,14 +1222,15 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_autolink_reference(name, block): {
       local resource = blockType.resource('github_repository_autolink_reference', name),
-      _: resource._(block, {
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        is_alphanumeric: build.template(std.get(block, 'is_alphanumeric', null)),
-        key_prefix: build.template(block.key_prefix),
-        repository: build.template(block.repository),
-        target_url_template: build.template(block.target_url_template),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'is_alphanumeric') +
+        attribute(block, 'key_prefix', true) +
+        attribute(block, 'repository', true) +
+        attribute(block, 'target_url_template', true)
+      ),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
       is_alphanumeric: resource.field(self._.blocks, 'is_alphanumeric'),
@@ -1039,14 +1240,15 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_collaborator(name, block): {
       local resource = blockType.resource('github_repository_collaborator', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        invitation_id: build.template(std.get(block, 'invitation_id', null)),
-        permission: build.template(std.get(block, 'permission', null)),
-        permission_diff_suppression: build.template(std.get(block, 'permission_diff_suppression', null)),
-        repository: build.template(block.repository),
-        username: build.template(block.username),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'invitation_id') +
+        attribute(block, 'permission') +
+        attribute(block, 'permission_diff_suppression') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'username', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       invitation_id: resource.field(self._.blocks, 'invitation_id'),
       permission: resource.field(self._.blocks, 'permission'),
@@ -1056,24 +1258,34 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_collaborators(name, block): {
       local resource = blockType.resource('github_repository_collaborators', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        invitation_ids: build.template(std.get(block, 'invitation_ids', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'invitation_ids') +
+        attribute(block, 'repository', true) +
+        blockObj(block, 'ignore_team', function(block)
+          attribute(block, 'team_id', true), 'set') +
+        blockObj(block, 'team', function(block)
+          attribute(block, 'permission') +
+          attribute(block, 'team_id', true), 'set') +
+        blockObj(block, 'user', function(block)
+          attribute(block, 'permission') +
+          attribute(block, 'username', true), 'set')
+      ),
       id: resource.field(self._.blocks, 'id'),
       invitation_ids: resource.field(self._.blocks, 'invitation_ids'),
       repository: resource.field(self._.blocks, 'repository'),
     },
     repository_custom_property(name, block): {
       local resource = blockType.resource('github_repository_custom_property', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        property_name: build.template(block.property_name),
-        property_type: build.template(block.property_type),
-        property_value: build.template(block.property_value),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'property_name', true) +
+        attribute(block, 'property_type', true) +
+        attribute(block, 'property_value', true) +
+        attribute(block, 'repository', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       property_name: resource.field(self._.blocks, 'property_name'),
       property_type: resource.field(self._.blocks, 'property_type'),
@@ -1082,25 +1294,27 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_dependabot_security_updates(name, block): {
       local resource = blockType.resource('github_repository_dependabot_security_updates', name),
-      _: resource._(block, {
-        enabled: build.template(block.enabled),
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'enabled', true) +
+        attribute(block, 'id') +
+        attribute(block, 'repository', true)
+      ),
       enabled: resource.field(self._.blocks, 'enabled'),
       id: resource.field(self._.blocks, 'id'),
       repository: resource.field(self._.blocks, 'repository'),
     },
     repository_deploy_key(name, block): {
       local resource = blockType.resource('github_repository_deploy_key', name),
-      _: resource._(block, {
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        key: build.template(block.key),
-        read_only: build.template(std.get(block, 'read_only', null)),
-        repository: build.template(block.repository),
-        title: build.template(block.title),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'key', true) +
+        attribute(block, 'read_only') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'title', true)
+      ),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
       key: resource.field(self._.blocks, 'key'),
@@ -1110,13 +1324,14 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_deployment_branch_policy(name, block): {
       local resource = blockType.resource('github_repository_deployment_branch_policy', name),
-      _: resource._(block, {
-        environment_name: build.template(block.environment_name),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(block.name),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'environment_name', true) +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'name', true) +
+        attribute(block, 'repository', true)
+      ),
       environment_name: resource.field(self._.blocks, 'environment_name'),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
@@ -1125,14 +1340,21 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_environment(name, block): {
       local resource = blockType.resource('github_repository_environment', name),
-      _: resource._(block, {
-        can_admins_bypass: build.template(std.get(block, 'can_admins_bypass', null)),
-        environment: build.template(block.environment),
-        id: build.template(std.get(block, 'id', null)),
-        prevent_self_review: build.template(std.get(block, 'prevent_self_review', null)),
-        repository: build.template(block.repository),
-        wait_timer: build.template(std.get(block, 'wait_timer', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'can_admins_bypass') +
+        attribute(block, 'environment', true) +
+        attribute(block, 'id') +
+        attribute(block, 'prevent_self_review') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'wait_timer') +
+        blockObj(block, 'deployment_branch_policy', function(block)
+          attribute(block, 'custom_branch_policies', true) +
+          attribute(block, 'protected_branches', true), 'list') +
+        blockObj(block, 'reviewers', function(block)
+          attribute(block, 'teams') +
+          attribute(block, 'users'), 'list')
+      ),
       can_admins_bypass: resource.field(self._.blocks, 'can_admins_bypass'),
       environment: resource.field(self._.blocks, 'environment'),
       id: resource.field(self._.blocks, 'id'),
@@ -1142,13 +1364,14 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_environment_deployment_policy(name, block): {
       local resource = blockType.resource('github_repository_environment_deployment_policy', name),
-      _: resource._(block, {
-        branch_pattern: build.template(std.get(block, 'branch_pattern', null)),
-        environment: build.template(block.environment),
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-        tag_pattern: build.template(std.get(block, 'tag_pattern', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'branch_pattern') +
+        attribute(block, 'environment', true) +
+        attribute(block, 'id') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'tag_pattern')
+      ),
       branch_pattern: resource.field(self._.blocks, 'branch_pattern'),
       environment: resource.field(self._.blocks, 'environment'),
       id: resource.field(self._.blocks, 'id'),
@@ -1157,23 +1380,24 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_file(name, block): {
       local resource = blockType.resource('github_repository_file', name),
-      _: resource._(block, {
-        autocreate_branch: build.template(std.get(block, 'autocreate_branch', null)),
-        autocreate_branch_source_branch: build.template(std.get(block, 'autocreate_branch_source_branch', null)),
-        autocreate_branch_source_sha: build.template(std.get(block, 'autocreate_branch_source_sha', null)),
-        branch: build.template(std.get(block, 'branch', null)),
-        commit_author: build.template(std.get(block, 'commit_author', null)),
-        commit_email: build.template(std.get(block, 'commit_email', null)),
-        commit_message: build.template(std.get(block, 'commit_message', null)),
-        commit_sha: build.template(std.get(block, 'commit_sha', null)),
-        content: build.template(block.content),
-        file: build.template(block.file),
-        id: build.template(std.get(block, 'id', null)),
-        overwrite_on_create: build.template(std.get(block, 'overwrite_on_create', null)),
-        ref: build.template(std.get(block, 'ref', null)),
-        repository: build.template(block.repository),
-        sha: build.template(std.get(block, 'sha', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'autocreate_branch') +
+        attribute(block, 'autocreate_branch_source_branch') +
+        attribute(block, 'autocreate_branch_source_sha') +
+        attribute(block, 'branch') +
+        attribute(block, 'commit_author') +
+        attribute(block, 'commit_email') +
+        attribute(block, 'commit_message') +
+        attribute(block, 'commit_sha') +
+        attribute(block, 'content', true) +
+        attribute(block, 'file', true) +
+        attribute(block, 'id') +
+        attribute(block, 'overwrite_on_create') +
+        attribute(block, 'ref') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'sha')
+      ),
       autocreate_branch: resource.field(self._.blocks, 'autocreate_branch'),
       autocreate_branch_source_branch: resource.field(self._.blocks, 'autocreate_branch_source_branch'),
       autocreate_branch_source_sha: resource.field(self._.blocks, 'autocreate_branch_source_sha'),
@@ -1192,16 +1416,17 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_milestone(name, block): {
       local resource = blockType.resource('github_repository_milestone', name),
-      _: resource._(block, {
-        description: build.template(std.get(block, 'description', null)),
-        due_date: build.template(std.get(block, 'due_date', null)),
-        id: build.template(std.get(block, 'id', null)),
-        number: build.template(std.get(block, 'number', null)),
-        owner: build.template(block.owner),
-        repository: build.template(block.repository),
-        state: build.template(std.get(block, 'state', null)),
-        title: build.template(block.title),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'description') +
+        attribute(block, 'due_date') +
+        attribute(block, 'id') +
+        attribute(block, 'number') +
+        attribute(block, 'owner', true) +
+        attribute(block, 'repository', true) +
+        attribute(block, 'state') +
+        attribute(block, 'title', true)
+      ),
       description: resource.field(self._.blocks, 'description'),
       due_date: resource.field(self._.blocks, 'due_date'),
       id: resource.field(self._.blocks, 'id'),
@@ -1213,14 +1438,15 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_project(name, block): {
       local resource = blockType.resource('github_repository_project', name),
-      _: resource._(block, {
-        body: build.template(std.get(block, 'body', null)),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(block.name),
-        repository: build.template(block.repository),
-        url: build.template(std.get(block, 'url', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'body') +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'name', true) +
+        attribute(block, 'repository', true) +
+        attribute(block, 'url')
+      ),
       body: resource.field(self._.blocks, 'body'),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
@@ -1230,25 +1456,26 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_pull_request(name, block): {
       local resource = blockType.resource('github_repository_pull_request', name),
-      _: resource._(block, {
-        base_ref: build.template(block.base_ref),
-        base_repository: build.template(block.base_repository),
-        base_sha: build.template(std.get(block, 'base_sha', null)),
-        body: build.template(std.get(block, 'body', null)),
-        draft: build.template(std.get(block, 'draft', null)),
-        head_ref: build.template(block.head_ref),
-        head_sha: build.template(std.get(block, 'head_sha', null)),
-        id: build.template(std.get(block, 'id', null)),
-        labels: build.template(std.get(block, 'labels', null)),
-        maintainer_can_modify: build.template(std.get(block, 'maintainer_can_modify', null)),
-        number: build.template(std.get(block, 'number', null)),
-        opened_at: build.template(std.get(block, 'opened_at', null)),
-        opened_by: build.template(std.get(block, 'opened_by', null)),
-        owner: build.template(std.get(block, 'owner', null)),
-        state: build.template(std.get(block, 'state', null)),
-        title: build.template(block.title),
-        updated_at: build.template(std.get(block, 'updated_at', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'base_ref', true) +
+        attribute(block, 'base_repository', true) +
+        attribute(block, 'base_sha') +
+        attribute(block, 'body') +
+        attribute(block, 'draft') +
+        attribute(block, 'head_ref', true) +
+        attribute(block, 'head_sha') +
+        attribute(block, 'id') +
+        attribute(block, 'labels') +
+        attribute(block, 'maintainer_can_modify') +
+        attribute(block, 'number') +
+        attribute(block, 'opened_at') +
+        attribute(block, 'opened_by') +
+        attribute(block, 'owner') +
+        attribute(block, 'state') +
+        attribute(block, 'title', true) +
+        attribute(block, 'updated_at')
+      ),
       base_ref: resource.field(self._.blocks, 'base_ref'),
       base_repository: resource.field(self._.blocks, 'base_repository'),
       base_sha: resource.field(self._.blocks, 'base_sha'),
@@ -1269,16 +1496,85 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_ruleset(name, block): {
       local resource = blockType.resource('github_repository_ruleset', name),
-      _: resource._(block, {
-        enforcement: build.template(block.enforcement),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(block.name),
-        node_id: build.template(std.get(block, 'node_id', null)),
-        repository: build.template(std.get(block, 'repository', null)),
-        ruleset_id: build.template(std.get(block, 'ruleset_id', null)),
-        target: build.template(block.target),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'enforcement', true) +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'name', true) +
+        attribute(block, 'node_id') +
+        attribute(block, 'repository') +
+        attribute(block, 'ruleset_id') +
+        attribute(block, 'target', true) +
+        blockObj(block, 'bypass_actors', function(block)
+          attribute(block, 'actor_id', true) +
+          attribute(block, 'actor_type', true) +
+          attribute(block, 'bypass_mode', true), 'list') +
+        blockObj(block, 'conditions', function(block)
+          blockObj(block, 'ref_name', function(block)
+            attribute(block, 'exclude', true) +
+            attribute(block, 'include', true), 'list'), 'list') +
+        blockObj(block, 'rules', function(block)
+          attribute(block, 'creation') +
+          attribute(block, 'deletion') +
+          attribute(block, 'non_fast_forward') +
+          attribute(block, 'required_linear_history') +
+          attribute(block, 'required_signatures') +
+          attribute(block, 'update') +
+          attribute(block, 'update_allows_fetch_and_merge') +
+          blockObj(block, 'branch_name_pattern', function(block)
+            attribute(block, 'name') +
+            attribute(block, 'negate') +
+            attribute(block, 'operator', true) +
+            attribute(block, 'pattern', true), 'list') +
+          blockObj(block, 'commit_author_email_pattern', function(block)
+            attribute(block, 'name') +
+            attribute(block, 'negate') +
+            attribute(block, 'operator', true) +
+            attribute(block, 'pattern', true), 'list') +
+          blockObj(block, 'commit_message_pattern', function(block)
+            attribute(block, 'name') +
+            attribute(block, 'negate') +
+            attribute(block, 'operator', true) +
+            attribute(block, 'pattern', true), 'list') +
+          blockObj(block, 'committer_email_pattern', function(block)
+            attribute(block, 'name') +
+            attribute(block, 'negate') +
+            attribute(block, 'operator', true) +
+            attribute(block, 'pattern', true), 'list') +
+          blockObj(block, 'merge_queue', function(block)
+            attribute(block, 'check_response_timeout_minutes') +
+            attribute(block, 'grouping_strategy') +
+            attribute(block, 'max_entries_to_build') +
+            attribute(block, 'max_entries_to_merge') +
+            attribute(block, 'merge_method') +
+            attribute(block, 'min_entries_to_merge') +
+            attribute(block, 'min_entries_to_merge_wait_minutes'), 'list') +
+          blockObj(block, 'pull_request', function(block)
+            attribute(block, 'dismiss_stale_reviews_on_push') +
+            attribute(block, 'require_code_owner_review') +
+            attribute(block, 'require_last_push_approval') +
+            attribute(block, 'required_approving_review_count') +
+            attribute(block, 'required_review_thread_resolution'), 'list') +
+          blockObj(block, 'required_code_scanning', function(block)
+            blockObj(block, 'required_code_scanning_tool', function(block)
+              attribute(block, 'alerts_threshold', true) +
+              attribute(block, 'security_alerts_threshold', true) +
+              attribute(block, 'tool', true), 'set'), 'list') +
+          blockObj(block, 'required_deployments', function(block)
+            attribute(block, 'required_deployment_environments', true), 'list') +
+          blockObj(block, 'required_status_checks', function(block)
+            attribute(block, 'do_not_enforce_on_create') +
+            attribute(block, 'strict_required_status_checks_policy') +
+            blockObj(block, 'required_check', function(block)
+              attribute(block, 'context', true) +
+              attribute(block, 'integration_id'), 'set'), 'list') +
+          blockObj(block, 'tag_name_pattern', function(block)
+            attribute(block, 'name') +
+            attribute(block, 'negate') +
+            attribute(block, 'operator', true) +
+            attribute(block, 'pattern', true), 'list'), 'list')
+      ),
       enforcement: resource.field(self._.blocks, 'enforcement'),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
@@ -1290,25 +1586,32 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_topics(name, block): {
       local resource = blockType.resource('github_repository_topics', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-        topics: build.template(block.topics),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'topics', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       repository: resource.field(self._.blocks, 'repository'),
       topics: resource.field(self._.blocks, 'topics'),
     },
     repository_webhook(name, block): {
       local resource = blockType.resource('github_repository_webhook', name),
-      _: resource._(block, {
-        active: build.template(std.get(block, 'active', null)),
-        etag: build.template(std.get(block, 'etag', null)),
-        events: build.template(block.events),
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-        url: build.template(std.get(block, 'url', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'active') +
+        attribute(block, 'etag') +
+        attribute(block, 'events', true) +
+        attribute(block, 'id') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'url') +
+        blockObj(block, 'configuration', function(block)
+          attribute(block, 'content_type') +
+          attribute(block, 'insecure_ssl') +
+          attribute(block, 'secret') +
+          attribute(block, 'url', true), 'list')
+      ),
       active: resource.field(self._.blocks, 'active'),
       etag: resource.field(self._.blocks, 'etag'),
       events: resource.field(self._.blocks, 'events'),
@@ -1318,21 +1621,22 @@ local provider(rawConfiguration, configuration) = {
     },
     team(name, block): {
       local resource = blockType.resource('github_team', name),
-      _: resource._(block, {
-        create_default_maintainer: build.template(std.get(block, 'create_default_maintainer', null)),
-        description: build.template(std.get(block, 'description', null)),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        ldap_dn: build.template(std.get(block, 'ldap_dn', null)),
-        members_count: build.template(std.get(block, 'members_count', null)),
-        name: build.template(block.name),
-        node_id: build.template(std.get(block, 'node_id', null)),
-        parent_team_id: build.template(std.get(block, 'parent_team_id', null)),
-        parent_team_read_id: build.template(std.get(block, 'parent_team_read_id', null)),
-        parent_team_read_slug: build.template(std.get(block, 'parent_team_read_slug', null)),
-        privacy: build.template(std.get(block, 'privacy', null)),
-        slug: build.template(std.get(block, 'slug', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'create_default_maintainer') +
+        attribute(block, 'description') +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'ldap_dn') +
+        attribute(block, 'members_count') +
+        attribute(block, 'name', true) +
+        attribute(block, 'node_id') +
+        attribute(block, 'parent_team_id') +
+        attribute(block, 'parent_team_read_id') +
+        attribute(block, 'parent_team_read_slug') +
+        attribute(block, 'privacy') +
+        attribute(block, 'slug')
+      ),
       create_default_maintainer: resource.field(self._.blocks, 'create_default_maintainer'),
       description: resource.field(self._.blocks, 'description'),
       etag: resource.field(self._.blocks, 'etag'),
@@ -1349,22 +1653,27 @@ local provider(rawConfiguration, configuration) = {
     },
     team_members(name, block): {
       local resource = blockType.resource('github_team_members', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        team_id: build.template(block.team_id),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'team_id', true) +
+        blockObj(block, 'members', function(block)
+          attribute(block, 'role') +
+          attribute(block, 'username', true), 'set')
+      ),
       id: resource.field(self._.blocks, 'id'),
       team_id: resource.field(self._.blocks, 'team_id'),
     },
     team_membership(name, block): {
       local resource = blockType.resource('github_team_membership', name),
-      _: resource._(block, {
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        role: build.template(std.get(block, 'role', null)),
-        team_id: build.template(block.team_id),
-        username: build.template(block.username),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'role') +
+        attribute(block, 'team_id', true) +
+        attribute(block, 'username', true)
+      ),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
       role: resource.field(self._.blocks, 'role'),
@@ -1373,13 +1682,14 @@ local provider(rawConfiguration, configuration) = {
     },
     team_repository(name, block): {
       local resource = blockType.resource('github_team_repository', name),
-      _: resource._(block, {
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        permission: build.template(std.get(block, 'permission', null)),
-        repository: build.template(block.repository),
-        team_id: build.template(block.team_id),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'permission') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'team_id', true)
+      ),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
       permission: resource.field(self._.blocks, 'permission'),
@@ -1388,12 +1698,17 @@ local provider(rawConfiguration, configuration) = {
     },
     team_settings(name, block): {
       local resource = blockType.resource('github_team_settings', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        team_id: build.template(block.team_id),
-        team_slug: build.template(std.get(block, 'team_slug', null)),
-        team_uid: build.template(std.get(block, 'team_uid', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'team_id', true) +
+        attribute(block, 'team_slug') +
+        attribute(block, 'team_uid') +
+        blockObj(block, 'review_request_delegation', function(block)
+          attribute(block, 'algorithm') +
+          attribute(block, 'member_count') +
+          attribute(block, 'notify'), 'list')
+      ),
       id: resource.field(self._.blocks, 'id'),
       team_id: resource.field(self._.blocks, 'team_id'),
       team_slug: resource.field(self._.blocks, 'team_slug'),
@@ -1401,23 +1716,29 @@ local provider(rawConfiguration, configuration) = {
     },
     team_sync_group_mapping(name, block): {
       local resource = blockType.resource('github_team_sync_group_mapping', name),
-      _: resource._(block, {
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        team_slug: build.template(block.team_slug),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'team_slug', true) +
+        blockObj(block, 'group', function(block)
+          attribute(block, 'group_description', true) +
+          attribute(block, 'group_id', true) +
+          attribute(block, 'group_name', true), 'set')
+      ),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
       team_slug: resource.field(self._.blocks, 'team_slug'),
     },
     user_gpg_key(name, block): {
       local resource = blockType.resource('github_user_gpg_key', name),
-      _: resource._(block, {
-        armored_public_key: build.template(block.armored_public_key),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        key_id: build.template(std.get(block, 'key_id', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'armored_public_key', true) +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'key_id')
+      ),
       armored_public_key: resource.field(self._.blocks, 'armored_public_key'),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
@@ -1425,24 +1746,26 @@ local provider(rawConfiguration, configuration) = {
     },
     user_invitation_accepter(name, block): {
       local resource = blockType.resource('github_user_invitation_accepter', name),
-      _: resource._(block, {
-        allow_empty_id: build.template(std.get(block, 'allow_empty_id', null)),
-        id: build.template(std.get(block, 'id', null)),
-        invitation_id: build.template(std.get(block, 'invitation_id', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'allow_empty_id') +
+        attribute(block, 'id') +
+        attribute(block, 'invitation_id')
+      ),
       allow_empty_id: resource.field(self._.blocks, 'allow_empty_id'),
       id: resource.field(self._.blocks, 'id'),
       invitation_id: resource.field(self._.blocks, 'invitation_id'),
     },
     user_ssh_key(name, block): {
       local resource = blockType.resource('github_user_ssh_key', name),
-      _: resource._(block, {
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        key: build.template(block.key),
-        title: build.template(block.title),
-        url: build.template(std.get(block, 'url', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'key', true) +
+        attribute(block, 'title', true) +
+        attribute(block, 'url')
+      ),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
       key: resource.field(self._.blocks, 'key'),
@@ -1454,13 +1777,14 @@ local provider(rawConfiguration, configuration) = {
     local blockType = provider.blockType('data'),
     actions_environment_secrets(name, block): {
       local resource = blockType.resource('github_actions_environment_secrets', name),
-      _: resource._(block, {
-        environment: build.template(block.environment),
-        full_name: build.template(std.get(block, 'full_name', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(std.get(block, 'name', null)),
-        secrets: build.template(std.get(block, 'secrets', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'environment', true) +
+        attribute(block, 'full_name') +
+        attribute(block, 'id') +
+        attribute(block, 'name') +
+        attribute(block, 'secrets')
+      ),
       environment: resource.field(self._.blocks, 'environment'),
       full_name: resource.field(self._.blocks, 'full_name'),
       id: resource.field(self._.blocks, 'id'),
@@ -1469,13 +1793,14 @@ local provider(rawConfiguration, configuration) = {
     },
     actions_environment_variables(name, block): {
       local resource = blockType.resource('github_actions_environment_variables', name),
-      _: resource._(block, {
-        environment: build.template(block.environment),
-        full_name: build.template(std.get(block, 'full_name', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(std.get(block, 'name', null)),
-        variables: build.template(std.get(block, 'variables', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'environment', true) +
+        attribute(block, 'full_name') +
+        attribute(block, 'id') +
+        attribute(block, 'name') +
+        attribute(block, 'variables')
+      ),
       environment: resource.field(self._.blocks, 'environment'),
       full_name: resource.field(self._.blocks, 'full_name'),
       id: resource.field(self._.blocks, 'id'),
@@ -1484,61 +1809,67 @@ local provider(rawConfiguration, configuration) = {
     },
     actions_organization_oidc_subject_claim_customization_template(name, block): {
       local resource = blockType.resource('github_actions_organization_oidc_subject_claim_customization_template', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        include_claim_keys: build.template(std.get(block, 'include_claim_keys', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'include_claim_keys')
+      ),
       id: resource.field(self._.blocks, 'id'),
       include_claim_keys: resource.field(self._.blocks, 'include_claim_keys'),
     },
     actions_organization_public_key(name, block): {
       local resource = blockType.resource('github_actions_organization_public_key', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        key: build.template(std.get(block, 'key', null)),
-        key_id: build.template(std.get(block, 'key_id', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'key') +
+        attribute(block, 'key_id')
+      ),
       id: resource.field(self._.blocks, 'id'),
       key: resource.field(self._.blocks, 'key'),
       key_id: resource.field(self._.blocks, 'key_id'),
     },
     actions_organization_registration_token(name, block): {
       local resource = blockType.resource('github_actions_organization_registration_token', name),
-      _: resource._(block, {
-        expires_at: build.template(std.get(block, 'expires_at', null)),
-        id: build.template(std.get(block, 'id', null)),
-        token: build.template(std.get(block, 'token', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'expires_at') +
+        attribute(block, 'id') +
+        attribute(block, 'token')
+      ),
       expires_at: resource.field(self._.blocks, 'expires_at'),
       id: resource.field(self._.blocks, 'id'),
       token: resource.field(self._.blocks, 'token'),
     },
     actions_organization_secrets(name, block): {
       local resource = blockType.resource('github_actions_organization_secrets', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        secrets: build.template(std.get(block, 'secrets', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'secrets')
+      ),
       id: resource.field(self._.blocks, 'id'),
       secrets: resource.field(self._.blocks, 'secrets'),
     },
     actions_organization_variables(name, block): {
       local resource = blockType.resource('github_actions_organization_variables', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        variables: build.template(std.get(block, 'variables', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'variables')
+      ),
       id: resource.field(self._.blocks, 'id'),
       variables: resource.field(self._.blocks, 'variables'),
     },
     actions_public_key(name, block): {
       local resource = blockType.resource('github_actions_public_key', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        key: build.template(std.get(block, 'key', null)),
-        key_id: build.template(std.get(block, 'key_id', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'key') +
+        attribute(block, 'key_id') +
+        attribute(block, 'repository', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       key: resource.field(self._.blocks, 'key'),
       key_id: resource.field(self._.blocks, 'key_id'),
@@ -1546,12 +1877,13 @@ local provider(rawConfiguration, configuration) = {
     },
     actions_registration_token(name, block): {
       local resource = blockType.resource('github_actions_registration_token', name),
-      _: resource._(block, {
-        expires_at: build.template(std.get(block, 'expires_at', null)),
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-        token: build.template(std.get(block, 'token', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'expires_at') +
+        attribute(block, 'id') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'token')
+      ),
       expires_at: resource.field(self._.blocks, 'expires_at'),
       id: resource.field(self._.blocks, 'id'),
       repository: resource.field(self._.blocks, 'repository'),
@@ -1559,12 +1891,13 @@ local provider(rawConfiguration, configuration) = {
     },
     actions_repository_oidc_subject_claim_customization_template(name, block): {
       local resource = blockType.resource('github_actions_repository_oidc_subject_claim_customization_template', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        include_claim_keys: build.template(std.get(block, 'include_claim_keys', null)),
-        name: build.template(block.name),
-        use_default: build.template(std.get(block, 'use_default', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'include_claim_keys') +
+        attribute(block, 'name', true) +
+        attribute(block, 'use_default')
+      ),
       id: resource.field(self._.blocks, 'id'),
       include_claim_keys: resource.field(self._.blocks, 'include_claim_keys'),
       name: resource.field(self._.blocks, 'name'),
@@ -1572,12 +1905,13 @@ local provider(rawConfiguration, configuration) = {
     },
     actions_secrets(name, block): {
       local resource = blockType.resource('github_actions_secrets', name),
-      _: resource._(block, {
-        full_name: build.template(std.get(block, 'full_name', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(std.get(block, 'name', null)),
-        secrets: build.template(std.get(block, 'secrets', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'full_name') +
+        attribute(block, 'id') +
+        attribute(block, 'name') +
+        attribute(block, 'secrets')
+      ),
       full_name: resource.field(self._.blocks, 'full_name'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
@@ -1585,12 +1919,13 @@ local provider(rawConfiguration, configuration) = {
     },
     actions_variables(name, block): {
       local resource = blockType.resource('github_actions_variables', name),
-      _: resource._(block, {
-        full_name: build.template(std.get(block, 'full_name', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(std.get(block, 'name', null)),
-        variables: build.template(std.get(block, 'variables', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'full_name') +
+        attribute(block, 'id') +
+        attribute(block, 'name') +
+        attribute(block, 'variables')
+      ),
       full_name: resource.field(self._.blocks, 'full_name'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
@@ -1598,13 +1933,14 @@ local provider(rawConfiguration, configuration) = {
     },
     app(name, block): {
       local resource = blockType.resource('github_app', name),
-      _: resource._(block, {
-        description: build.template(std.get(block, 'description', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(std.get(block, 'name', null)),
-        node_id: build.template(std.get(block, 'node_id', null)),
-        slug: build.template(block.slug),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'description') +
+        attribute(block, 'id') +
+        attribute(block, 'name') +
+        attribute(block, 'node_id') +
+        attribute(block, 'slug', true)
+      ),
       description: resource.field(self._.blocks, 'description'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
@@ -1613,13 +1949,14 @@ local provider(rawConfiguration, configuration) = {
     },
     app_token(name, block): {
       local resource = blockType.resource('github_app_token', name),
-      _: resource._(block, {
-        app_id: build.template(block.app_id),
-        id: build.template(std.get(block, 'id', null)),
-        installation_id: build.template(block.installation_id),
-        pem_file: build.template(block.pem_file),
-        token: build.template(std.get(block, 'token', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'app_id', true) +
+        attribute(block, 'id') +
+        attribute(block, 'installation_id', true) +
+        attribute(block, 'pem_file', true) +
+        attribute(block, 'token')
+      ),
       app_id: resource.field(self._.blocks, 'app_id'),
       id: resource.field(self._.blocks, 'id'),
       installation_id: resource.field(self._.blocks, 'installation_id'),
@@ -1628,14 +1965,15 @@ local provider(rawConfiguration, configuration) = {
     },
     branch(name, block): {
       local resource = blockType.resource('github_branch', name),
-      _: resource._(block, {
-        branch: build.template(block.branch),
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        ref: build.template(std.get(block, 'ref', null)),
-        repository: build.template(block.repository),
-        sha: build.template(std.get(block, 'sha', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'branch', true) +
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'ref') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'sha')
+      ),
       branch: resource.field(self._.blocks, 'branch'),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
@@ -1645,43 +1983,47 @@ local provider(rawConfiguration, configuration) = {
     },
     branch_protection_rules(name, block): {
       local resource = blockType.resource('github_branch_protection_rules', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-        rules: build.template(std.get(block, 'rules', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'rules')
+      ),
       id: resource.field(self._.blocks, 'id'),
       repository: resource.field(self._.blocks, 'repository'),
       rules: resource.field(self._.blocks, 'rules'),
     },
     codespaces_organization_public_key(name, block): {
       local resource = blockType.resource('github_codespaces_organization_public_key', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        key: build.template(std.get(block, 'key', null)),
-        key_id: build.template(std.get(block, 'key_id', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'key') +
+        attribute(block, 'key_id')
+      ),
       id: resource.field(self._.blocks, 'id'),
       key: resource.field(self._.blocks, 'key'),
       key_id: resource.field(self._.blocks, 'key_id'),
     },
     codespaces_organization_secrets(name, block): {
       local resource = blockType.resource('github_codespaces_organization_secrets', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        secrets: build.template(std.get(block, 'secrets', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'secrets')
+      ),
       id: resource.field(self._.blocks, 'id'),
       secrets: resource.field(self._.blocks, 'secrets'),
     },
     codespaces_public_key(name, block): {
       local resource = blockType.resource('github_codespaces_public_key', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        key: build.template(std.get(block, 'key', null)),
-        key_id: build.template(std.get(block, 'key_id', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'key') +
+        attribute(block, 'key_id') +
+        attribute(block, 'repository', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       key: resource.field(self._.blocks, 'key'),
       key_id: resource.field(self._.blocks, 'key_id'),
@@ -1689,12 +2031,13 @@ local provider(rawConfiguration, configuration) = {
     },
     codespaces_secrets(name, block): {
       local resource = blockType.resource('github_codespaces_secrets', name),
-      _: resource._(block, {
-        full_name: build.template(std.get(block, 'full_name', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(std.get(block, 'name', null)),
-        secrets: build.template(std.get(block, 'secrets', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'full_name') +
+        attribute(block, 'id') +
+        attribute(block, 'name') +
+        attribute(block, 'secrets')
+      ),
       full_name: resource.field(self._.blocks, 'full_name'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
@@ -1702,34 +2045,37 @@ local provider(rawConfiguration, configuration) = {
     },
     codespaces_user_public_key(name, block): {
       local resource = blockType.resource('github_codespaces_user_public_key', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        key: build.template(std.get(block, 'key', null)),
-        key_id: build.template(std.get(block, 'key_id', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'key') +
+        attribute(block, 'key_id')
+      ),
       id: resource.field(self._.blocks, 'id'),
       key: resource.field(self._.blocks, 'key'),
       key_id: resource.field(self._.blocks, 'key_id'),
     },
     codespaces_user_secrets(name, block): {
       local resource = blockType.resource('github_codespaces_user_secrets', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        secrets: build.template(std.get(block, 'secrets', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'secrets')
+      ),
       id: resource.field(self._.blocks, 'id'),
       secrets: resource.field(self._.blocks, 'secrets'),
     },
     collaborators(name, block): {
       local resource = blockType.resource('github_collaborators', name),
-      _: resource._(block, {
-        affiliation: build.template(std.get(block, 'affiliation', null)),
-        collaborator: build.template(std.get(block, 'collaborator', null)),
-        id: build.template(std.get(block, 'id', null)),
-        owner: build.template(block.owner),
-        permission: build.template(std.get(block, 'permission', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'affiliation') +
+        attribute(block, 'collaborator') +
+        attribute(block, 'id') +
+        attribute(block, 'owner', true) +
+        attribute(block, 'permission') +
+        attribute(block, 'repository', true)
+      ),
       affiliation: resource.field(self._.blocks, 'affiliation'),
       collaborator: resource.field(self._.blocks, 'collaborator'),
       id: resource.field(self._.blocks, 'id'),
@@ -1739,32 +2085,35 @@ local provider(rawConfiguration, configuration) = {
     },
     dependabot_organization_public_key(name, block): {
       local resource = blockType.resource('github_dependabot_organization_public_key', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        key: build.template(std.get(block, 'key', null)),
-        key_id: build.template(std.get(block, 'key_id', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'key') +
+        attribute(block, 'key_id')
+      ),
       id: resource.field(self._.blocks, 'id'),
       key: resource.field(self._.blocks, 'key'),
       key_id: resource.field(self._.blocks, 'key_id'),
     },
     dependabot_organization_secrets(name, block): {
       local resource = blockType.resource('github_dependabot_organization_secrets', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        secrets: build.template(std.get(block, 'secrets', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'secrets')
+      ),
       id: resource.field(self._.blocks, 'id'),
       secrets: resource.field(self._.blocks, 'secrets'),
     },
     dependabot_public_key(name, block): {
       local resource = blockType.resource('github_dependabot_public_key', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        key: build.template(std.get(block, 'key', null)),
-        key_id: build.template(std.get(block, 'key_id', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'key') +
+        attribute(block, 'key_id') +
+        attribute(block, 'repository', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       key: resource.field(self._.blocks, 'key'),
       key_id: resource.field(self._.blocks, 'key_id'),
@@ -1772,12 +2121,13 @@ local provider(rawConfiguration, configuration) = {
     },
     dependabot_secrets(name, block): {
       local resource = blockType.resource('github_dependabot_secrets', name),
-      _: resource._(block, {
-        full_name: build.template(std.get(block, 'full_name', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(std.get(block, 'name', null)),
-        secrets: build.template(std.get(block, 'secrets', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'full_name') +
+        attribute(block, 'id') +
+        attribute(block, 'name') +
+        attribute(block, 'secrets')
+      ),
       full_name: resource.field(self._.blocks, 'full_name'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
@@ -1785,15 +2135,16 @@ local provider(rawConfiguration, configuration) = {
     },
     enterprise(name, block): {
       local resource = blockType.resource('github_enterprise', name),
-      _: resource._(block, {
-        created_at: build.template(std.get(block, 'created_at', null)),
-        database_id: build.template(std.get(block, 'database_id', null)),
-        description: build.template(std.get(block, 'description', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(std.get(block, 'name', null)),
-        slug: build.template(block.slug),
-        url: build.template(std.get(block, 'url', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'created_at') +
+        attribute(block, 'database_id') +
+        attribute(block, 'description') +
+        attribute(block, 'id') +
+        attribute(block, 'name') +
+        attribute(block, 'slug', true) +
+        attribute(block, 'url')
+      ),
       created_at: resource.field(self._.blocks, 'created_at'),
       database_id: resource.field(self._.blocks, 'database_id'),
       description: resource.field(self._.blocks, 'description'),
@@ -1804,45 +2155,47 @@ local provider(rawConfiguration, configuration) = {
     },
     external_groups(name, block): {
       local resource = blockType.resource('github_external_groups', name),
-      _: resource._(block, {
-        external_groups: build.template(std.get(block, 'external_groups', null)),
-        id: build.template(std.get(block, 'id', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'external_groups') +
+        attribute(block, 'id')
+      ),
       external_groups: resource.field(self._.blocks, 'external_groups'),
       id: resource.field(self._.blocks, 'id'),
     },
     ip_ranges(name, block): {
       local resource = blockType.resource('github_ip_ranges', name),
-      _: resource._(block, {
-        actions: build.template(std.get(block, 'actions', null)),
-        actions_ipv4: build.template(std.get(block, 'actions_ipv4', null)),
-        actions_ipv6: build.template(std.get(block, 'actions_ipv6', null)),
-        api: build.template(std.get(block, 'api', null)),
-        api_ipv4: build.template(std.get(block, 'api_ipv4', null)),
-        api_ipv6: build.template(std.get(block, 'api_ipv6', null)),
-        dependabot: build.template(std.get(block, 'dependabot', null)),
-        dependabot_ipv4: build.template(std.get(block, 'dependabot_ipv4', null)),
-        dependabot_ipv6: build.template(std.get(block, 'dependabot_ipv6', null)),
-        git: build.template(std.get(block, 'git', null)),
-        git_ipv4: build.template(std.get(block, 'git_ipv4', null)),
-        git_ipv6: build.template(std.get(block, 'git_ipv6', null)),
-        hooks: build.template(std.get(block, 'hooks', null)),
-        hooks_ipv4: build.template(std.get(block, 'hooks_ipv4', null)),
-        hooks_ipv6: build.template(std.get(block, 'hooks_ipv6', null)),
-        id: build.template(std.get(block, 'id', null)),
-        importer: build.template(std.get(block, 'importer', null)),
-        importer_ipv4: build.template(std.get(block, 'importer_ipv4', null)),
-        importer_ipv6: build.template(std.get(block, 'importer_ipv6', null)),
-        packages: build.template(std.get(block, 'packages', null)),
-        packages_ipv4: build.template(std.get(block, 'packages_ipv4', null)),
-        packages_ipv6: build.template(std.get(block, 'packages_ipv6', null)),
-        pages: build.template(std.get(block, 'pages', null)),
-        pages_ipv4: build.template(std.get(block, 'pages_ipv4', null)),
-        pages_ipv6: build.template(std.get(block, 'pages_ipv6', null)),
-        web: build.template(std.get(block, 'web', null)),
-        web_ipv4: build.template(std.get(block, 'web_ipv4', null)),
-        web_ipv6: build.template(std.get(block, 'web_ipv6', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'actions') +
+        attribute(block, 'actions_ipv4') +
+        attribute(block, 'actions_ipv6') +
+        attribute(block, 'api') +
+        attribute(block, 'api_ipv4') +
+        attribute(block, 'api_ipv6') +
+        attribute(block, 'dependabot') +
+        attribute(block, 'dependabot_ipv4') +
+        attribute(block, 'dependabot_ipv6') +
+        attribute(block, 'git') +
+        attribute(block, 'git_ipv4') +
+        attribute(block, 'git_ipv6') +
+        attribute(block, 'hooks') +
+        attribute(block, 'hooks_ipv4') +
+        attribute(block, 'hooks_ipv6') +
+        attribute(block, 'id') +
+        attribute(block, 'importer') +
+        attribute(block, 'importer_ipv4') +
+        attribute(block, 'importer_ipv6') +
+        attribute(block, 'packages') +
+        attribute(block, 'packages_ipv4') +
+        attribute(block, 'packages_ipv6') +
+        attribute(block, 'pages') +
+        attribute(block, 'pages_ipv4') +
+        attribute(block, 'pages_ipv6') +
+        attribute(block, 'web') +
+        attribute(block, 'web_ipv4') +
+        attribute(block, 'web_ipv6')
+      ),
       actions: resource.field(self._.blocks, 'actions'),
       actions_ipv4: resource.field(self._.blocks, 'actions_ipv4'),
       actions_ipv6: resource.field(self._.blocks, 'actions_ipv6'),
@@ -1874,25 +2227,27 @@ local provider(rawConfiguration, configuration) = {
     },
     issue_labels(name, block): {
       local resource = blockType.resource('github_issue_labels', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        labels: build.template(std.get(block, 'labels', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'labels') +
+        attribute(block, 'repository', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       labels: resource.field(self._.blocks, 'labels'),
       repository: resource.field(self._.blocks, 'repository'),
     },
     membership(name, block): {
       local resource = blockType.resource('github_membership', name),
-      _: resource._(block, {
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        organization: build.template(std.get(block, 'organization', null)),
-        role: build.template(std.get(block, 'role', null)),
-        state: build.template(std.get(block, 'state', null)),
-        username: build.template(block.username),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'organization') +
+        attribute(block, 'role') +
+        attribute(block, 'state') +
+        attribute(block, 'username', true)
+      ),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
       organization: resource.field(self._.blocks, 'organization'),
@@ -1902,38 +2257,39 @@ local provider(rawConfiguration, configuration) = {
     },
     organization(name, block): {
       local resource = blockType.resource('github_organization', name),
-      _: resource._(block, {
-        advanced_security_enabled_for_new_repositories: build.template(std.get(block, 'advanced_security_enabled_for_new_repositories', null)),
-        default_repository_permission: build.template(std.get(block, 'default_repository_permission', null)),
-        dependabot_alerts_enabled_for_new_repositories: build.template(std.get(block, 'dependabot_alerts_enabled_for_new_repositories', null)),
-        dependabot_security_updates_enabled_for_new_repositories: build.template(std.get(block, 'dependabot_security_updates_enabled_for_new_repositories', null)),
-        dependency_graph_enabled_for_new_repositories: build.template(std.get(block, 'dependency_graph_enabled_for_new_repositories', null)),
-        description: build.template(std.get(block, 'description', null)),
-        id: build.template(std.get(block, 'id', null)),
-        ignore_archived_repos: build.template(std.get(block, 'ignore_archived_repos', null)),
-        login: build.template(std.get(block, 'login', null)),
-        members: build.template(std.get(block, 'members', null)),
-        members_allowed_repository_creation_type: build.template(std.get(block, 'members_allowed_repository_creation_type', null)),
-        members_can_create_internal_repositories: build.template(std.get(block, 'members_can_create_internal_repositories', null)),
-        members_can_create_pages: build.template(std.get(block, 'members_can_create_pages', null)),
-        members_can_create_private_pages: build.template(std.get(block, 'members_can_create_private_pages', null)),
-        members_can_create_private_repositories: build.template(std.get(block, 'members_can_create_private_repositories', null)),
-        members_can_create_public_pages: build.template(std.get(block, 'members_can_create_public_pages', null)),
-        members_can_create_public_repositories: build.template(std.get(block, 'members_can_create_public_repositories', null)),
-        members_can_create_repositories: build.template(std.get(block, 'members_can_create_repositories', null)),
-        members_can_fork_private_repositories: build.template(std.get(block, 'members_can_fork_private_repositories', null)),
-        name: build.template(block.name),
-        node_id: build.template(std.get(block, 'node_id', null)),
-        orgname: build.template(std.get(block, 'orgname', null)),
-        plan: build.template(std.get(block, 'plan', null)),
-        repositories: build.template(std.get(block, 'repositories', null)),
-        secret_scanning_enabled_for_new_repositories: build.template(std.get(block, 'secret_scanning_enabled_for_new_repositories', null)),
-        secret_scanning_push_protection_enabled_for_new_repositories: build.template(std.get(block, 'secret_scanning_push_protection_enabled_for_new_repositories', null)),
-        summary_only: build.template(std.get(block, 'summary_only', null)),
-        two_factor_requirement_enabled: build.template(std.get(block, 'two_factor_requirement_enabled', null)),
-        users: build.template(std.get(block, 'users', null)),
-        web_commit_signoff_required: build.template(std.get(block, 'web_commit_signoff_required', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'advanced_security_enabled_for_new_repositories') +
+        attribute(block, 'default_repository_permission') +
+        attribute(block, 'dependabot_alerts_enabled_for_new_repositories') +
+        attribute(block, 'dependabot_security_updates_enabled_for_new_repositories') +
+        attribute(block, 'dependency_graph_enabled_for_new_repositories') +
+        attribute(block, 'description') +
+        attribute(block, 'id') +
+        attribute(block, 'ignore_archived_repos') +
+        attribute(block, 'login') +
+        attribute(block, 'members') +
+        attribute(block, 'members_allowed_repository_creation_type') +
+        attribute(block, 'members_can_create_internal_repositories') +
+        attribute(block, 'members_can_create_pages') +
+        attribute(block, 'members_can_create_private_pages') +
+        attribute(block, 'members_can_create_private_repositories') +
+        attribute(block, 'members_can_create_public_pages') +
+        attribute(block, 'members_can_create_public_repositories') +
+        attribute(block, 'members_can_create_repositories') +
+        attribute(block, 'members_can_fork_private_repositories') +
+        attribute(block, 'name', true) +
+        attribute(block, 'node_id') +
+        attribute(block, 'orgname') +
+        attribute(block, 'plan') +
+        attribute(block, 'repositories') +
+        attribute(block, 'secret_scanning_enabled_for_new_repositories') +
+        attribute(block, 'secret_scanning_push_protection_enabled_for_new_repositories') +
+        attribute(block, 'summary_only') +
+        attribute(block, 'two_factor_requirement_enabled') +
+        attribute(block, 'users') +
+        attribute(block, 'web_commit_signoff_required')
+      ),
       advanced_security_enabled_for_new_repositories: resource.field(self._.blocks, 'advanced_security_enabled_for_new_repositories'),
       default_repository_permission: resource.field(self._.blocks, 'default_repository_permission'),
       dependabot_alerts_enabled_for_new_repositories: resource.field(self._.blocks, 'dependabot_alerts_enabled_for_new_repositories'),
@@ -1967,13 +2323,14 @@ local provider(rawConfiguration, configuration) = {
     },
     organization_custom_role(name, block): {
       local resource = blockType.resource('github_organization_custom_role', name),
-      _: resource._(block, {
-        base_role: build.template(std.get(block, 'base_role', null)),
-        description: build.template(std.get(block, 'description', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(block.name),
-        permissions: build.template(std.get(block, 'permissions', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'base_role') +
+        attribute(block, 'description') +
+        attribute(block, 'id') +
+        attribute(block, 'name', true) +
+        attribute(block, 'permissions')
+      ),
       base_role: resource.field(self._.blocks, 'base_role'),
       description: resource.field(self._.blocks, 'description'),
       id: resource.field(self._.blocks, 'id'),
@@ -1982,40 +2339,44 @@ local provider(rawConfiguration, configuration) = {
     },
     organization_external_identities(name, block): {
       local resource = blockType.resource('github_organization_external_identities', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        identities: build.template(std.get(block, 'identities', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'identities')
+      ),
       id: resource.field(self._.blocks, 'id'),
       identities: resource.field(self._.blocks, 'identities'),
     },
     organization_ip_allow_list(name, block): {
       local resource = blockType.resource('github_organization_ip_allow_list', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        ip_allow_list: build.template(std.get(block, 'ip_allow_list', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'ip_allow_list')
+      ),
       id: resource.field(self._.blocks, 'id'),
       ip_allow_list: resource.field(self._.blocks, 'ip_allow_list'),
     },
     organization_team_sync_groups(name, block): {
       local resource = blockType.resource('github_organization_team_sync_groups', name),
-      _: resource._(block, {
-        groups: build.template(std.get(block, 'groups', null)),
-        id: build.template(std.get(block, 'id', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'groups') +
+        attribute(block, 'id')
+      ),
       groups: resource.field(self._.blocks, 'groups'),
       id: resource.field(self._.blocks, 'id'),
     },
     organization_teams(name, block): {
       local resource = blockType.resource('github_organization_teams', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        results_per_page: build.template(std.get(block, 'results_per_page', null)),
-        root_teams_only: build.template(std.get(block, 'root_teams_only', null)),
-        summary_only: build.template(std.get(block, 'summary_only', null)),
-        teams: build.template(std.get(block, 'teams', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'results_per_page') +
+        attribute(block, 'root_teams_only') +
+        attribute(block, 'summary_only') +
+        attribute(block, 'teams')
+      ),
       id: resource.field(self._.blocks, 'id'),
       results_per_page: resource.field(self._.blocks, 'results_per_page'),
       root_teams_only: resource.field(self._.blocks, 'root_teams_only'),
@@ -2024,23 +2385,25 @@ local provider(rawConfiguration, configuration) = {
     },
     organization_webhooks(name, block): {
       local resource = blockType.resource('github_organization_webhooks', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        webhooks: build.template(std.get(block, 'webhooks', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'webhooks')
+      ),
       id: resource.field(self._.blocks, 'id'),
       webhooks: resource.field(self._.blocks, 'webhooks'),
     },
     ref(name, block): {
       local resource = blockType.resource('github_ref', name),
-      _: resource._(block, {
-        etag: build.template(std.get(block, 'etag', null)),
-        id: build.template(std.get(block, 'id', null)),
-        owner: build.template(std.get(block, 'owner', null)),
-        ref: build.template(block.ref),
-        repository: build.template(block.repository),
-        sha: build.template(std.get(block, 'sha', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'etag') +
+        attribute(block, 'id') +
+        attribute(block, 'owner') +
+        attribute(block, 'ref', true) +
+        attribute(block, 'repository', true) +
+        attribute(block, 'sha')
+      ),
       etag: resource.field(self._.blocks, 'etag'),
       id: resource.field(self._.blocks, 'id'),
       owner: resource.field(self._.blocks, 'owner'),
@@ -2050,29 +2413,30 @@ local provider(rawConfiguration, configuration) = {
     },
     release(name, block): {
       local resource = blockType.resource('github_release', name),
-      _: resource._(block, {
-        asserts_url: build.template(std.get(block, 'asserts_url', null)),
-        assets: build.template(std.get(block, 'assets', null)),
-        assets_url: build.template(std.get(block, 'assets_url', null)),
-        body: build.template(std.get(block, 'body', null)),
-        created_at: build.template(std.get(block, 'created_at', null)),
-        draft: build.template(std.get(block, 'draft', null)),
-        html_url: build.template(std.get(block, 'html_url', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(std.get(block, 'name', null)),
-        owner: build.template(block.owner),
-        prerelease: build.template(std.get(block, 'prerelease', null)),
-        published_at: build.template(std.get(block, 'published_at', null)),
-        release_id: build.template(std.get(block, 'release_id', null)),
-        release_tag: build.template(std.get(block, 'release_tag', null)),
-        repository: build.template(block.repository),
-        retrieve_by: build.template(block.retrieve_by),
-        tarball_url: build.template(std.get(block, 'tarball_url', null)),
-        target_commitish: build.template(std.get(block, 'target_commitish', null)),
-        upload_url: build.template(std.get(block, 'upload_url', null)),
-        url: build.template(std.get(block, 'url', null)),
-        zipball_url: build.template(std.get(block, 'zipball_url', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'asserts_url') +
+        attribute(block, 'assets') +
+        attribute(block, 'assets_url') +
+        attribute(block, 'body') +
+        attribute(block, 'created_at') +
+        attribute(block, 'draft') +
+        attribute(block, 'html_url') +
+        attribute(block, 'id') +
+        attribute(block, 'name') +
+        attribute(block, 'owner', true) +
+        attribute(block, 'prerelease') +
+        attribute(block, 'published_at') +
+        attribute(block, 'release_id') +
+        attribute(block, 'release_tag') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'retrieve_by', true) +
+        attribute(block, 'tarball_url') +
+        attribute(block, 'target_commitish') +
+        attribute(block, 'upload_url') +
+        attribute(block, 'url') +
+        attribute(block, 'zipball_url')
+      ),
       asserts_url: resource.field(self._.blocks, 'asserts_url'),
       assets: resource.field(self._.blocks, 'assets'),
       assets_url: resource.field(self._.blocks, 'assets_url'),
@@ -2097,16 +2461,17 @@ local provider(rawConfiguration, configuration) = {
     },
     repositories(name, block): {
       local resource = blockType.resource('github_repositories', name),
-      _: resource._(block, {
-        full_names: build.template(std.get(block, 'full_names', null)),
-        id: build.template(std.get(block, 'id', null)),
-        include_repo_id: build.template(std.get(block, 'include_repo_id', null)),
-        names: build.template(std.get(block, 'names', null)),
-        query: build.template(block.query),
-        repo_ids: build.template(std.get(block, 'repo_ids', null)),
-        results_per_page: build.template(std.get(block, 'results_per_page', null)),
-        sort: build.template(std.get(block, 'sort', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'full_names') +
+        attribute(block, 'id') +
+        attribute(block, 'include_repo_id') +
+        attribute(block, 'names') +
+        attribute(block, 'query', true) +
+        attribute(block, 'repo_ids') +
+        attribute(block, 'results_per_page') +
+        attribute(block, 'sort')
+      ),
       full_names: resource.field(self._.blocks, 'full_names'),
       id: resource.field(self._.blocks, 'id'),
       include_repo_id: resource.field(self._.blocks, 'include_repo_id'),
@@ -2118,46 +2483,47 @@ local provider(rawConfiguration, configuration) = {
     },
     repository(name, block): {
       local resource = blockType.resource('github_repository', name),
-      _: resource._(block, {
-        allow_auto_merge: build.template(std.get(block, 'allow_auto_merge', null)),
-        allow_merge_commit: build.template(std.get(block, 'allow_merge_commit', null)),
-        allow_rebase_merge: build.template(std.get(block, 'allow_rebase_merge', null)),
-        allow_squash_merge: build.template(std.get(block, 'allow_squash_merge', null)),
-        allow_update_branch: build.template(std.get(block, 'allow_update_branch', null)),
-        archived: build.template(std.get(block, 'archived', null)),
-        default_branch: build.template(std.get(block, 'default_branch', null)),
-        delete_branch_on_merge: build.template(std.get(block, 'delete_branch_on_merge', null)),
-        description: build.template(std.get(block, 'description', null)),
-        fork: build.template(std.get(block, 'fork', null)),
-        full_name: build.template(std.get(block, 'full_name', null)),
-        git_clone_url: build.template(std.get(block, 'git_clone_url', null)),
-        has_discussions: build.template(std.get(block, 'has_discussions', null)),
-        has_downloads: build.template(std.get(block, 'has_downloads', null)),
-        has_issues: build.template(std.get(block, 'has_issues', null)),
-        has_projects: build.template(std.get(block, 'has_projects', null)),
-        has_wiki: build.template(std.get(block, 'has_wiki', null)),
-        homepage_url: build.template(std.get(block, 'homepage_url', null)),
-        html_url: build.template(std.get(block, 'html_url', null)),
-        http_clone_url: build.template(std.get(block, 'http_clone_url', null)),
-        id: build.template(std.get(block, 'id', null)),
-        is_template: build.template(std.get(block, 'is_template', null)),
-        merge_commit_message: build.template(std.get(block, 'merge_commit_message', null)),
-        merge_commit_title: build.template(std.get(block, 'merge_commit_title', null)),
-        name: build.template(std.get(block, 'name', null)),
-        node_id: build.template(std.get(block, 'node_id', null)),
-        pages: build.template(std.get(block, 'pages', null)),
-        primary_language: build.template(std.get(block, 'primary_language', null)),
-        private: build.template(std.get(block, 'private', null)),
-        repo_id: build.template(std.get(block, 'repo_id', null)),
-        repository_license: build.template(std.get(block, 'repository_license', null)),
-        squash_merge_commit_message: build.template(std.get(block, 'squash_merge_commit_message', null)),
-        squash_merge_commit_title: build.template(std.get(block, 'squash_merge_commit_title', null)),
-        ssh_clone_url: build.template(std.get(block, 'ssh_clone_url', null)),
-        svn_url: build.template(std.get(block, 'svn_url', null)),
-        template: build.template(std.get(block, 'template', null)),
-        topics: build.template(std.get(block, 'topics', null)),
-        visibility: build.template(std.get(block, 'visibility', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'allow_auto_merge') +
+        attribute(block, 'allow_merge_commit') +
+        attribute(block, 'allow_rebase_merge') +
+        attribute(block, 'allow_squash_merge') +
+        attribute(block, 'allow_update_branch') +
+        attribute(block, 'archived') +
+        attribute(block, 'default_branch') +
+        attribute(block, 'delete_branch_on_merge') +
+        attribute(block, 'description') +
+        attribute(block, 'fork') +
+        attribute(block, 'full_name') +
+        attribute(block, 'git_clone_url') +
+        attribute(block, 'has_discussions') +
+        attribute(block, 'has_downloads') +
+        attribute(block, 'has_issues') +
+        attribute(block, 'has_projects') +
+        attribute(block, 'has_wiki') +
+        attribute(block, 'homepage_url') +
+        attribute(block, 'html_url') +
+        attribute(block, 'http_clone_url') +
+        attribute(block, 'id') +
+        attribute(block, 'is_template') +
+        attribute(block, 'merge_commit_message') +
+        attribute(block, 'merge_commit_title') +
+        attribute(block, 'name') +
+        attribute(block, 'node_id') +
+        attribute(block, 'pages') +
+        attribute(block, 'primary_language') +
+        attribute(block, 'private') +
+        attribute(block, 'repo_id') +
+        attribute(block, 'repository_license') +
+        attribute(block, 'squash_merge_commit_message') +
+        attribute(block, 'squash_merge_commit_title') +
+        attribute(block, 'ssh_clone_url') +
+        attribute(block, 'svn_url') +
+        attribute(block, 'template') +
+        attribute(block, 'topics') +
+        attribute(block, 'visibility')
+      ),
       allow_auto_merge: resource.field(self._.blocks, 'allow_auto_merge'),
       allow_merge_commit: resource.field(self._.blocks, 'allow_merge_commit'),
       allow_rebase_merge: resource.field(self._.blocks, 'allow_rebase_merge'),
@@ -2199,24 +2565,26 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_autolink_references(name, block): {
       local resource = blockType.resource('github_repository_autolink_references', name),
-      _: resource._(block, {
-        autolink_references: build.template(std.get(block, 'autolink_references', null)),
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'autolink_references') +
+        attribute(block, 'id') +
+        attribute(block, 'repository', true)
+      ),
       autolink_references: resource.field(self._.blocks, 'autolink_references'),
       id: resource.field(self._.blocks, 'id'),
       repository: resource.field(self._.blocks, 'repository'),
     },
     repository_branches(name, block): {
       local resource = blockType.resource('github_repository_branches', name),
-      _: resource._(block, {
-        branches: build.template(std.get(block, 'branches', null)),
-        id: build.template(std.get(block, 'id', null)),
-        only_non_protected_branches: build.template(std.get(block, 'only_non_protected_branches', null)),
-        only_protected_branches: build.template(std.get(block, 'only_protected_branches', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'branches') +
+        attribute(block, 'id') +
+        attribute(block, 'only_non_protected_branches') +
+        attribute(block, 'only_protected_branches') +
+        attribute(block, 'repository', true)
+      ),
       branches: resource.field(self._.blocks, 'branches'),
       id: resource.field(self._.blocks, 'id'),
       only_non_protected_branches: resource.field(self._.blocks, 'only_non_protected_branches'),
@@ -2225,34 +2593,37 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_custom_properties(name, block): {
       local resource = blockType.resource('github_repository_custom_properties', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        property: build.template(std.get(block, 'property', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'property') +
+        attribute(block, 'repository', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       property: resource.field(self._.blocks, 'property'),
       repository: resource.field(self._.blocks, 'repository'),
     },
     repository_deploy_keys(name, block): {
       local resource = blockType.resource('github_repository_deploy_keys', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        keys: build.template(std.get(block, 'keys', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'keys') +
+        attribute(block, 'repository', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       keys: resource.field(self._.blocks, 'keys'),
       repository: resource.field(self._.blocks, 'repository'),
     },
     repository_deployment_branch_policies(name, block): {
       local resource = blockType.resource('github_repository_deployment_branch_policies', name),
-      _: resource._(block, {
-        deployment_branch_policies: build.template(std.get(block, 'deployment_branch_policies', null)),
-        environment_name: build.template(block.environment_name),
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'deployment_branch_policies') +
+        attribute(block, 'environment_name', true) +
+        attribute(block, 'id') +
+        attribute(block, 'repository', true)
+      ),
       deployment_branch_policies: resource.field(self._.blocks, 'deployment_branch_policies'),
       environment_name: resource.field(self._.blocks, 'environment_name'),
       id: resource.field(self._.blocks, 'id'),
@@ -2260,30 +2631,32 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_environments(name, block): {
       local resource = blockType.resource('github_repository_environments', name),
-      _: resource._(block, {
-        environments: build.template(std.get(block, 'environments', null)),
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'environments') +
+        attribute(block, 'id') +
+        attribute(block, 'repository', true)
+      ),
       environments: resource.field(self._.blocks, 'environments'),
       id: resource.field(self._.blocks, 'id'),
       repository: resource.field(self._.blocks, 'repository'),
     },
     repository_file(name, block): {
       local resource = blockType.resource('github_repository_file', name),
-      _: resource._(block, {
-        branch: build.template(std.get(block, 'branch', null)),
-        commit_author: build.template(std.get(block, 'commit_author', null)),
-        commit_email: build.template(std.get(block, 'commit_email', null)),
-        commit_message: build.template(std.get(block, 'commit_message', null)),
-        commit_sha: build.template(std.get(block, 'commit_sha', null)),
-        content: build.template(std.get(block, 'content', null)),
-        file: build.template(block.file),
-        id: build.template(std.get(block, 'id', null)),
-        ref: build.template(std.get(block, 'ref', null)),
-        repository: build.template(block.repository),
-        sha: build.template(std.get(block, 'sha', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'branch') +
+        attribute(block, 'commit_author') +
+        attribute(block, 'commit_email') +
+        attribute(block, 'commit_message') +
+        attribute(block, 'commit_sha') +
+        attribute(block, 'content') +
+        attribute(block, 'file', true) +
+        attribute(block, 'id') +
+        attribute(block, 'ref') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'sha')
+      ),
       branch: resource.field(self._.blocks, 'branch'),
       commit_author: resource.field(self._.blocks, 'commit_author'),
       commit_email: resource.field(self._.blocks, 'commit_email'),
@@ -2298,16 +2671,17 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_milestone(name, block): {
       local resource = blockType.resource('github_repository_milestone', name),
-      _: resource._(block, {
-        description: build.template(std.get(block, 'description', null)),
-        due_date: build.template(std.get(block, 'due_date', null)),
-        id: build.template(std.get(block, 'id', null)),
-        number: build.template(block.number),
-        owner: build.template(block.owner),
-        repository: build.template(block.repository),
-        state: build.template(std.get(block, 'state', null)),
-        title: build.template(std.get(block, 'title', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'description') +
+        attribute(block, 'due_date') +
+        attribute(block, 'id') +
+        attribute(block, 'number', true) +
+        attribute(block, 'owner', true) +
+        attribute(block, 'repository', true) +
+        attribute(block, 'state') +
+        attribute(block, 'title')
+      ),
       description: resource.field(self._.blocks, 'description'),
       due_date: resource.field(self._.blocks, 'due_date'),
       id: resource.field(self._.blocks, 'id'),
@@ -2319,27 +2693,28 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_pull_request(name, block): {
       local resource = blockType.resource('github_repository_pull_request', name),
-      _: resource._(block, {
-        base_ref: build.template(std.get(block, 'base_ref', null)),
-        base_repository: build.template(block.base_repository),
-        base_sha: build.template(std.get(block, 'base_sha', null)),
-        body: build.template(std.get(block, 'body', null)),
-        draft: build.template(std.get(block, 'draft', null)),
-        head_owner: build.template(std.get(block, 'head_owner', null)),
-        head_ref: build.template(std.get(block, 'head_ref', null)),
-        head_repository: build.template(std.get(block, 'head_repository', null)),
-        head_sha: build.template(std.get(block, 'head_sha', null)),
-        id: build.template(std.get(block, 'id', null)),
-        labels: build.template(std.get(block, 'labels', null)),
-        maintainer_can_modify: build.template(std.get(block, 'maintainer_can_modify', null)),
-        number: build.template(block.number),
-        opened_at: build.template(std.get(block, 'opened_at', null)),
-        opened_by: build.template(std.get(block, 'opened_by', null)),
-        owner: build.template(std.get(block, 'owner', null)),
-        state: build.template(std.get(block, 'state', null)),
-        title: build.template(std.get(block, 'title', null)),
-        updated_at: build.template(std.get(block, 'updated_at', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'base_ref') +
+        attribute(block, 'base_repository', true) +
+        attribute(block, 'base_sha') +
+        attribute(block, 'body') +
+        attribute(block, 'draft') +
+        attribute(block, 'head_owner') +
+        attribute(block, 'head_ref') +
+        attribute(block, 'head_repository') +
+        attribute(block, 'head_sha') +
+        attribute(block, 'id') +
+        attribute(block, 'labels') +
+        attribute(block, 'maintainer_can_modify') +
+        attribute(block, 'number', true) +
+        attribute(block, 'opened_at') +
+        attribute(block, 'opened_by') +
+        attribute(block, 'owner') +
+        attribute(block, 'state') +
+        attribute(block, 'title') +
+        attribute(block, 'updated_at')
+      ),
       base_ref: resource.field(self._.blocks, 'base_ref'),
       base_repository: resource.field(self._.blocks, 'base_repository'),
       base_sha: resource.field(self._.blocks, 'base_sha'),
@@ -2362,17 +2737,18 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_pull_requests(name, block): {
       local resource = blockType.resource('github_repository_pull_requests', name),
-      _: resource._(block, {
-        base_ref: build.template(std.get(block, 'base_ref', null)),
-        base_repository: build.template(block.base_repository),
-        head_ref: build.template(std.get(block, 'head_ref', null)),
-        id: build.template(std.get(block, 'id', null)),
-        owner: build.template(std.get(block, 'owner', null)),
-        results: build.template(std.get(block, 'results', null)),
-        sort_by: build.template(std.get(block, 'sort_by', null)),
-        sort_direction: build.template(std.get(block, 'sort_direction', null)),
-        state: build.template(std.get(block, 'state', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'base_ref') +
+        attribute(block, 'base_repository', true) +
+        attribute(block, 'head_ref') +
+        attribute(block, 'id') +
+        attribute(block, 'owner') +
+        attribute(block, 'results') +
+        attribute(block, 'sort_by') +
+        attribute(block, 'sort_direction') +
+        attribute(block, 'state')
+      ),
       base_ref: resource.field(self._.blocks, 'base_ref'),
       base_repository: resource.field(self._.blocks, 'base_repository'),
       head_ref: resource.field(self._.blocks, 'head_ref'),
@@ -2385,12 +2761,13 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_teams(name, block): {
       local resource = blockType.resource('github_repository_teams', name),
-      _: resource._(block, {
-        full_name: build.template(std.get(block, 'full_name', null)),
-        id: build.template(std.get(block, 'id', null)),
-        name: build.template(std.get(block, 'name', null)),
-        teams: build.template(std.get(block, 'teams', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'full_name') +
+        attribute(block, 'id') +
+        attribute(block, 'name') +
+        attribute(block, 'teams')
+      ),
       full_name: resource.field(self._.blocks, 'full_name'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
@@ -2398,25 +2775,27 @@ local provider(rawConfiguration, configuration) = {
     },
     repository_webhooks(name, block): {
       local resource = blockType.resource('github_repository_webhooks', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        repository: build.template(block.repository),
-        webhooks: build.template(std.get(block, 'webhooks', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'webhooks')
+      ),
       id: resource.field(self._.blocks, 'id'),
       repository: resource.field(self._.blocks, 'repository'),
       webhooks: resource.field(self._.blocks, 'webhooks'),
     },
     rest_api(name, block): {
       local resource = blockType.resource('github_rest_api', name),
-      _: resource._(block, {
-        body: build.template(std.get(block, 'body', null)),
-        code: build.template(std.get(block, 'code', null)),
-        endpoint: build.template(block.endpoint),
-        headers: build.template(std.get(block, 'headers', null)),
-        id: build.template(std.get(block, 'id', null)),
-        status: build.template(std.get(block, 'status', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'body') +
+        attribute(block, 'code') +
+        attribute(block, 'endpoint', true) +
+        attribute(block, 'headers') +
+        attribute(block, 'id') +
+        attribute(block, 'status')
+      ),
       body: resource.field(self._.blocks, 'body'),
       code: resource.field(self._.blocks, 'code'),
       endpoint: resource.field(self._.blocks, 'endpoint'),
@@ -2426,30 +2805,32 @@ local provider(rawConfiguration, configuration) = {
     },
     ssh_keys(name, block): {
       local resource = blockType.resource('github_ssh_keys', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        keys: build.template(std.get(block, 'keys', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'keys')
+      ),
       id: resource.field(self._.blocks, 'id'),
       keys: resource.field(self._.blocks, 'keys'),
     },
     team(name, block): {
       local resource = blockType.resource('github_team', name),
-      _: resource._(block, {
-        description: build.template(std.get(block, 'description', null)),
-        id: build.template(std.get(block, 'id', null)),
-        members: build.template(std.get(block, 'members', null)),
-        membership_type: build.template(std.get(block, 'membership_type', null)),
-        name: build.template(std.get(block, 'name', null)),
-        node_id: build.template(std.get(block, 'node_id', null)),
-        permission: build.template(std.get(block, 'permission', null)),
-        privacy: build.template(std.get(block, 'privacy', null)),
-        repositories: build.template(std.get(block, 'repositories', null)),
-        repositories_detailed: build.template(std.get(block, 'repositories_detailed', null)),
-        results_per_page: build.template(std.get(block, 'results_per_page', null)),
-        slug: build.template(block.slug),
-        summary_only: build.template(std.get(block, 'summary_only', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'description') +
+        attribute(block, 'id') +
+        attribute(block, 'members') +
+        attribute(block, 'membership_type') +
+        attribute(block, 'name') +
+        attribute(block, 'node_id') +
+        attribute(block, 'permission') +
+        attribute(block, 'privacy') +
+        attribute(block, 'repositories') +
+        attribute(block, 'repositories_detailed') +
+        attribute(block, 'results_per_page') +
+        attribute(block, 'slug', true) +
+        attribute(block, 'summary_only')
+      ),
       description: resource.field(self._.blocks, 'description'),
       id: resource.field(self._.blocks, 'id'),
       members: resource.field(self._.blocks, 'members'),
@@ -2466,13 +2847,14 @@ local provider(rawConfiguration, configuration) = {
     },
     tree(name, block): {
       local resource = blockType.resource('github_tree', name),
-      _: resource._(block, {
-        entries: build.template(std.get(block, 'entries', null)),
-        id: build.template(std.get(block, 'id', null)),
-        recursive: build.template(std.get(block, 'recursive', null)),
-        repository: build.template(block.repository),
-        tree_sha: build.template(block.tree_sha),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'entries') +
+        attribute(block, 'id') +
+        attribute(block, 'recursive') +
+        attribute(block, 'repository', true) +
+        attribute(block, 'tree_sha', true)
+      ),
       entries: resource.field(self._.blocks, 'entries'),
       id: resource.field(self._.blocks, 'id'),
       recursive: resource.field(self._.blocks, 'recursive'),
@@ -2481,30 +2863,31 @@ local provider(rawConfiguration, configuration) = {
     },
     user(name, block): {
       local resource = blockType.resource('github_user', name),
-      _: resource._(block, {
-        avatar_url: build.template(std.get(block, 'avatar_url', null)),
-        bio: build.template(std.get(block, 'bio', null)),
-        blog: build.template(std.get(block, 'blog', null)),
-        company: build.template(std.get(block, 'company', null)),
-        created_at: build.template(std.get(block, 'created_at', null)),
-        email: build.template(std.get(block, 'email', null)),
-        followers: build.template(std.get(block, 'followers', null)),
-        following: build.template(std.get(block, 'following', null)),
-        gpg_keys: build.template(std.get(block, 'gpg_keys', null)),
-        gravatar_id: build.template(std.get(block, 'gravatar_id', null)),
-        id: build.template(std.get(block, 'id', null)),
-        location: build.template(std.get(block, 'location', null)),
-        login: build.template(std.get(block, 'login', null)),
-        name: build.template(std.get(block, 'name', null)),
-        node_id: build.template(std.get(block, 'node_id', null)),
-        public_gists: build.template(std.get(block, 'public_gists', null)),
-        public_repos: build.template(std.get(block, 'public_repos', null)),
-        site_admin: build.template(std.get(block, 'site_admin', null)),
-        ssh_keys: build.template(std.get(block, 'ssh_keys', null)),
-        suspended_at: build.template(std.get(block, 'suspended_at', null)),
-        updated_at: build.template(std.get(block, 'updated_at', null)),
-        username: build.template(block.username),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'avatar_url') +
+        attribute(block, 'bio') +
+        attribute(block, 'blog') +
+        attribute(block, 'company') +
+        attribute(block, 'created_at') +
+        attribute(block, 'email') +
+        attribute(block, 'followers') +
+        attribute(block, 'following') +
+        attribute(block, 'gpg_keys') +
+        attribute(block, 'gravatar_id') +
+        attribute(block, 'id') +
+        attribute(block, 'location') +
+        attribute(block, 'login') +
+        attribute(block, 'name') +
+        attribute(block, 'node_id') +
+        attribute(block, 'public_gists') +
+        attribute(block, 'public_repos') +
+        attribute(block, 'site_admin') +
+        attribute(block, 'ssh_keys') +
+        attribute(block, 'suspended_at') +
+        attribute(block, 'updated_at') +
+        attribute(block, 'username', true)
+      ),
       avatar_url: resource.field(self._.blocks, 'avatar_url'),
       bio: resource.field(self._.blocks, 'bio'),
       blog: resource.field(self._.blocks, 'blog'),
@@ -2530,13 +2913,14 @@ local provider(rawConfiguration, configuration) = {
     },
     user_external_identity(name, block): {
       local resource = blockType.resource('github_user_external_identity', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        login: build.template(std.get(block, 'login', null)),
-        saml_identity: build.template(std.get(block, 'saml_identity', null)),
-        scim_identity: build.template(std.get(block, 'scim_identity', null)),
-        username: build.template(block.username),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'login') +
+        attribute(block, 'saml_identity') +
+        attribute(block, 'scim_identity') +
+        attribute(block, 'username', true)
+      ),
       id: resource.field(self._.blocks, 'id'),
       login: resource.field(self._.blocks, 'login'),
       saml_identity: resource.field(self._.blocks, 'saml_identity'),
@@ -2545,14 +2929,15 @@ local provider(rawConfiguration, configuration) = {
     },
     users(name, block): {
       local resource = blockType.resource('github_users', name),
-      _: resource._(block, {
-        emails: build.template(std.get(block, 'emails', null)),
-        id: build.template(std.get(block, 'id', null)),
-        logins: build.template(std.get(block, 'logins', null)),
-        node_ids: build.template(std.get(block, 'node_ids', null)),
-        unknown_logins: build.template(std.get(block, 'unknown_logins', null)),
-        usernames: build.template(block.usernames),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'emails') +
+        attribute(block, 'id') +
+        attribute(block, 'logins') +
+        attribute(block, 'node_ids') +
+        attribute(block, 'unknown_logins') +
+        attribute(block, 'usernames', true)
+      ),
       emails: resource.field(self._.blocks, 'emails'),
       id: resource.field(self._.blocks, 'id'),
       logins: resource.field(self._.blocks, 'logins'),
