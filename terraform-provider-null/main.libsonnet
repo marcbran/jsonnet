@@ -92,7 +92,7 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
         block: {
           [blockType]: {
             [type]: {
-              [name]: std.prune(providerConfiguration._.refBlock + metaBlock + block),
+              [name]: providerConfiguration._.refBlock + metaBlock + block,
             },
           },
         },
@@ -115,6 +115,12 @@ local providerTemplate(provider, requirements, rawConfiguration, configuration) 
     },
   },
 };
+local attribute(block, name, required=false) = if !required && !std.objectHas(block, name) then {} else {
+  [name]: build.template(block[name]),
+};
+local blockObj(block, name, body, nestingMode, required=false) = if !required && !std.objectHas(block, name) then {} else {
+  [name]: if nestingMode == 'list' then [body(block) for block in block[name]] else body(block[name]),
+};
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/hashicorp/null',
@@ -125,10 +131,11 @@ local provider(rawConfiguration, configuration) = {
     local blockType = provider.blockType('resource'),
     resource(name, block): {
       local resource = blockType.resource('null_resource', name),
-      _: resource._(block, {
-        id: build.template(std.get(block, 'id', null)),
-        triggers: build.template(std.get(block, 'triggers', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'triggers')
+      ),
       id: resource.field(self._.blocks, 'id'),
       triggers: resource.field(self._.blocks, 'triggers'),
     },
@@ -137,13 +144,14 @@ local provider(rawConfiguration, configuration) = {
     local blockType = provider.blockType('data'),
     data_source(name, block): {
       local resource = blockType.resource('null_data_source', name),
-      _: resource._(block, {
-        has_computed_default: build.template(std.get(block, 'has_computed_default', null)),
-        id: build.template(std.get(block, 'id', null)),
-        inputs: build.template(std.get(block, 'inputs', null)),
-        outputs: build.template(std.get(block, 'outputs', null)),
-        random: build.template(std.get(block, 'random', null)),
-      }),
+      _: resource._(
+        block,
+        attribute(block, 'has_computed_default') +
+        attribute(block, 'id') +
+        attribute(block, 'inputs') +
+        attribute(block, 'outputs') +
+        attribute(block, 'random')
+      ),
       has_computed_default: resource.field(self._.blocks, 'has_computed_default'),
       id: resource.field(self._.blocks, 'id'),
       inputs: resource.field(self._.blocks, 'inputs'),
