@@ -101,6 +101,13 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Readme](terraform-provider/registry.terraform.io/hashicorp/local/README.md): Documentation of installation and usage
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/hashicorp/local/terraform-provider-local/main.libsonnet): Inlined code published for usage in other projects
+## terraform-provider-null
+
+> Terraform provider null
+
+- [Readme](terraform-provider/registry.terraform.io/hashicorp/null/README.md): Documentation of installation and usage
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/hashicorp/null/terraform-provider-null/main.libsonnet): Inlined code published for usage in other projects
 ## terraform-provider-tfmigrate
 
 > Terraform provider tfmigrate
