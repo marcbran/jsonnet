@@ -124,7 +124,7 @@ local blockObj(block, name, body, nestingMode, required=false) = if !required &&
 local provider(rawConfiguration, configuration) = {
   local requirements = {
     source: 'registry.terraform.io/integrations/github',
-    version: '6.6.0',
+    version: '6.11.1',
   },
   local provider = providerTemplate('github', requirements, rawConfiguration, configuration),
   resource: {
@@ -137,8 +137,11 @@ local provider(rawConfiguration, configuration) = {
         attribute(block, 'encrypted_value') +
         attribute(block, 'environment', true) +
         attribute(block, 'id') +
+        attribute(block, 'key_id') +
         attribute(block, 'plaintext_value') +
+        attribute(block, 'remote_updated_at') +
         attribute(block, 'repository', true) +
+        attribute(block, 'repository_id') +
         attribute(block, 'secret_name', true) +
         attribute(block, 'updated_at')
       ),
@@ -146,8 +149,11 @@ local provider(rawConfiguration, configuration) = {
       encrypted_value: resource.field(self._.blocks, 'encrypted_value'),
       environment: resource.field(self._.blocks, 'environment'),
       id: resource.field(self._.blocks, 'id'),
+      key_id: resource.field(self._.blocks, 'key_id'),
       plaintext_value: resource.field(self._.blocks, 'plaintext_value'),
+      remote_updated_at: resource.field(self._.blocks, 'remote_updated_at'),
       repository: resource.field(self._.blocks, 'repository'),
+      repository_id: resource.field(self._.blocks, 'repository_id'),
       secret_name: resource.field(self._.blocks, 'secret_name'),
       updated_at: resource.field(self._.blocks, 'updated_at'),
     },
@@ -159,6 +165,7 @@ local provider(rawConfiguration, configuration) = {
         attribute(block, 'environment', true) +
         attribute(block, 'id') +
         attribute(block, 'repository', true) +
+        attribute(block, 'repository_id') +
         attribute(block, 'updated_at') +
         attribute(block, 'value', true) +
         attribute(block, 'variable_name', true)
@@ -167,9 +174,48 @@ local provider(rawConfiguration, configuration) = {
       environment: resource.field(self._.blocks, 'environment'),
       id: resource.field(self._.blocks, 'id'),
       repository: resource.field(self._.blocks, 'repository'),
+      repository_id: resource.field(self._.blocks, 'repository_id'),
       updated_at: resource.field(self._.blocks, 'updated_at'),
       value: resource.field(self._.blocks, 'value'),
       variable_name: resource.field(self._.blocks, 'variable_name'),
+    },
+    actions_hosted_runner(name, block): {
+      local resource = blockType.resource('github_actions_hosted_runner', name),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'image_gen') +
+        attribute(block, 'image_version') +
+        attribute(block, 'last_active_on') +
+        attribute(block, 'machine_size_details') +
+        attribute(block, 'maximum_runners') +
+        attribute(block, 'name', true) +
+        attribute(block, 'platform') +
+        attribute(block, 'public_ip_enabled') +
+        attribute(block, 'public_ips') +
+        attribute(block, 'runner_group_id', true) +
+        attribute(block, 'size', true) +
+        attribute(block, 'status') +
+        blockObj(block, 'image', function(block)
+          attribute(block, 'id', true) +
+          attribute(block, 'size_gb') +
+          attribute(block, 'source'), 'list') +
+        blockObj(block, 'timeouts', function(block)
+          attribute(block, 'delete'), 'single')
+      ),
+      id: resource.field(self._.blocks, 'id'),
+      image_gen: resource.field(self._.blocks, 'image_gen'),
+      image_version: resource.field(self._.blocks, 'image_version'),
+      last_active_on: resource.field(self._.blocks, 'last_active_on'),
+      machine_size_details: resource.field(self._.blocks, 'machine_size_details'),
+      maximum_runners: resource.field(self._.blocks, 'maximum_runners'),
+      name: resource.field(self._.blocks, 'name'),
+      platform: resource.field(self._.blocks, 'platform'),
+      public_ip_enabled: resource.field(self._.blocks, 'public_ip_enabled'),
+      public_ips: resource.field(self._.blocks, 'public_ips'),
+      runner_group_id: resource.field(self._.blocks, 'runner_group_id'),
+      size: resource.field(self._.blocks, 'size'),
+      status: resource.field(self._.blocks, 'status'),
     },
     actions_organization_oidc_subject_claim_customization_template(name, block): {
       local resource = blockType.resource('github_actions_organization_oidc_subject_claim_customization_template', name),
@@ -188,6 +234,7 @@ local provider(rawConfiguration, configuration) = {
         attribute(block, 'allowed_actions') +
         attribute(block, 'enabled_repositories', true) +
         attribute(block, 'id') +
+        attribute(block, 'sha_pinning_required') +
         blockObj(block, 'allowed_actions_config', function(block)
           attribute(block, 'github_owned_allowed', true) +
           attribute(block, 'patterns_allowed') +
@@ -198,24 +245,31 @@ local provider(rawConfiguration, configuration) = {
       allowed_actions: resource.field(self._.blocks, 'allowed_actions'),
       enabled_repositories: resource.field(self._.blocks, 'enabled_repositories'),
       id: resource.field(self._.blocks, 'id'),
+      sha_pinning_required: resource.field(self._.blocks, 'sha_pinning_required'),
     },
     actions_organization_secret(name, block): {
       local resource = blockType.resource('github_actions_organization_secret', name),
       _: resource._(
         block,
         attribute(block, 'created_at') +
+        attribute(block, 'destroy_on_drift') +
         attribute(block, 'encrypted_value') +
         attribute(block, 'id') +
+        attribute(block, 'key_id') +
         attribute(block, 'plaintext_value') +
+        attribute(block, 'remote_updated_at') +
         attribute(block, 'secret_name', true) +
         attribute(block, 'selected_repository_ids') +
         attribute(block, 'updated_at') +
         attribute(block, 'visibility', true)
       ),
       created_at: resource.field(self._.blocks, 'created_at'),
+      destroy_on_drift: resource.field(self._.blocks, 'destroy_on_drift'),
       encrypted_value: resource.field(self._.blocks, 'encrypted_value'),
       id: resource.field(self._.blocks, 'id'),
+      key_id: resource.field(self._.blocks, 'key_id'),
       plaintext_value: resource.field(self._.blocks, 'plaintext_value'),
+      remote_updated_at: resource.field(self._.blocks, 'remote_updated_at'),
       secret_name: resource.field(self._.blocks, 'secret_name'),
       selected_repository_ids: resource.field(self._.blocks, 'selected_repository_ids'),
       updated_at: resource.field(self._.blocks, 'updated_at'),
@@ -232,6 +286,18 @@ local provider(rawConfiguration, configuration) = {
       id: resource.field(self._.blocks, 'id'),
       secret_name: resource.field(self._.blocks, 'secret_name'),
       selected_repository_ids: resource.field(self._.blocks, 'selected_repository_ids'),
+    },
+    actions_organization_secret_repository(name, block): {
+      local resource = blockType.resource('github_actions_organization_secret_repository', name),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'repository_id', true) +
+        attribute(block, 'secret_name', true)
+      ),
+      id: resource.field(self._.blocks, 'id'),
+      repository_id: resource.field(self._.blocks, 'repository_id'),
+      secret_name: resource.field(self._.blocks, 'secret_name'),
     },
     actions_organization_variable(name, block): {
       local resource = blockType.resource('github_actions_organization_variable', name),
@@ -252,6 +318,44 @@ local provider(rawConfiguration, configuration) = {
       value: resource.field(self._.blocks, 'value'),
       variable_name: resource.field(self._.blocks, 'variable_name'),
       visibility: resource.field(self._.blocks, 'visibility'),
+    },
+    actions_organization_variable_repositories(name, block): {
+      local resource = blockType.resource('github_actions_organization_variable_repositories', name),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'selected_repository_ids', true) +
+        attribute(block, 'variable_name', true)
+      ),
+      id: resource.field(self._.blocks, 'id'),
+      selected_repository_ids: resource.field(self._.blocks, 'selected_repository_ids'),
+      variable_name: resource.field(self._.blocks, 'variable_name'),
+    },
+    actions_organization_variable_repository(name, block): {
+      local resource = blockType.resource('github_actions_organization_variable_repository', name),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'repository_id', true) +
+        attribute(block, 'variable_name', true)
+      ),
+      id: resource.field(self._.blocks, 'id'),
+      repository_id: resource.field(self._.blocks, 'repository_id'),
+      variable_name: resource.field(self._.blocks, 'variable_name'),
+    },
+    actions_organization_workflow_permissions(name, block): {
+      local resource = blockType.resource('github_actions_organization_workflow_permissions', name),
+      _: resource._(
+        block,
+        attribute(block, 'can_approve_pull_request_reviews') +
+        attribute(block, 'default_workflow_permissions') +
+        attribute(block, 'id') +
+        attribute(block, 'organization_slug', true)
+      ),
+      can_approve_pull_request_reviews: resource.field(self._.blocks, 'can_approve_pull_request_reviews'),
+      default_workflow_permissions: resource.field(self._.blocks, 'default_workflow_permissions'),
+      id: resource.field(self._.blocks, 'id'),
+      organization_slug: resource.field(self._.blocks, 'organization_slug'),
     },
     actions_repository_access_level(name, block): {
       local resource = blockType.resource('github_actions_repository_access_level', name),
@@ -287,6 +391,7 @@ local provider(rawConfiguration, configuration) = {
         attribute(block, 'enabled') +
         attribute(block, 'id') +
         attribute(block, 'repository', true) +
+        attribute(block, 'sha_pinning_required') +
         blockObj(block, 'allowed_actions_config', function(block)
           attribute(block, 'github_owned_allowed', true) +
           attribute(block, 'patterns_allowed') +
@@ -296,6 +401,7 @@ local provider(rawConfiguration, configuration) = {
       enabled: resource.field(self._.blocks, 'enabled'),
       id: resource.field(self._.blocks, 'id'),
       repository: resource.field(self._.blocks, 'repository'),
+      sha_pinning_required: resource.field(self._.blocks, 'sha_pinning_required'),
     },
     actions_runner_group(name, block): {
       local resource = blockType.resource('github_actions_runner_group', name),
@@ -332,18 +438,26 @@ local provider(rawConfiguration, configuration) = {
       _: resource._(
         block,
         attribute(block, 'created_at') +
+        attribute(block, 'destroy_on_drift') +
         attribute(block, 'encrypted_value') +
         attribute(block, 'id') +
+        attribute(block, 'key_id') +
         attribute(block, 'plaintext_value') +
+        attribute(block, 'remote_updated_at') +
         attribute(block, 'repository', true) +
+        attribute(block, 'repository_id') +
         attribute(block, 'secret_name', true) +
         attribute(block, 'updated_at')
       ),
       created_at: resource.field(self._.blocks, 'created_at'),
+      destroy_on_drift: resource.field(self._.blocks, 'destroy_on_drift'),
       encrypted_value: resource.field(self._.blocks, 'encrypted_value'),
       id: resource.field(self._.blocks, 'id'),
+      key_id: resource.field(self._.blocks, 'key_id'),
       plaintext_value: resource.field(self._.blocks, 'plaintext_value'),
+      remote_updated_at: resource.field(self._.blocks, 'remote_updated_at'),
       repository: resource.field(self._.blocks, 'repository'),
+      repository_id: resource.field(self._.blocks, 'repository_id'),
       secret_name: resource.field(self._.blocks, 'secret_name'),
       updated_at: resource.field(self._.blocks, 'updated_at'),
     },
@@ -354,6 +468,7 @@ local provider(rawConfiguration, configuration) = {
         attribute(block, 'created_at') +
         attribute(block, 'id') +
         attribute(block, 'repository', true) +
+        attribute(block, 'repository_id') +
         attribute(block, 'updated_at') +
         attribute(block, 'value', true) +
         attribute(block, 'variable_name', true)
@@ -361,6 +476,7 @@ local provider(rawConfiguration, configuration) = {
       created_at: resource.field(self._.blocks, 'created_at'),
       id: resource.field(self._.blocks, 'id'),
       repository: resource.field(self._.blocks, 'repository'),
+      repository_id: resource.field(self._.blocks, 'repository_id'),
       updated_at: resource.field(self._.blocks, 'updated_at'),
       value: resource.field(self._.blocks, 'value'),
       variable_name: resource.field(self._.blocks, 'variable_name'),
@@ -594,7 +710,9 @@ local provider(rawConfiguration, configuration) = {
         attribute(block, 'created_at') +
         attribute(block, 'encrypted_value') +
         attribute(block, 'id') +
+        attribute(block, 'key_id') +
         attribute(block, 'plaintext_value') +
+        attribute(block, 'remote_updated_at') +
         attribute(block, 'secret_name', true) +
         attribute(block, 'selected_repository_ids') +
         attribute(block, 'updated_at') +
@@ -603,7 +721,9 @@ local provider(rawConfiguration, configuration) = {
       created_at: resource.field(self._.blocks, 'created_at'),
       encrypted_value: resource.field(self._.blocks, 'encrypted_value'),
       id: resource.field(self._.blocks, 'id'),
+      key_id: resource.field(self._.blocks, 'key_id'),
       plaintext_value: resource.field(self._.blocks, 'plaintext_value'),
+      remote_updated_at: resource.field(self._.blocks, 'remote_updated_at'),
       secret_name: resource.field(self._.blocks, 'secret_name'),
       selected_repository_ids: resource.field(self._.blocks, 'selected_repository_ids'),
       updated_at: resource.field(self._.blocks, 'updated_at'),
@@ -621,6 +741,18 @@ local provider(rawConfiguration, configuration) = {
       secret_name: resource.field(self._.blocks, 'secret_name'),
       selected_repository_ids: resource.field(self._.blocks, 'selected_repository_ids'),
     },
+    dependabot_organization_secret_repository(name, block): {
+      local resource = blockType.resource('github_dependabot_organization_secret_repository', name),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'repository_id', true) +
+        attribute(block, 'secret_name', true)
+      ),
+      id: resource.field(self._.blocks, 'id'),
+      repository_id: resource.field(self._.blocks, 'repository_id'),
+      secret_name: resource.field(self._.blocks, 'secret_name'),
+    },
     dependabot_secret(name, block): {
       local resource = blockType.resource('github_dependabot_secret', name),
       _: resource._(
@@ -628,16 +760,22 @@ local provider(rawConfiguration, configuration) = {
         attribute(block, 'created_at') +
         attribute(block, 'encrypted_value') +
         attribute(block, 'id') +
+        attribute(block, 'key_id') +
         attribute(block, 'plaintext_value') +
+        attribute(block, 'remote_updated_at') +
         attribute(block, 'repository', true) +
+        attribute(block, 'repository_id') +
         attribute(block, 'secret_name', true) +
         attribute(block, 'updated_at')
       ),
       created_at: resource.field(self._.blocks, 'created_at'),
       encrypted_value: resource.field(self._.blocks, 'encrypted_value'),
       id: resource.field(self._.blocks, 'id'),
+      key_id: resource.field(self._.blocks, 'key_id'),
       plaintext_value: resource.field(self._.blocks, 'plaintext_value'),
+      remote_updated_at: resource.field(self._.blocks, 'remote_updated_at'),
       repository: resource.field(self._.blocks, 'repository'),
+      repository_id: resource.field(self._.blocks, 'repository_id'),
       secret_name: resource.field(self._.blocks, 'secret_name'),
       updated_at: resource.field(self._.blocks, 'updated_at'),
     },
@@ -647,12 +785,16 @@ local provider(rawConfiguration, configuration) = {
         block,
         attribute(block, 'etag') +
         attribute(block, 'group_id', true) +
+        attribute(block, 'group_name') +
         attribute(block, 'id') +
+        attribute(block, 'team_id') +
         attribute(block, 'team_slug', true)
       ),
       etag: resource.field(self._.blocks, 'etag'),
       group_id: resource.field(self._.blocks, 'group_id'),
+      group_name: resource.field(self._.blocks, 'group_name'),
       id: resource.field(self._.blocks, 'id'),
+      team_id: resource.field(self._.blocks, 'team_id'),
       team_slug: resource.field(self._.blocks, 'team_slug'),
     },
     enterprise_actions_permissions(name, block): {
@@ -705,6 +847,20 @@ local provider(rawConfiguration, configuration) = {
       selected_workflows: resource.field(self._.blocks, 'selected_workflows'),
       visibility: resource.field(self._.blocks, 'visibility'),
     },
+    enterprise_actions_workflow_permissions(name, block): {
+      local resource = blockType.resource('github_enterprise_actions_workflow_permissions', name),
+      _: resource._(
+        block,
+        attribute(block, 'can_approve_pull_request_reviews') +
+        attribute(block, 'default_workflow_permissions') +
+        attribute(block, 'enterprise_slug', true) +
+        attribute(block, 'id')
+      ),
+      can_approve_pull_request_reviews: resource.field(self._.blocks, 'can_approve_pull_request_reviews'),
+      default_workflow_permissions: resource.field(self._.blocks, 'default_workflow_permissions'),
+      enterprise_slug: resource.field(self._.blocks, 'enterprise_slug'),
+      id: resource.field(self._.blocks, 'id'),
+    },
     enterprise_organization(name, block): {
       local resource = blockType.resource('github_enterprise_organization', name),
       _: resource._(
@@ -726,6 +882,26 @@ local provider(rawConfiguration, configuration) = {
       enterprise_id: resource.field(self._.blocks, 'enterprise_id'),
       id: resource.field(self._.blocks, 'id'),
       name: resource.field(self._.blocks, 'name'),
+    },
+    enterprise_security_analysis_settings(name, block): {
+      local resource = blockType.resource('github_enterprise_security_analysis_settings', name),
+      _: resource._(
+        block,
+        attribute(block, 'advanced_security_enabled_for_new_repositories') +
+        attribute(block, 'enterprise_slug', true) +
+        attribute(block, 'id') +
+        attribute(block, 'secret_scanning_enabled_for_new_repositories') +
+        attribute(block, 'secret_scanning_push_protection_custom_link') +
+        attribute(block, 'secret_scanning_push_protection_enabled_for_new_repositories') +
+        attribute(block, 'secret_scanning_validity_checks_enabled')
+      ),
+      advanced_security_enabled_for_new_repositories: resource.field(self._.blocks, 'advanced_security_enabled_for_new_repositories'),
+      enterprise_slug: resource.field(self._.blocks, 'enterprise_slug'),
+      id: resource.field(self._.blocks, 'id'),
+      secret_scanning_enabled_for_new_repositories: resource.field(self._.blocks, 'secret_scanning_enabled_for_new_repositories'),
+      secret_scanning_push_protection_custom_link: resource.field(self._.blocks, 'secret_scanning_push_protection_custom_link'),
+      secret_scanning_push_protection_enabled_for_new_repositories: resource.field(self._.blocks, 'secret_scanning_push_protection_enabled_for_new_repositories'),
+      secret_scanning_validity_checks_enabled: resource.field(self._.blocks, 'secret_scanning_validity_checks_enabled'),
     },
     issue(name, block): {
       local resource = blockType.resource('github_issue', name),
@@ -816,6 +992,28 @@ local provider(rawConfiguration, configuration) = {
       id: resource.field(self._.blocks, 'id'),
       username: resource.field(self._.blocks, 'username'),
     },
+    organization_custom_properties(name, block): {
+      local resource = blockType.resource('github_organization_custom_properties', name),
+      _: resource._(
+        block,
+        attribute(block, 'allowed_values') +
+        attribute(block, 'default_value') +
+        attribute(block, 'description') +
+        attribute(block, 'id') +
+        attribute(block, 'property_name', true) +
+        attribute(block, 'required') +
+        attribute(block, 'value_type') +
+        attribute(block, 'values_editable_by')
+      ),
+      allowed_values: resource.field(self._.blocks, 'allowed_values'),
+      default_value: resource.field(self._.blocks, 'default_value'),
+      description: resource.field(self._.blocks, 'description'),
+      id: resource.field(self._.blocks, 'id'),
+      property_name: resource.field(self._.blocks, 'property_name'),
+      required: resource.field(self._.blocks, 'required'),
+      value_type: resource.field(self._.blocks, 'value_type'),
+      values_editable_by: resource.field(self._.blocks, 'values_editable_by'),
+    },
     organization_custom_role(name, block): {
       local resource = blockType.resource('github_organization_custom_role', name),
       _: resource._(
@@ -848,6 +1046,78 @@ local provider(rawConfiguration, configuration) = {
       name: resource.field(self._.blocks, 'name'),
       url: resource.field(self._.blocks, 'url'),
     },
+    organization_repository_role(name, block): {
+      local resource = blockType.resource('github_organization_repository_role', name),
+      _: resource._(
+        block,
+        attribute(block, 'base_role', true) +
+        attribute(block, 'description') +
+        attribute(block, 'id') +
+        attribute(block, 'name', true) +
+        attribute(block, 'permissions', true) +
+        attribute(block, 'role_id')
+      ),
+      base_role: resource.field(self._.blocks, 'base_role'),
+      description: resource.field(self._.blocks, 'description'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      permissions: resource.field(self._.blocks, 'permissions'),
+      role_id: resource.field(self._.blocks, 'role_id'),
+    },
+    organization_role(name, block): {
+      local resource = blockType.resource('github_organization_role', name),
+      _: resource._(
+        block,
+        attribute(block, 'base_role') +
+        attribute(block, 'description') +
+        attribute(block, 'id') +
+        attribute(block, 'name', true) +
+        attribute(block, 'permissions', true) +
+        attribute(block, 'role_id')
+      ),
+      base_role: resource.field(self._.blocks, 'base_role'),
+      description: resource.field(self._.blocks, 'description'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      permissions: resource.field(self._.blocks, 'permissions'),
+      role_id: resource.field(self._.blocks, 'role_id'),
+    },
+    organization_role_team(name, block): {
+      local resource = blockType.resource('github_organization_role_team', name),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'role_id', true) +
+        attribute(block, 'team_slug', true)
+      ),
+      id: resource.field(self._.blocks, 'id'),
+      role_id: resource.field(self._.blocks, 'role_id'),
+      team_slug: resource.field(self._.blocks, 'team_slug'),
+    },
+    organization_role_team_assignment(name, block): {
+      local resource = blockType.resource('github_organization_role_team_assignment', name),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'role_id', true) +
+        attribute(block, 'team_slug', true)
+      ),
+      id: resource.field(self._.blocks, 'id'),
+      role_id: resource.field(self._.blocks, 'role_id'),
+      team_slug: resource.field(self._.blocks, 'team_slug'),
+    },
+    organization_role_user(name, block): {
+      local resource = blockType.resource('github_organization_role_user', name),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'login', true) +
+        attribute(block, 'role_id', true)
+      ),
+      id: resource.field(self._.blocks, 'id'),
+      login: resource.field(self._.blocks, 'login'),
+      role_id: resource.field(self._.blocks, 'role_id'),
+    },
     organization_ruleset(name, block): {
       local resource = blockType.resource('github_organization_ruleset', name),
       _: resource._(
@@ -860,7 +1130,7 @@ local provider(rawConfiguration, configuration) = {
         attribute(block, 'ruleset_id') +
         attribute(block, 'target', true) +
         blockObj(block, 'bypass_actors', function(block)
-          attribute(block, 'actor_id', true) +
+          attribute(block, 'actor_id') +
           attribute(block, 'actor_type', true) +
           attribute(block, 'bypass_mode', true), 'list') +
         blockObj(block, 'conditions', function(block)
@@ -899,23 +1169,43 @@ local provider(rawConfiguration, configuration) = {
             attribute(block, 'negate') +
             attribute(block, 'operator', true) +
             attribute(block, 'pattern', true), 'list') +
+          blockObj(block, 'copilot_code_review', function(block)
+            attribute(block, 'review_draft_pull_requests') +
+            attribute(block, 'review_on_push'), 'list') +
+          blockObj(block, 'file_extension_restriction', function(block)
+            attribute(block, 'restricted_file_extensions', true), 'list') +
+          blockObj(block, 'file_path_restriction', function(block)
+            attribute(block, 'restricted_file_paths', true), 'list') +
+          blockObj(block, 'max_file_path_length', function(block)
+            attribute(block, 'max_file_path_length', true), 'list') +
+          blockObj(block, 'max_file_size', function(block)
+            attribute(block, 'max_file_size', true), 'list') +
           blockObj(block, 'pull_request', function(block)
+            attribute(block, 'allowed_merge_methods') +
             attribute(block, 'dismiss_stale_reviews_on_push') +
             attribute(block, 'require_code_owner_review') +
             attribute(block, 'require_last_push_approval') +
             attribute(block, 'required_approving_review_count') +
-            attribute(block, 'required_review_thread_resolution'), 'list') +
+            attribute(block, 'required_review_thread_resolution') +
+            blockObj(block, 'required_reviewers', function(block)
+              attribute(block, 'file_patterns', true) +
+              attribute(block, 'minimum_approvals', true) +
+              blockObj(block, 'reviewer', function(block)
+                attribute(block, 'id', true) +
+                attribute(block, 'type', true), 'list'), 'list'), 'list') +
           blockObj(block, 'required_code_scanning', function(block)
             blockObj(block, 'required_code_scanning_tool', function(block)
               attribute(block, 'alerts_threshold', true) +
               attribute(block, 'security_alerts_threshold', true) +
               attribute(block, 'tool', true), 'set'), 'list') +
           blockObj(block, 'required_status_checks', function(block)
+            attribute(block, 'do_not_enforce_on_create') +
             attribute(block, 'strict_required_status_checks_policy') +
             blockObj(block, 'required_check', function(block)
               attribute(block, 'context', true) +
               attribute(block, 'integration_id'), 'set'), 'list') +
           blockObj(block, 'required_workflows', function(block)
+            attribute(block, 'do_not_enforce_on_create') +
             blockObj(block, 'required_workflow', function(block)
               attribute(block, 'path', true) +
               attribute(block, 'ref') +
@@ -1114,6 +1404,7 @@ local provider(rawConfiguration, configuration) = {
       _: resource._(
         block,
         attribute(block, 'allow_auto_merge') +
+        attribute(block, 'allow_forking') +
         attribute(block, 'allow_merge_commit') +
         attribute(block, 'allow_rebase_merge') +
         attribute(block, 'allow_squash_merge') +
@@ -1125,6 +1416,7 @@ local provider(rawConfiguration, configuration) = {
         attribute(block, 'delete_branch_on_merge') +
         attribute(block, 'description') +
         attribute(block, 'etag') +
+        attribute(block, 'fork') +
         attribute(block, 'full_name') +
         attribute(block, 'git_clone_url') +
         attribute(block, 'gitignore_template') +
@@ -1147,6 +1439,8 @@ local provider(rawConfiguration, configuration) = {
         attribute(block, 'primary_language') +
         attribute(block, 'private') +
         attribute(block, 'repo_id') +
+        attribute(block, 'source_owner') +
+        attribute(block, 'source_repo') +
         attribute(block, 'squash_merge_commit_message') +
         attribute(block, 'squash_merge_commit_title') +
         attribute(block, 'ssh_clone_url') +
@@ -1168,7 +1462,13 @@ local provider(rawConfiguration, configuration) = {
         blockObj(block, 'security_and_analysis', function(block)
           blockObj(block, 'advanced_security', function(block)
             attribute(block, 'status', true), 'list') +
+          blockObj(block, 'code_security', function(block)
+            attribute(block, 'status', true), 'list') +
           blockObj(block, 'secret_scanning', function(block)
+            attribute(block, 'status', true), 'list') +
+          blockObj(block, 'secret_scanning_ai_detection', function(block)
+            attribute(block, 'status', true), 'list') +
+          blockObj(block, 'secret_scanning_non_provider_patterns', function(block)
             attribute(block, 'status', true), 'list') +
           blockObj(block, 'secret_scanning_push_protection', function(block)
             attribute(block, 'status', true), 'list'), 'list') +
@@ -1178,6 +1478,7 @@ local provider(rawConfiguration, configuration) = {
           attribute(block, 'repository', true), 'list')
       ),
       allow_auto_merge: resource.field(self._.blocks, 'allow_auto_merge'),
+      allow_forking: resource.field(self._.blocks, 'allow_forking'),
       allow_merge_commit: resource.field(self._.blocks, 'allow_merge_commit'),
       allow_rebase_merge: resource.field(self._.blocks, 'allow_rebase_merge'),
       allow_squash_merge: resource.field(self._.blocks, 'allow_squash_merge'),
@@ -1189,6 +1490,7 @@ local provider(rawConfiguration, configuration) = {
       delete_branch_on_merge: resource.field(self._.blocks, 'delete_branch_on_merge'),
       description: resource.field(self._.blocks, 'description'),
       etag: resource.field(self._.blocks, 'etag'),
+      fork: resource.field(self._.blocks, 'fork'),
       full_name: resource.field(self._.blocks, 'full_name'),
       git_clone_url: resource.field(self._.blocks, 'git_clone_url'),
       gitignore_template: resource.field(self._.blocks, 'gitignore_template'),
@@ -1211,6 +1513,8 @@ local provider(rawConfiguration, configuration) = {
       primary_language: resource.field(self._.blocks, 'primary_language'),
       private: resource.field(self._.blocks, 'private'),
       repo_id: resource.field(self._.blocks, 'repo_id'),
+      source_owner: resource.field(self._.blocks, 'source_owner'),
+      source_repo: resource.field(self._.blocks, 'source_repo'),
       squash_merge_commit_message: resource.field(self._.blocks, 'squash_merge_commit_message'),
       squash_merge_commit_title: resource.field(self._.blocks, 'squash_merge_commit_title'),
       ssh_clone_url: resource.field(self._.blocks, 'ssh_clone_url'),
@@ -1396,6 +1700,7 @@ local provider(rawConfiguration, configuration) = {
         attribute(block, 'overwrite_on_create') +
         attribute(block, 'ref') +
         attribute(block, 'repository', true) +
+        attribute(block, 'repository_id') +
         attribute(block, 'sha')
       ),
       autocreate_branch: resource.field(self._.blocks, 'autocreate_branch'),
@@ -1412,6 +1717,7 @@ local provider(rawConfiguration, configuration) = {
       overwrite_on_create: resource.field(self._.blocks, 'overwrite_on_create'),
       ref: resource.field(self._.blocks, 'ref'),
       repository: resource.field(self._.blocks, 'repository'),
+      repository_id: resource.field(self._.blocks, 'repository_id'),
       sha: resource.field(self._.blocks, 'sha'),
     },
     repository_milestone(name, block): {
@@ -1503,11 +1809,11 @@ local provider(rawConfiguration, configuration) = {
         attribute(block, 'id') +
         attribute(block, 'name', true) +
         attribute(block, 'node_id') +
-        attribute(block, 'repository') +
+        attribute(block, 'repository', true) +
         attribute(block, 'ruleset_id') +
         attribute(block, 'target', true) +
         blockObj(block, 'bypass_actors', function(block)
-          attribute(block, 'actor_id', true) +
+          attribute(block, 'actor_id') +
           attribute(block, 'actor_type', true) +
           attribute(block, 'bypass_mode', true), 'list') +
         blockObj(block, 'conditions', function(block)
@@ -1542,6 +1848,17 @@ local provider(rawConfiguration, configuration) = {
             attribute(block, 'negate') +
             attribute(block, 'operator', true) +
             attribute(block, 'pattern', true), 'list') +
+          blockObj(block, 'copilot_code_review', function(block)
+            attribute(block, 'review_draft_pull_requests') +
+            attribute(block, 'review_on_push'), 'list') +
+          blockObj(block, 'file_extension_restriction', function(block)
+            attribute(block, 'restricted_file_extensions', true), 'list') +
+          blockObj(block, 'file_path_restriction', function(block)
+            attribute(block, 'restricted_file_paths', true), 'list') +
+          blockObj(block, 'max_file_path_length', function(block)
+            attribute(block, 'max_file_path_length', true), 'list') +
+          blockObj(block, 'max_file_size', function(block)
+            attribute(block, 'max_file_size', true), 'list') +
           blockObj(block, 'merge_queue', function(block)
             attribute(block, 'check_response_timeout_minutes') +
             attribute(block, 'grouping_strategy') +
@@ -1551,11 +1868,18 @@ local provider(rawConfiguration, configuration) = {
             attribute(block, 'min_entries_to_merge') +
             attribute(block, 'min_entries_to_merge_wait_minutes'), 'list') +
           blockObj(block, 'pull_request', function(block)
+            attribute(block, 'allowed_merge_methods') +
             attribute(block, 'dismiss_stale_reviews_on_push') +
             attribute(block, 'require_code_owner_review') +
             attribute(block, 'require_last_push_approval') +
             attribute(block, 'required_approving_review_count') +
-            attribute(block, 'required_review_thread_resolution'), 'list') +
+            attribute(block, 'required_review_thread_resolution') +
+            blockObj(block, 'required_reviewers', function(block)
+              attribute(block, 'file_patterns', true) +
+              attribute(block, 'minimum_approvals', true) +
+              blockObj(block, 'reviewer', function(block)
+                attribute(block, 'id', true) +
+                attribute(block, 'type', true), 'list'), 'list'), 'list') +
           blockObj(block, 'required_code_scanning', function(block)
             blockObj(block, 'required_code_scanning_tool', function(block)
               attribute(block, 'alerts_threshold', true) +
@@ -1631,6 +1955,7 @@ local provider(rawConfiguration, configuration) = {
         attribute(block, 'members_count') +
         attribute(block, 'name', true) +
         attribute(block, 'node_id') +
+        attribute(block, 'notification_setting') +
         attribute(block, 'parent_team_id') +
         attribute(block, 'parent_team_read_id') +
         attribute(block, 'parent_team_read_slug') +
@@ -1645,6 +1970,7 @@ local provider(rawConfiguration, configuration) = {
       members_count: resource.field(self._.blocks, 'members_count'),
       name: resource.field(self._.blocks, 'name'),
       node_id: resource.field(self._.blocks, 'node_id'),
+      notification_setting: resource.field(self._.blocks, 'notification_setting'),
       parent_team_id: resource.field(self._.blocks, 'parent_team_id'),
       parent_team_read_id: resource.field(self._.blocks, 'parent_team_read_id'),
       parent_team_read_slug: resource.field(self._.blocks, 'parent_team_read_slug'),
@@ -1772,9 +2098,39 @@ local provider(rawConfiguration, configuration) = {
       title: resource.field(self._.blocks, 'title'),
       url: resource.field(self._.blocks, 'url'),
     },
+    workflow_repository_permissions(name, block): {
+      local resource = blockType.resource('github_workflow_repository_permissions', name),
+      _: resource._(
+        block,
+        attribute(block, 'can_approve_pull_request_reviews') +
+        attribute(block, 'default_workflow_permissions') +
+        attribute(block, 'id') +
+        attribute(block, 'repository', true)
+      ),
+      can_approve_pull_request_reviews: resource.field(self._.blocks, 'can_approve_pull_request_reviews'),
+      default_workflow_permissions: resource.field(self._.blocks, 'default_workflow_permissions'),
+      id: resource.field(self._.blocks, 'id'),
+      repository: resource.field(self._.blocks, 'repository'),
+    },
   },
   data: {
     local blockType = provider.blockType('data'),
+    actions_environment_public_key(name, block): {
+      local resource = blockType.resource('github_actions_environment_public_key', name),
+      _: resource._(
+        block,
+        attribute(block, 'environment', true) +
+        attribute(block, 'id') +
+        attribute(block, 'key') +
+        attribute(block, 'key_id') +
+        attribute(block, 'repository', true)
+      ),
+      environment: resource.field(self._.blocks, 'environment'),
+      id: resource.field(self._.blocks, 'id'),
+      key: resource.field(self._.blocks, 'key'),
+      key_id: resource.field(self._.blocks, 'key_id'),
+      repository: resource.field(self._.blocks, 'repository'),
+    },
     actions_environment_secrets(name, block): {
       local resource = blockType.resource('github_actions_environment_secrets', name),
       _: resource._(
@@ -2321,6 +2677,28 @@ local provider(rawConfiguration, configuration) = {
       users: resource.field(self._.blocks, 'users'),
       web_commit_signoff_required: resource.field(self._.blocks, 'web_commit_signoff_required'),
     },
+    organization_custom_properties(name, block): {
+      local resource = blockType.resource('github_organization_custom_properties', name),
+      _: resource._(
+        block,
+        attribute(block, 'allowed_values') +
+        attribute(block, 'default_value') +
+        attribute(block, 'description') +
+        attribute(block, 'id') +
+        attribute(block, 'property_name', true) +
+        attribute(block, 'required') +
+        attribute(block, 'value_type') +
+        attribute(block, 'values_editable_by')
+      ),
+      allowed_values: resource.field(self._.blocks, 'allowed_values'),
+      default_value: resource.field(self._.blocks, 'default_value'),
+      description: resource.field(self._.blocks, 'description'),
+      id: resource.field(self._.blocks, 'id'),
+      property_name: resource.field(self._.blocks, 'property_name'),
+      required: resource.field(self._.blocks, 'required'),
+      value_type: resource.field(self._.blocks, 'value_type'),
+      values_editable_by: resource.field(self._.blocks, 'values_editable_by'),
+    },
     organization_custom_role(name, block): {
       local resource = blockType.resource('github_organization_custom_role', name),
       _: resource._(
@@ -2356,6 +2734,98 @@ local provider(rawConfiguration, configuration) = {
       ),
       id: resource.field(self._.blocks, 'id'),
       ip_allow_list: resource.field(self._.blocks, 'ip_allow_list'),
+    },
+    organization_repository_role(name, block): {
+      local resource = blockType.resource('github_organization_repository_role', name),
+      _: resource._(
+        block,
+        attribute(block, 'base_role') +
+        attribute(block, 'description') +
+        attribute(block, 'id') +
+        attribute(block, 'name') +
+        attribute(block, 'permissions') +
+        attribute(block, 'role_id', true)
+      ),
+      base_role: resource.field(self._.blocks, 'base_role'),
+      description: resource.field(self._.blocks, 'description'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      permissions: resource.field(self._.blocks, 'permissions'),
+      role_id: resource.field(self._.blocks, 'role_id'),
+    },
+    organization_repository_roles(name, block): {
+      local resource = blockType.resource('github_organization_repository_roles', name),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'roles')
+      ),
+      id: resource.field(self._.blocks, 'id'),
+      roles: resource.field(self._.blocks, 'roles'),
+    },
+    organization_role(name, block): {
+      local resource = blockType.resource('github_organization_role', name),
+      _: resource._(
+        block,
+        attribute(block, 'base_role') +
+        attribute(block, 'description') +
+        attribute(block, 'id') +
+        attribute(block, 'name') +
+        attribute(block, 'permissions') +
+        attribute(block, 'role_id', true) +
+        attribute(block, 'source')
+      ),
+      base_role: resource.field(self._.blocks, 'base_role'),
+      description: resource.field(self._.blocks, 'description'),
+      id: resource.field(self._.blocks, 'id'),
+      name: resource.field(self._.blocks, 'name'),
+      permissions: resource.field(self._.blocks, 'permissions'),
+      role_id: resource.field(self._.blocks, 'role_id'),
+      source: resource.field(self._.blocks, 'source'),
+    },
+    organization_role_teams(name, block): {
+      local resource = blockType.resource('github_organization_role_teams', name),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'role_id', true) +
+        attribute(block, 'teams')
+      ),
+      id: resource.field(self._.blocks, 'id'),
+      role_id: resource.field(self._.blocks, 'role_id'),
+      teams: resource.field(self._.blocks, 'teams'),
+    },
+    organization_role_users(name, block): {
+      local resource = blockType.resource('github_organization_role_users', name),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'role_id', true) +
+        attribute(block, 'users')
+      ),
+      id: resource.field(self._.blocks, 'id'),
+      role_id: resource.field(self._.blocks, 'role_id'),
+      users: resource.field(self._.blocks, 'users'),
+    },
+    organization_roles(name, block): {
+      local resource = blockType.resource('github_organization_roles', name),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'roles')
+      ),
+      id: resource.field(self._.blocks, 'id'),
+      roles: resource.field(self._.blocks, 'roles'),
+    },
+    organization_security_managers(name, block): {
+      local resource = blockType.resource('github_organization_security_managers', name),
+      _: resource._(
+        block,
+        attribute(block, 'id') +
+        attribute(block, 'teams')
+      ),
+      id: resource.field(self._.blocks, 'id'),
+      teams: resource.field(self._.blocks, 'teams'),
     },
     organization_team_sync_groups(name, block): {
       local resource = blockType.resource('github_organization_team_sync_groups', name),
@@ -2459,6 +2929,42 @@ local provider(rawConfiguration, configuration) = {
       url: resource.field(self._.blocks, 'url'),
       zipball_url: resource.field(self._.blocks, 'zipball_url'),
     },
+    release_asset(name, block): {
+      local resource = blockType.resource('github_release_asset', name),
+      _: resource._(
+        block,
+        attribute(block, 'asset_id', true) +
+        attribute(block, 'browser_download_url') +
+        attribute(block, 'content_type') +
+        attribute(block, 'created_at') +
+        attribute(block, 'download_file_contents') +
+        attribute(block, 'file_contents') +
+        attribute(block, 'id') +
+        attribute(block, 'label') +
+        attribute(block, 'name') +
+        attribute(block, 'node_id') +
+        attribute(block, 'owner', true) +
+        attribute(block, 'repository', true) +
+        attribute(block, 'size') +
+        attribute(block, 'updated_at') +
+        attribute(block, 'url')
+      ),
+      asset_id: resource.field(self._.blocks, 'asset_id'),
+      browser_download_url: resource.field(self._.blocks, 'browser_download_url'),
+      content_type: resource.field(self._.blocks, 'content_type'),
+      created_at: resource.field(self._.blocks, 'created_at'),
+      download_file_contents: resource.field(self._.blocks, 'download_file_contents'),
+      file_contents: resource.field(self._.blocks, 'file_contents'),
+      id: resource.field(self._.blocks, 'id'),
+      label: resource.field(self._.blocks, 'label'),
+      name: resource.field(self._.blocks, 'name'),
+      node_id: resource.field(self._.blocks, 'node_id'),
+      owner: resource.field(self._.blocks, 'owner'),
+      repository: resource.field(self._.blocks, 'repository'),
+      size: resource.field(self._.blocks, 'size'),
+      updated_at: resource.field(self._.blocks, 'updated_at'),
+      url: resource.field(self._.blocks, 'url'),
+    },
     repositories(name, block): {
       local resource = blockType.resource('github_repositories', name),
       _: resource._(
@@ -2486,6 +2992,7 @@ local provider(rawConfiguration, configuration) = {
       _: resource._(
         block,
         attribute(block, 'allow_auto_merge') +
+        attribute(block, 'allow_forking') +
         attribute(block, 'allow_merge_commit') +
         attribute(block, 'allow_rebase_merge') +
         attribute(block, 'allow_squash_merge') +
@@ -2525,6 +3032,7 @@ local provider(rawConfiguration, configuration) = {
         attribute(block, 'visibility')
       ),
       allow_auto_merge: resource.field(self._.blocks, 'allow_auto_merge'),
+      allow_forking: resource.field(self._.blocks, 'allow_forking'),
       allow_merge_commit: resource.field(self._.blocks, 'allow_merge_commit'),
       allow_rebase_merge: resource.field(self._.blocks, 'allow_rebase_merge'),
       allow_squash_merge: resource.field(self._.blocks, 'allow_squash_merge'),
@@ -2627,6 +3135,20 @@ local provider(rawConfiguration, configuration) = {
       deployment_branch_policies: resource.field(self._.blocks, 'deployment_branch_policies'),
       environment_name: resource.field(self._.blocks, 'environment_name'),
       id: resource.field(self._.blocks, 'id'),
+      repository: resource.field(self._.blocks, 'repository'),
+    },
+    repository_environment_deployment_policies(name, block): {
+      local resource = blockType.resource('github_repository_environment_deployment_policies', name),
+      _: resource._(
+        block,
+        attribute(block, 'environment', true) +
+        attribute(block, 'id') +
+        attribute(block, 'policies') +
+        attribute(block, 'repository', true)
+      ),
+      environment: resource.field(self._.blocks, 'environment'),
+      id: resource.field(self._.blocks, 'id'),
+      policies: resource.field(self._.blocks, 'policies'),
       repository: resource.field(self._.blocks, 'repository'),
     },
     repository_environments(name, block): {
@@ -2823,6 +3345,7 @@ local provider(rawConfiguration, configuration) = {
         attribute(block, 'membership_type') +
         attribute(block, 'name') +
         attribute(block, 'node_id') +
+        attribute(block, 'notification_setting') +
         attribute(block, 'permission') +
         attribute(block, 'privacy') +
         attribute(block, 'repositories') +
@@ -2837,6 +3360,7 @@ local provider(rawConfiguration, configuration) = {
       membership_type: resource.field(self._.blocks, 'membership_type'),
       name: resource.field(self._.blocks, 'name'),
       node_id: resource.field(self._.blocks, 'node_id'),
+      notification_setting: resource.field(self._.blocks, 'notification_setting'),
       permission: resource.field(self._.blocks, 'permission'),
       privacy: resource.field(self._.blocks, 'privacy'),
       repositories: resource.field(self._.blocks, 'repositories'),
@@ -2952,6 +3476,7 @@ local providerWithConfiguration = provider(null, null) + {
     alias: alias,
     base_url: build.template(std.get(block, 'base_url', null)),
     insecure: build.template(std.get(block, 'insecure', null)),
+    max_per_page: build.template(std.get(block, 'max_per_page', null)),
     max_retries: build.template(std.get(block, 'max_retries', null)),
     organization: build.template(std.get(block, 'organization', null)),
     owner: build.template(std.get(block, 'owner', null)),
