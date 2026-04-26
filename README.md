@@ -4,15 +4,6 @@ This repository hosts reusable Jsonnet packages prepared for easy integration in
 Each package has been processed by inlining all its code into a single file.
 Additionally, each output file has been placed onto a separate branch.
 This enables lightweight and straightforward usage with the [jsonnet-bundler](https://github.com/jsonnet-bundler/jsonnet-bundler).
-## kubectl
-
-> Read-only access to Kubernetes resources via client-go, similar to `kubectl get`.
-
-- [Readme](kubectl/README.md): Documentation of installation and usage
-
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-kubectl): Original source code
-
-- [Inlined Code](https://github.com/marcbran/jsonnet/blob/kubectl/kubectl/main.libsonnet): Inlined code published for usage in other projects
 ## pkg
 
 > Jsonnet package definitions.
