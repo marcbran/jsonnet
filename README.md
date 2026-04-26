@@ -49,6 +49,15 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/jsonnet-plugin-jsonnet): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin-jsonnet/plugin/jsonnet/main.libsonnet): Inlined code published for usage in other projects
+## plugin/http
+
+> Read-only HTTP GET requests against a REST API. Base URL and default headers are configured when the plugin is started or embedded in Go.
+
+- [Readme](plugin/http/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-http): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/http/plugin/http/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/jsonnet
 
 > DSL for creating Jsonnet code.
@@ -58,6 +67,24 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/jsonnet-plugin-jsonnet): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/jsonnet/plugin/jsonnet/main.libsonnet): Inlined code published for usage in other projects
+## plugin/markdown
+
+> DSL for creating Markdown documents.
+
+- [Readme](plugin/markdown/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-markdown): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/markdown/plugin/markdown/main.libsonnet): Inlined code published for usage in other projects
+## plugin/openapi
+
+> OpenAPI-oriented native functions and code generation support for Jsonnet.
+
+- [Readme](plugin/openapi/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-openapi): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/openapi/plugin/openapi/main.libsonnet): Inlined code published for usage in other projects
 ## terraform-provider-authentik
 
 > Terraform provider authentik
