@@ -67,6 +67,15 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/jsonnet-plugin-jsonnet): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/jsonnet/plugin/jsonnet/main.libsonnet): Inlined code published for usage in other projects
+## plugin/kubectl
+
+> Read-only access to Kubernetes resources via client-go, similar to `kubectl get`.
+
+- [Readme](plugin/kubectl/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-kubectl): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/kubectl/plugin/kubectl/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/markdown
 
 > DSL for creating Markdown documents.
