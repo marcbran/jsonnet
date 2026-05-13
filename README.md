@@ -58,6 +58,15 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/jsonnet-plugin-openapi): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/openapi/plugin/openapi/main.libsonnet): Inlined code published for usage in other projects
+## promql
+
+> Jsonnet library that implements a DSL for PromQL.
+
+- [Readme](promql/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-libs): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/promql/promql/main.libsonnet): Inlined code published for usage in other projects
 ## terraform-provider-authentik
 
 > Terraform provider authentik
