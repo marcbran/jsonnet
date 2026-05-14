@@ -67,6 +67,13 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/jsonnet-libs): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/promql/promql/main.libsonnet): Inlined code published for usage in other projects
+## terraform-provider-cloudflare
+
+> Terraform provider cloudflare
+
+- [Readme](terraform-provider/registry.terraform.io/cloudflare/cloudflare/README.md): Documentation of installation and usage
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/terraform-provider/registry.terraform.io/cloudflare/cloudflare/terraform-provider-cloudflare/main.libsonnet): Inlined code published for usage in other projects
 ## terraform-provider-authentik
 
 > Terraform provider authentik
