@@ -40,6 +40,15 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-openapi): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-openapi/arcourse/arcourse-openapi/main.libsonnet): Inlined code published for usage in other projects
+## arcourse/arcourse-ui
+
+> Shared views for rendering arcourse graph nodes as HTML, built on top of
+
+- [Readme](arcourse/arcourse-ui/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-ui): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-ui/arcourse/arcourse-ui/main.libsonnet): Inlined code published for usage in other projects
 ## pkg
 
 > Jsonnet package definitions.
