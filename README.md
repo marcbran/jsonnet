@@ -13,6 +13,15 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-graph): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-graph/arcourse/arcourse-graph/main.libsonnet): Inlined code published for usage in other projects
+## arcourse/arcourse-kubectl
+
+> Generates an arcourse graph for browsing Kubernetes resources via `kubectl`.
+
+- [Readme](arcourse/arcourse-kubectl/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-kubectl): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-kubectl/arcourse/arcourse-kubectl/main.libsonnet): Inlined code published for usage in other projects
 ## pkg
 
 > Jsonnet package definitions.
