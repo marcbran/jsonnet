@@ -31,6 +31,15 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-kubernetes): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-kubernetes/arcourse/arcourse-kubernetes/main.libsonnet): Inlined code published for usage in other projects
+## arcourse/arcourse-openapi
+
+> Generates an arcourse graph for browsing any OpenAPI-described service.
+
+- [Readme](arcourse/arcourse-openapi/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-openapi): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-openapi/arcourse/arcourse-openapi/main.libsonnet): Inlined code published for usage in other projects
 ## pkg
 
 > Jsonnet package definitions.
