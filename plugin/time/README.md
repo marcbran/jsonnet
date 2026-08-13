@@ -1,6 +1,6 @@
 # plugin/time
 
-> Relative time resolution: get the current time, and add a signed duration spec to it. Calendar units - `Y`(ear), `M`(onth), `W`(eek), `D`(ay), uppercase - use calendar-aware arithmetic, so they land on the right day even though months and years aren't a fixed length. The remainder - `h`, `m`, `s`, `ms`, `us`, `ns`, lowercase - is fixed-length duration. Also parses absolute RFC3339 timestamps.
+> Relative time resolution: get the current time, and add a signed duration spec to it. `y`(ear) and `M`(onth) use calendar-aware arithmetic, so they land on the right day even though months and years aren't a fixed length - `M` is uppercase since lowercase `m` means minute. `w`(eek) and `d`(ay) are fixed-length (7/1 days). The remainder - `h`, `m`, `s`, `ms`, `us`, `ns` - is also fixed-length duration.
 
 - [Source Code](https://github.com/marcbran/jsonnet-plugin-time): Original source code
 
@@ -27,7 +27,7 @@ local time = import 'plugin/time/main.libsonnet';
 
 ### addDuration
 
-Adds a signed duration spec (e.g. `2h30m`, `1Y2M3D`, `-6h`) to `epochMs`, returning the resulting epoch milliseconds.
+Adds a signed duration spec (e.g. `2h30m`, `1y2M3w4d`, `-6h`) to `epochMs`, returning the resulting epoch milliseconds.
 
 ```jsonnet
 time.addDuration()
