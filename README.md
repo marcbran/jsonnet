@@ -123,7 +123,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/openapi/plugin/openapi/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/time
 
-> Relative time resolution: get the current time, and add a signed duration spec to it. Calendar units - `Y`(ear), `M`(onth), `W`(eek), `D`(ay), uppercase - use calendar-aware arithmetic, so they land on the right day even though months and years aren't a fixed length. The remainder - `h`, `m`, `s`, `ms`, `us`, `ns`, lowercase - is fixed-length duration.
+> Relative time resolution: get the current time, and add a signed duration spec to it. Calendar units - `Y`(ear), `M`(onth), `W`(eek), `D`(ay), uppercase - use calendar-aware arithmetic, so they land on the right day even though months and years aren't a fixed length. The remainder - `h`, `m`, `s`, `ms`, `us`, `ns`, lowercase - is fixed-length duration. Also parses absolute RFC3339 timestamps.
 
 - [Readme](plugin/time/README.md): Documentation of installation and usage
 
