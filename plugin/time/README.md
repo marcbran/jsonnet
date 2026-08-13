@@ -1,6 +1,6 @@
 # plugin/time
 
-> Relative time resolution: get the current time, and add a signed duration spec to it. Calendar units - `Y`(ear), `M`(onth), `W`(eek), `D`(ay), uppercase - use calendar-aware arithmetic, so they land on the right day even though months and years aren't a fixed length. The remainder - `h`, `m`, `s`, `ms`, `us`, `ns`, lowercase - is fixed-length duration.
+> Relative time resolution: get the current time, and add a signed duration spec to it. Calendar units - `Y`(ear), `M`(onth), `W`(eek), `D`(ay), uppercase - use calendar-aware arithmetic, so they land on the right day even though months and years aren't a fixed length. The remainder - `h`, `m`, `s`, `ms`, `us`, `ns`, lowercase - is fixed-length duration. Also parses absolute RFC3339 timestamps.
 
 - [Source Code](https://github.com/marcbran/jsonnet-plugin-time): Original source code
 
@@ -40,5 +40,14 @@ Returns the current time as epoch milliseconds.
 
 ```jsonnet
 time.now()
+```
+
+
+### parseRFC3339
+
+Parses an RFC3339 timestamp (e.g. `2026-08-04T00:00:00Z`) into epoch milliseconds.
+
+```jsonnet
+time.parseRFC3339()
 ```
 
