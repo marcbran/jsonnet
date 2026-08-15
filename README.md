@@ -13,6 +13,15 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-echarts): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-echarts/arcourse/arcourse-echarts/main.libsonnet): Inlined code published for usage in other projects
+## arcourse/arcourse-grafana
+
+> Generates an arcourse graph for browsing Grafana datasources and rendering their
+
+- [Readme](arcourse/arcourse-grafana/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-grafana): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-grafana/arcourse/arcourse-grafana/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/arcourse-graph
 
 > Path-addressable node graph primitives used to compose arcourse resource explorers.
