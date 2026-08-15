@@ -4,6 +4,15 @@ This repository hosts reusable Jsonnet packages prepared for easy integration in
 Each package has been processed by inlining all its code into a single file.
 Additionally, each output file has been placed onto a separate branch.
 This enables lightweight and straightforward usage with the [jsonnet-bundler](https://github.com/jsonnet-bundler/jsonnet-bundler).
+## arcourse/arcourse-echarts
+
+> Shared views for rendering arcourse graph nodes as ECharts charts and dashboards,
+
+- [Readme](arcourse/arcourse-echarts/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-echarts): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-echarts/arcourse/arcourse-echarts/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/arcourse-graph
 
 > Path-addressable node graph primitives used to compose arcourse resource explorers.
