@@ -57,7 +57,7 @@ arcourse-ui.resource
 
 ### table
 
-Renders `data` items (at `itemsPath`, default `['items']`) as a table with `columns`.
+Renders `data` items (at `table.at`, default `['items']`) as a table with `table.columns`, each row linking to its own item if `linkSpecs` resolves one.
 
 ```jsonnet
 arcourse-ui.table
