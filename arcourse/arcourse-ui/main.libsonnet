@@ -1,75 +1,158 @@
 local c = {
-  list: {
-    local c = self,
-    items:: error 'List requires items',
-    html: {
-      element: 'aside',
-      attributes: { style: 'font-family: monospace' },
-      children: [{
-        element: 'nav',
-        children: [{
-          element: 'ul',
-          attributes: { style: 'list-style: none;' },
-          children: [
-            {
-              element: 'li',
-              children: [{
-                element: 'a',
-                attributes: { href: item.link, style: 'color: var(--primary-color)' },
-                children: [item.text],
-              }],
-            }
-            for item in c.items
-          ],
-        }],
-      }],
-    },
-  },
-  groupList:
-    local groupBorder = 'border: 1px solid var(--border-color); border-radius: 0.5em; padding: 0.75em 1em;';
-
-    local itemList(items) = {
-      element: 'ul',
-      attributes: { style: 'list-style: none; margin: 0; padding: 0;' },
-      children: [
-        {
-          element: 'li',
-          children: [{
-            element: 'a',
-            attributes: { href: item.link, style: 'color: var(--primary-color)' },
-            children: [item.text],
-          }],
+  list:
+    local style = |||
+      @scope (.list) {
+        :scope {
+          font-family: monospace;
         }
-        for item in items
+        a {
+          color: var(--primary-color);
+        }
+        a:hover {
+          text-decoration: none;
+        }
+        ul {
+          list-style: none;
+        }
+      }
+    |||;
+
+    {
+      local c = self,
+      items:: error 'List requires items',
+      style:: '',
+      html: [
+        { element: 'style', children: [style] },
+        {
+          element: 'aside',
+          attributes: { class: 'list card' } + (if c.style != '' then { style: c.style } else {}),
+          children: [{
+            element: 'nav',
+            children: [{
+              element: 'ul',
+              children: [
+                {
+                  element: 'li',
+                  children: [{
+                    element: 'a',
+                    attributes: { href: item.link },
+                    children: [item.text],
+                  }],
+                }
+                for item in c.items
+              ],
+            }],
+          }],
+        },
       ],
+    },
+  groupList:
+    local style = |||
+      @scope (.group-list) {
+        :scope {
+          font-family: monospace;
+          display: inline-flex;
+          flex-direction: column;
+          gap: 0.25em;
+        }
+        a {
+          color: var(--primary-color);
+        }
+        a:hover {
+          text-decoration: none;
+        }
+        ul {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+        }
+      }
+    |||;
+
+    local itemList = {
+      local c = self,
+      items:: error 'ItemList requires items',
+      html: {
+        element: 'ul',
+        children: [
+          {
+            element: 'li',
+            children: [{
+              element: 'a',
+              attributes: { href: item.link },
+              children: [item.text],
+            }],
+          }
+          for item in c.items
+        ],
+      },
     };
 
     {
       local c = self,
       items:: error 'GroupList requires items',
       groups:: [],
-      html: {
-        element: 'aside',
-        attributes: { style: 'font-family: monospace; display: inline-flex; flex-direction: column; gap: 0.25em;' },
-        children:
-          (if std.length(c.items) > 0 then [{
-             element: 'nav',
-             attributes: { style: groupBorder },
-             children: [itemList(c.items)],
-           }] else []) + [
-            {
-              element: 'nav',
-              attributes: { style: groupBorder },
-              children: [
-                { element: 'strong', children: [group.title] },
-                itemList(group.items),
-              ],
-            }
-            for group in c.groups
-          ],
-      },
+      html: [
+        { element: 'style', children: [style] },
+        {
+          element: 'aside',
+          attributes: { class: 'group-list' },
+          children:
+            (if std.length(c.items) > 0 then [{
+               element: 'nav',
+               attributes: { class: 'card' },
+               children: [itemList { items:: c.items }],
+             }] else []) + [
+              {
+                element: 'nav',
+                attributes: { class: 'card' },
+                children: [
+                  { element: 'strong', children: [group.title] },
+                  itemList { items:: group.items },
+                ],
+              }
+              for group in c.groups
+            ],
+        },
+      ],
     },
   table:
+    local style = |||
+      @scope (.table) {
+        :scope {
+          display: inline-table;
+          border-collapse: separate;
+          border-spacing: 0;
+          font-family: monospace;
+        }
+        th {
+          color: var(--primary-color);
+          font-weight: bold;
+          padding: 0.3em 0.4em;
+        }
+        td {
+          padding: 0;
+        }
+        td > * {
+          display: block;
+          box-sizing: border-box;
+          height: 100%;
+          padding: 0.3em 0.4em;
+        }
+        td > a {
+          text-decoration: none;
+          color: var(--on-background-color);
+        }
+        tbody tr:has(a):hover {
+          background-color: var(--container-low-color);
+        }
+        td.empty {
+          text-align: center;
+          opacity: 0.6;
+        }
+      }
+    |||;
+
     local cellValue(item, col) =
       if std.objectHas(col, 'value') then col.value(item)
       else std.foldl(
@@ -78,49 +161,85 @@ local c = {
         item
       );
 
-    local cellContent(item, col) =
+    local cellText(item, col) =
       local val = cellValue(item, col);
-      local str = if val == null then '' else std.toString(val);
-      local link = if std.objectHas(col, 'link') then col.link(item) else null;
-      if link != null then
-        { element: 'a', attributes: { href: link._queryPath, style: 'color: var(--primary-color)' }, children: [str] }
+      if val == null then '' else std.toString(val);
+
+    local rowHref(rowLink, item) =
+      if rowLink == null then null
       else
-        str;
+        local target = rowLink(item);
+        if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
+        then target._queryPath
+        else null;
+
+    local cell = {
+      local c = self,
+      item:: error 'Cell requires item',
+      col:: error 'Cell requires col',
+      href:: null,
+      local text = cellText(c.item, c.col),
+      html:
+        if c.href == null then
+          { element: 'span', children: [text] }
+        else
+          { element: 'a', attributes: { href: c.href }, children: [text] },
+    };
+
+    local emptyRow = {
+      local c = self,
+      columnCount:: error 'EmptyRow requires columnCount',
+      html: {
+        element: 'tr',
+        children: [{
+          element: 'td',
+          attributes: { class: 'empty', colspan: std.max(1, c.columnCount) },
+          children: [{ element: 'span', children: ['No items'] }],
+        }],
+      },
+    };
 
     {
       local c = self,
       items:: error 'Table requires items',
       columns:: [],
-      html: {
-        element: 'table',
-        attributes: { style: 'font-family: monospace' },
-        children: [
-          {
-            element: 'thead',
-            children: [{
-              element: 'tr',
-              children: [
-                {
-                  element: 'th',
-                  attributes: { style: 'color: var(--primary-color); font-weight: bold' },
-                  children: [col.label],
-                }
-                for col in c.columns
-              ],
-            }],
-          },
-          {
-            element: 'tbody',
-            children: [
-              {
+      rowLink:: null,
+      local rows = if std.isArray(c.items) then c.items else [],
+      html: [
+        { element: 'style', children: [style] },
+        {
+          element: 'table',
+          attributes: { class: 'table card' },
+          children: [
+            {
+              element: 'thead',
+              children: [{
                 element: 'tr',
-                children: [{ element: 'td', children: [cellContent(item, col)] } for col in c.columns],
-              }
-              for item in c.items
-            ],
-          },
-        ],
-      },
+                children: [
+                  { element: 'th', children: [col.label] }
+                  for col in c.columns
+                ],
+              }],
+            },
+            {
+              element: 'tbody',
+              children:
+                if std.length(rows) == 0 then [emptyRow { columnCount:: std.length(c.columns) }]
+                else [
+                  local href = rowHref(c.rowLink, item);
+                  {
+                    element: 'tr',
+                    children: [
+                      { element: 'td', children: [cell { item:: item, col:: col, href:: href }] }
+                      for col in c.columns
+                    ],
+                  }
+                  for item in rows
+                ],
+            },
+          ],
+        },
+      ],
     },
   yaml:
     local yaml = {
@@ -178,10 +297,20 @@ local c = {
                       , value),
     };
 
+    local style = |||
+      .yaml {
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+    |||;
+
     {
       local c = self,
       data:: error 'Yaml requires data',
-      html: { element: 'pre', children: yaml.children(c.data, 0) },
+      html: [
+        { element: 'style', children: [style] },
+        { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+      ],
     },
   page:
     local pageStyle = |||
@@ -192,6 +321,10 @@ local c = {
       :root {
         color-scheme: light dark;
         --primary-color: light-dark(#0451a5, #569cd6);
+        --on-background-color: light-dark(
+          color-mix(in srgb, var(--primary-color) 12%, black),
+          color-mix(in srgb, var(--primary-color) 12%, white)
+        );
         --background-color: light-dark(
           color-mix(in srgb, var(--primary-color) 3%, white),
           color-mix(in srgb, var(--primary-color) 8%, black)
@@ -207,20 +340,24 @@ local c = {
       }
       body {
         background-color: var(--background-color);
+        color: var(--on-background-color);
         padding: 0.5em;
       }
-      pre {
-        white-space: pre-wrap;
-        word-break: break-all;
+      .card {
+        display: inline-block;
+        border: 1px solid var(--border-color);
+        border-radius: 0.5em;
+        padding: 0.75em;
       }
-      a:hover {
-        text-decoration: none;
+      .deck {
+        display: contents;
       }
-      table {
-        border-collapse: collapse;
-      }
-      th, td {
-        padding: 0.1em 0.4em;
+      .deck:has(.card ~ .card) {
+        display: inline-flex;
+        gap: 0.25em;
+        border: 1px solid var(--border-color);
+        border-radius: 0.5em;
+        padding: 0.25em;
       }
     |||;
 
@@ -233,25 +370,102 @@ local c = {
           element: 'html',
           children: [
             { element: 'head', children: [{ element: 'style', children: [pageStyle] }] },
-            { element: 'body', children: [c.fragment] },
+            {
+              element: 'body',
+              children: [{ element: 'div', attributes: { class: 'deck' }, children: c.fragment }],
+            },
           ],
         },
       ],
     },
-  panel: {
-    local c = self,
-    child:: error 'Panel requires a child',
-    style:: '',
-    html: {
-      element: 'div',
-      attributes: { style: 'display: inline-block; border: 1px solid var(--border-color); border-radius: 0.5em; padding: 0.75em;' + c.style },
-      children: [c.child],
-    },
-  },
 };
 local html = {
   manifestHtml(tree): std.native('invoke:html')('manifestHtml', [tree]),
 };
+local linkspecs =
+  local walk(current, remaining, buildFn) =
+    if std.length(remaining) == 0 then
+      if std.type(current) == 'array' then
+        std.foldl(function(acc, item) acc + buildFn(item), current, {})
+      else buildFn(current)
+    else
+      local next =
+        if std.type(current) == 'object' then std.get(current, remaining[0], null)
+        else null;
+      if next == null then {}
+      else if std.type(next) == 'array' then
+        std.foldl(function(acc, item) acc + walk(item, remaining[1:], buildFn), next, {})
+      else
+        walk(next, remaining[1:], buildFn);
+
+  local itemPath(item, path) =
+    std.foldl(
+      function(acc, seg) if std.type(acc) == 'object' then std.get(acc, seg, null) else null,
+      path,
+      item
+    );
+
+  local nestValue(labels, index, value) =
+    if index == std.length(labels) - 1 then { [labels[index]]: value }
+    else { [labels[index]]+: nestValue(labels, index + 1, value) };
+
+  local nestKeys(keySegs, item, value) =
+    local labels = [
+      if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
+      for seg in keySegs
+    ];
+    nestValue(labels, 0, value);
+
+  local resolveTarget(root, node, item, valueSegs) =
+    std.foldl(
+      function(acc, seg)
+        if std.objectHas(seg, 'const') then acc[seg.const]
+        else if std.objectHas(seg, 'origin') then acc[seg.origin](std.toString(node[seg.origin]))
+        else acc[seg.param](std.toString(itemPath(item, seg.path))),
+      valueSegs,
+      root
+    );
+
+  local resolvable(item, valueSegs) =
+    std.all([
+      itemPath(item, seg.path) != null
+      for seg in valueSegs
+      if std.objectHas(seg, 'path')
+    ]);
+
+  local buildLinks(node, specs, root=import 'root') =
+    std.foldl(
+      function(acc, spec)
+        acc + walk(
+          node.data,
+          spec.at,
+          function(item)
+            if resolvable(item, spec.value)
+            then nestKeys(spec.keys, item, resolveTarget(root, node, item, spec.value))
+            else {}
+        ),
+      specs,
+      {}
+    );
+
+  local rowLinkSpec(specs, at) =
+    local matches = [spec for spec in specs if spec.at == at];
+    if std.length(matches) == 0 then null else matches[0];
+
+  local rowLinkFor(node, specs, at, root=import 'root') =
+    local spec = rowLinkSpec(specs, at);
+    if spec == null then null
+    else function(item)
+      if resolvable(item, spec.value) then resolveTarget(root, node, item, spec.value) else null;
+
+  {
+    buildLinks: buildLinks,
+    rowLinkFor: rowLinkFor,
+    withLinkSpecs: {
+      linkSpecs:: [],
+      links: buildLinks(self, self.linkSpecs, import 'root'),
+    },
+  };
 
 local collectNeighbors(obj, textPrefix='', exclude=[]) =
   std.flatMap(
@@ -284,7 +498,7 @@ local baseView = {
 
 local neighborView = baseView {
   _view+:: {
-    fragment: c.panel { child:: c.list { items:: neighbors($) } },
+    fragment: c.list { items:: neighbors($) },
   },
 };
 
@@ -322,16 +536,16 @@ local linksGroups(obj) =
 
 local groupView = baseView {
   _view+:: {
-    fragment: c.panel { style:: ' padding: 0.25em;', child:: c.groupList {
+    fragment: c.groupList {
       items:: directNeighbors($, exclude=['data', '_view', 'links']) + linksItems($),
       groups:: linksGroups($),
-    } },
+    },
   },
 };
 
 local yamlView = baseView {
   _view+:: {
-    fragment: c.panel { child:: c.yaml { data:: $.data } },
+    fragment: c.yaml { data:: $.data },
   },
 };
 
@@ -346,11 +560,14 @@ local safeGet(obj, path) =
 local tableView = baseView {
   _view+:: {
     fragment:
-      local items = safeGet($.data, std.get($, 'itemsPath', ['items']));
-      if std.isArray(items) then
-        c.panel { child:: c.table { items:: items, columns:: std.get($, 'columns', []) } }
-      else
-        c.panel { child:: c.yaml { data:: $.data } },
+      local table = std.get($, 'table', {});
+      local at = std.get(table, 'at', ['items']);
+      local items = safeGet($.data, at);
+      c.table {
+        items:: items,
+        columns:: std.get(table, 'columns', []),
+        rowLink:: linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at),
+      },
   },
 };
 
@@ -358,25 +575,18 @@ local resourceView = baseView {
   _view+:: {
     fragment:
       local items = neighbors($);
-      if std.length(items) > 0 then
-        {
-          element: 'div',
-          attributes: { style: 'display: inline-flex; gap: 0.25em; border: 1px solid var(--border-color); border-radius: 0.5em; padding: 0.25em;' },
-          children: [
-            c.panel { child:: c.list { items:: items }, style:: ' min-width: 8em;' },
-            c.panel { child:: c.yaml { data:: $.data } },
-          ],
-        }
-      else
-        c.panel { child:: c.yaml { data:: $.data } },
+      local listCard = if std.length(items) > 0 then [c.list { items:: items, style:: ' min-width: 8em;' }] else [];
+      listCard + [c.yaml { data:: $.data }],
   },
 };
 
+local withNode = { node: self.view + linkspecs.withLinkSpecs };
+
 {
-  default: { view: neighborView },
-  list: { view: neighborView },
-  groupList: { view: groupView },
-  table: { view: tableView },
-  yaml: { view: yamlView },
-  resource: { view: resourceView },
+  default: { view: neighborView } + withNode,
+  list: { view: neighborView } + withNode,
+  groupList: { view: groupView } + withNode,
+  table: { view: tableView } + withNode,
+  yaml: { view: yamlView } + withNode,
+  resource: { view: resourceView } + withNode,
 }
