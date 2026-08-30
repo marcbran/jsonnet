@@ -4,53 +4,6 @@ local c = {
       @scope (.list) {
         :scope {
           font-family: monospace;
-        }
-        a {
-          color: var(--primary-color);
-        }
-        a:hover {
-          text-decoration: none;
-        }
-        ul {
-          list-style: none;
-        }
-      }
-    |||;
-
-    {
-      local c = self,
-      items:: error 'List requires items',
-      style:: '',
-      html: [
-        { element: 'style', children: [style] },
-        {
-          element: 'aside',
-          attributes: { class: 'list card' } + (if c.style != '' then { style: c.style } else {}),
-          children: [{
-            element: 'nav',
-            children: [{
-              element: 'ul',
-              children: [
-                {
-                  element: 'li',
-                  children: [{
-                    element: 'a',
-                    attributes: { href: item.link },
-                    children: [item.text],
-                  }],
-                }
-                for item in c.items
-              ],
-            }],
-          }],
-        },
-      ],
-    },
-  groupList:
-    local style = |||
-      @scope (.group-list) {
-        :scope {
-          font-family: monospace;
           display: inline-flex;
           flex-direction: column;
           gap: 0.25em;
@@ -90,13 +43,14 @@ local c = {
 
     {
       local c = self,
-      items:: error 'GroupList requires items',
+      items:: error 'List requires items',
       groups:: [],
+      style:: '',
       html: [
         { element: 'style', children: [style] },
         {
           element: 'aside',
-          attributes: { class: 'group-list' },
+          attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
           children:
             (if std.length(c.items) > 0 then [{
                element: 'nav',
@@ -442,7 +396,8 @@ local c = {
       .deck {
         display: contents;
       }
-      .deck:has(.card ~ .card) {
+      .deck:has(.card ~ .card),
+      .deck:has(.list):has(.yaml) {
         display: inline-flex;
         gap: 0.25em;
         border: 1px solid var(--border-color);
@@ -465,6 +420,180 @@ local c = {
               children: [{ element: 'div', attributes: { class: 'deck' }, children: c.fragment }],
             },
           ],
+        },
+      ],
+    },
+  resource:
+    local list =
+      local style = |||
+        @scope (.list) {
+          :scope {
+            font-family: monospace;
+            display: inline-flex;
+            flex-direction: column;
+            gap: 0.25em;
+          }
+          a {
+            color: var(--primary-color);
+          }
+          a:hover {
+            text-decoration: none;
+          }
+          ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+          }
+        }
+      |||;
+
+      local itemList = {
+        local c = self,
+        items:: error 'ItemList requires items',
+        html: {
+          element: 'ul',
+          children: [
+            {
+              element: 'li',
+              children: [{
+                element: 'a',
+                attributes: { href: item.link },
+                children: [item.text],
+              }],
+            }
+            for item in c.items
+          ],
+        },
+      };
+
+      {
+        local c = self,
+        items:: error 'List requires items',
+        groups:: [],
+        style:: '',
+        html: [
+          { element: 'style', children: [style] },
+          {
+            element: 'aside',
+            attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+            children:
+              (if std.length(c.items) > 0 then [{
+                 element: 'nav',
+                 attributes: { class: 'card' },
+                 children: [itemList { items:: c.items }],
+               }] else []) + [
+                {
+                  element: 'nav',
+                  attributes: { class: 'card' },
+                  children: [
+                    { element: 'strong', children: [group.title] },
+                    itemList { items:: group.items },
+                  ],
+                }
+                for group in c.groups
+              ],
+          },
+        ],
+      };
+    local yaml =
+      local yaml = {
+        local c = self,
+
+        indent(depth)::
+          std.join('', std.makeArray(depth * 2, function(_) ' ')),
+
+        scalar(v)::
+          if std.type(v) == 'null' then 'null'
+          else if std.type(v) == 'boolean' then (if v then 'true' else 'false')
+          else if std.type(v) == 'object' then '{}'
+          else if std.type(v) == 'array' then '[]'
+          else '%s' % v,
+
+        key(k)::
+          { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+
+        row(key, value, depth, bullet)::
+          local hasChildren =
+            (std.type(value) == 'object' || std.type(value) == 'array')
+            && std.length(value) > 0;
+          if hasChildren then
+            [{ element: 'div', children: [
+              c.indent(depth),
+              bullet,
+              c.key(key),
+              ':',
+            ] }] + c.children(value, depth + 1)
+          else
+            [{ element: 'div', children: [
+              c.indent(depth),
+              bullet,
+              c.key(key),
+              ': ' + c.scalar(value),
+            ] }],
+
+        children(value, depth)::
+          if std.type(value) == 'object' then
+            std.flatMap(
+              function(kv) c.row(kv.key, kv.value, depth, ''),
+              std.objectKeysValues(value)
+            )
+          else
+            std.flatMap(function(item)
+              if std.type(item) == 'object' then
+                local kvs = std.objectKeysValues(item);
+                c.row(kvs[0].key, kvs[0].value, depth, '- ') +
+                std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
+              else
+                [{ element: 'div', children: [
+                  c.indent(depth),
+                  '- ' + c.scalar(item),
+                ] }]
+                        , value),
+      };
+
+      local style = |||
+        .yaml {
+          white-space: pre-wrap;
+          word-break: break-all;
+        }
+      |||;
+
+      {
+        local c = self,
+        data:: error 'Yaml requires data',
+        html: [
+          { element: 'style', children: [style] },
+          { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+        ],
+      };
+
+    local style = |||
+      .resource {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 0.25em;
+      }
+      .resource > .yaml {
+        flex: 1 1 0;
+        min-width: 0;
+      }
+    |||;
+
+    {
+      local c = self,
+      data:: error 'Resource requires data',
+      items:: [],
+      groups:: [],
+      html: [
+        { element: 'style', children: [style] },
+        {
+          element: 'div',
+          attributes: { class: 'resource' },
+          children:
+            (if std.length(c.items) > 0 || std.length(c.groups) > 0 then
+               [list { items:: c.items, groups:: c.groups, style:: ' min-width: 8em;' }]
+             else []) + [yaml { data:: c.data }],
         },
       ],
     },
@@ -508,7 +637,7 @@ local linkspecs =
 
   local splitPrefix(valueSegs) =
     if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
-    else if std.objectHas(valueSegs[0], 'param') then { prefix: [], suffix: valueSegs }
+    else if std.objectHas(valueSegs[0], 'param') || std.objectHas(valueSegs[0], 'path') then { prefix: [], suffix: valueSegs }
     else
       local rest = splitPrefix(valueSegs[1:]);
       { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
@@ -522,19 +651,34 @@ local linkspecs =
       root
     );
 
+  local resolveKey(spec, item) =
+    if std.type(spec) == 'string' then spec
+    else
+      local raw = itemPath(item, spec.path);
+      if std.objectHas(spec, 'transform') then spec.transform(raw) else raw;
+
   local resolveFromBase(base, item, suffixSegs) =
     std.foldl(
-      function(acc, seg) acc[seg.param](std.toString(itemPath(item, seg.path))),
+      function(acc, seg)
+        if std.objectHas(seg, 'param') then
+          acc[resolveKey(seg.param, item)](std.toString(itemPath(item, seg.path)))
+        else if std.objectHas(seg, 'const') then
+          acc[seg.const]
+        else
+          acc[resolveKey(seg, item)],
       suffixSegs,
       base
     );
 
   local resolvable(item, valueSegs) =
-    std.all([
-      itemPath(item, seg.path) != null
-      for seg in valueSegs
-      if std.objectHas(seg, 'path')
-    ]);
+    std.all(
+      [itemPath(item, seg.path) != null for seg in valueSegs if std.objectHas(seg, 'path')] +
+      [
+        itemPath(item, seg.param.path) != null
+        for seg in valueSegs
+        if std.objectHas(seg, 'param') && std.type(seg.param) == 'object'
+      ]
+    );
 
   local buildLinks(node, specs, root=import 'root') =
     std.foldl(
@@ -590,26 +734,6 @@ local collectNeighbors(obj, textPrefix='', exclude=[]) =
     std.objectFields(obj)
   );
 
-local neighbors(obj) =
-  local links = std.get(obj, 'links', {});
-  (if std.type(links) == 'object' then collectNeighbors(links) else []) +
-  collectNeighbors(obj, exclude=['data', '_view', 'links']);
-
-local baseView = {
-  local n = self,
-  _view:: {
-    fragment: error 'view requires a fragment',
-    page: c.page { fragment:: n._view.fragment },
-    html: html.manifestHtml(self.page),
-  },
-};
-
-local neighborView = baseView {
-  _view+:: {
-    fragment: c.list { items:: neighbors($) },
-  },
-};
-
 local isNode(value) =
   std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');
 
@@ -642,10 +766,29 @@ local linksGroups(obj) =
     std.objectFields(links)
   );
 
-local groupView = baseView {
+local neighborItems(obj) = directNeighbors(obj, exclude=['data', '_view', 'links']) + linksItems(obj);
+
+local safeGet(obj, path) =
+  std.foldl(
+    function(acc, k)
+      if acc != null && std.isObject(acc) && std.objectHasAll(acc, k) then acc[k] else null,
+    path,
+    obj
+  );
+
+local baseView = {
+  local n = self,
+  _view:: {
+    fragment: error 'view requires a fragment',
+    page: c.page { fragment:: n._view.fragment },
+    html: html.manifestHtml(self.page),
+  },
+};
+
+local listView = baseView {
   _view+:: {
-    fragment: c.groupList {
-      items:: directNeighbors($, exclude=['data', '_view', 'links']) + linksItems($),
+    fragment: c.list {
+      items:: neighborItems($),
       groups:: linksGroups($),
     },
   },
@@ -656,14 +799,6 @@ local yamlView = baseView {
     fragment: c.yaml { data:: $.data },
   },
 };
-
-local safeGet(obj, path) =
-  std.foldl(
-    function(acc, k)
-      if acc != null && std.isObject(acc) && std.objectHasAll(acc, k) then acc[k] else null,
-    path,
-    obj
-  );
 
 local tableView = baseView {
   _view+:: {
@@ -682,19 +817,19 @@ local tableView = baseView {
 
 local resourceView = baseView {
   _view+:: {
-    fragment:
-      local items = neighbors($);
-      local listCard = if std.length(items) > 0 then [c.list { items:: items, style:: ' min-width: 8em;' }] else [];
-      listCard + [c.yaml { data:: $.data }],
+    fragment: c.resource {
+      data:: $.data,
+      items:: neighborItems($),
+      groups:: linksGroups($),
+    },
   },
 };
 
 local withNode = { node: self.view + linkspecs.withLinkSpecs };
 
 {
-  default: { view: neighborView } + withNode,
-  list: { view: neighborView } + withNode,
-  groupList: { view: groupView } + withNode,
+  default: { view: listView } + withNode,
+  list: { view: listView } + withNode,
   table: { view: tableView } + withNode,
   yaml: { view: yamlView } + withNode,
   resource: { view: resourceView } + withNode,
