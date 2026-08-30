@@ -30,7 +30,7 @@ and wraps the result in a full page (`_view.html`).
 
 ### default
 
-Renders the node's neighboring links as a list. Fallback view.
+Same as `list`. Fallback view.
 
 ```jsonnet
 arcourse-ui.default
@@ -39,7 +39,7 @@ arcourse-ui.default
 
 ### list
 
-Renders the node's neighboring links as a list.
+Renders the node's neighboring links as a list, grouping any nested (two-level) links under a titled section.
 
 ```jsonnet
 arcourse-ui.list
@@ -48,7 +48,7 @@ arcourse-ui.list
 
 ### resource
 
-Renders `data` as YAML alongside a list of neighboring links, if any.
+Renders `data` as YAML alongside its neighboring links, if any, grouping any nested (two-level) links under a titled section like `list` does.
 
 ```jsonnet
 arcourse-ui.resource
