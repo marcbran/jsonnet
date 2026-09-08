@@ -32,7 +32,11 @@ local c = {
             element: 'li',
             children: [{
               element: 'a',
-              attributes: { href: item.link },
+              attributes: { href: item.link } + (
+                if std.get(item, 'external', false)
+                then { target: '_blank', rel: 'noopener noreferrer' }
+                else {}
+              ),
               children: [item.text],
             }],
           }
@@ -457,7 +461,11 @@ local c = {
               element: 'li',
               children: [{
                 element: 'a',
-                attributes: { href: item.link },
+                attributes: { href: item.link } + (
+                  if std.get(item, 'external', false)
+                  then { target: '_blank', rel: 'noopener noreferrer' }
+                  else {}
+                ),
                 children: [item.text],
               }],
             }
@@ -680,18 +688,77 @@ local linkspecs =
       ]
     );
 
+  local hexDigits = '0123456789ABCDEF';
+
+  local percentEncode(s) =
+    std.join('', [
+      local c = s[i];
+      local cp = std.codepoint(c);
+      if (cp >= 65 && cp <= 90) || (cp >= 97 && cp <= 122) || (cp >= 48 && cp <= 57)
+         || c == '-' || c == '_' || c == '.' || c == '~'
+      then c
+      else '%' + hexDigits[std.floor(cp / 16)] + hexDigits[cp % 16]
+      for i in std.range(0, std.length(s) - 1)
+    ]);
+
+  local resolveLiteralSegment(node, item, seg) =
+    if std.objectHas(seg, 'const') then seg.const
+    else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
+    else resolveKey(seg, item);
+
+  local resolveLiteralSegments(node, item, segs) =
+    std.foldl(function(acc, seg) acc + resolveLiteralSegment(node, item, seg), segs, '');
+
+  local resolveQuery(node, item, queryObj) =
+    local keys = std.objectFields(queryObj);
+    if std.length(keys) == 0 then ''
+    else '?' + std.join('&', [
+      percentEncode(k) + '=' + percentEncode(resolveLiteralSegments(node, item, queryObj[k]))
+      for k in keys
+    ]);
+
+  local resolveUrl(node, item, url) =
+    local scheme = std.get(url, 'scheme', null);
+    local host = std.get(url, 'host', []);
+    local path = std.get(url, 'path', []);
+    local query = std.get(url, 'query', {});
+    (if scheme != null then scheme + '://' else '')
+    + resolveLiteralSegments(node, item, host)
+    + (
+      if std.length(path) > 0 then
+        '/' + std.join('/', [percentEncode(resolveLiteralSegment(node, item, seg)) for seg in path])
+      else ''
+    )
+    + resolveQuery(node, item, query);
+
+  local urlSegments(url) =
+    std.get(url, 'host', []) + std.get(url, 'path', [])
+    + std.flattenArrays([url.query[k] for k in std.objectFields(std.get(url, 'query', {}))]);
+
   local buildLinks(node, specs, root=import 'root') =
     std.foldl(
       function(acc, spec)
-        local split = splitPrefix(spec.value);
-        local base = resolveBase(root, node, split.prefix);
-        acc + walk(
-          node.data,
-          spec.at,
-          function(item)
-            if resolvable(item, spec.value)
-            then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
-            else {}
+        acc + (
+          if std.type(spec.value) == 'object' then
+            walk(
+              node.data,
+              spec.at,
+              function(item)
+                if resolvable(item, urlSegments(spec.value))
+                then nestKeys(spec.keys, item, resolveUrl(node, item, spec.value))
+                else {}
+            )
+          else
+            local split = splitPrefix(spec.value);
+            local base = resolveBase(root, node, split.prefix);
+            walk(
+              node.data,
+              spec.at,
+              function(item)
+                if resolvable(item, spec.value)
+                then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
+                else {}
+            )
         ),
       specs,
       {}
@@ -726,7 +793,8 @@ local collectNeighbors(obj, textPrefix='', exclude=[]) =
       else
         local value = obj[k];
         local textPath = if textPrefix == '' then k else '%s/%s' % [textPrefix, k];
-        if std.type(value) != 'object' then []
+        if std.type(value) == 'string' then [{ link: value, text: textPath, external: true }]
+        else if std.type(value) != 'object' then []
         else
           if std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath') then
             [{ link: value._queryPath, text: textPath }]
@@ -751,7 +819,11 @@ local linksItems(obj) =
   local links = std.get(obj, 'links', {});
   if std.type(links) != 'object' then []
   else std.flatMap(
-    function(k) if isNode(links[k]) then [{ link: links[k]._queryPath, text: k }] else [],
+    function(k)
+      local value = links[k];
+      if isNode(value) then [{ link: value._queryPath, text: k }]
+      else if std.type(value) == 'string' then [{ link: value, text: k, external: true }]
+      else [],
     std.objectFields(links)
   );
 
