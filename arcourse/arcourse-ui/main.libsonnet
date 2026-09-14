@@ -10,9 +10,14 @@ local c = {
         }
         a {
           color: var(--primary-color);
+          border-radius: 0.5em;
         }
         a:hover {
           text-decoration: none;
+        }
+        a:focus {
+          outline: 2px solid var(--primary-color);
+          outline-offset: 2px;
         }
         ul {
           list-style: none;
@@ -97,9 +102,29 @@ local c = {
           color: var(--primary-color);
           font-weight: bold;
           padding: 0.3em 0.4em;
+          cursor: pointer;
+          user-select: none;
+          white-space: nowrap;
+        }
+        th:hover {
+          text-decoration: underline;
+        }
+        th.sort-asc::after {
+          content: ' ↑';
+        }
+        th.sort-desc::after {
+          content: ' ↓';
         }
         td {
           padding: 0;
+          border-top: 2px solid transparent;
+          border-bottom: 2px solid transparent;
+        }
+        td:first-child {
+          border-left: 2px solid transparent;
+        }
+        td:last-child {
+          border-right: 2px solid transparent;
         }
         td > * {
           display: block;
@@ -113,6 +138,19 @@ local c = {
         }
         tbody tr:has(a):hover {
           background-color: var(--container-low-color);
+        }
+        tbody tr:has(a:focus) td {
+          background-color: var(--container-low-color);
+          border-color: var(--primary-color);
+        }
+        tbody tr:has(a:focus) td:first-child {
+          border-radius: 0.8em 0 0 0.8em;
+        }
+        tbody tr:has(a:focus) td:last-child {
+          border-radius: 0 0.8em 0.8em 0;
+        }
+        td > a:focus {
+          outline: none;
         }
         td.empty {
           text-align: center;
@@ -154,6 +192,10 @@ local c = {
       }
     |||;
 
+    local sortScript = importstr 'table-sort.js';
+
+    local slug(label) = std.asciiLower(std.strReplace(std.toString(label), ' ', '-'));
+
     local cellValue(item, col) =
       if std.objectHas(col, 'value') then col.value(item)
       else std.foldl(
@@ -179,12 +221,13 @@ local c = {
       item:: error 'Cell requires item',
       col:: error 'Cell requires col',
       href:: null,
+      first:: true,
       local text = cellText(c.item, c.col),
       html:
         if c.href == null then
           { element: 'span', children: [text] }
         else
-          { element: 'a', attributes: { href: c.href }, children: [text] },
+          { element: 'a', attributes: { href: c.href } + (if c.first then {} else { tabindex: '-1' }), children: [text] },
     };
 
     local emptyRow = {
@@ -262,7 +305,7 @@ local c = {
                   children: [{
                     element: 'tr',
                     children: [
-                      { element: 'th', children: [col.label] }
+                      { element: 'th', attributes: { 'data-col': slug(col.label) }, children: [col.label] }
                       for col in c.columns
                     ],
                   }],
@@ -276,8 +319,8 @@ local c = {
                       {
                         element: 'tr',
                         children: [
-                          { element: 'td', children: [cell { item:: item, col:: col, href:: href }] }
-                          for col in c.columns
+                          { element: 'td', children: [cell { item:: item, col:: c.columns[i], href:: href, first:: i == 0 }] }
+                          for i in std.range(0, std.length(c.columns) - 1)
                         ],
                       }
                       for item in rows
@@ -287,6 +330,7 @@ local c = {
             },
           ] + (if nav.visible then [nav.html] else []),
         },
+        { element: 'script', children: [{ html: sortScript }] },
       ],
     },
   yaml:
@@ -410,6 +454,9 @@ local c = {
       }
     |||;
 
+    local hashScript = importstr 'hash.js';
+    local navScript = importstr 'quick-nav.js';
+
     {
       local c = self,
       fragment:: error 'HtmlPage requires a fragment',
@@ -418,10 +465,20 @@ local c = {
         {
           element: 'html',
           children: [
-            { element: 'head', children: [{ element: 'style', children: [pageStyle] }] },
+            {
+              element: 'head',
+              children: [
+                { element: 'style', children: [pageStyle] },
+                { element: 'script', children: [{ html: hashScript }] },
+              ],
+            },
             {
               element: 'body',
-              children: [{ element: 'div', attributes: { class: 'deck' }, children: c.fragment }],
+              children: [
+                { element: 'div', attributes: { class: 'deck' }, children: c.fragment },
+                { element: 'quick-nav' },
+                { element: 'script', children: [{ html: navScript }] },
+              ],
             },
           ],
         },
@@ -439,9 +496,14 @@ local c = {
           }
           a {
             color: var(--primary-color);
+            border-radius: 0.5em;
           }
           a:hover {
             text-decoration: none;
+          }
+          a:focus {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
           }
           ul {
             list-style: none;
