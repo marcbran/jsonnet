@@ -1495,9 +1495,12 @@ local nodesChartLib =
           .deck {
             display: contents;
           }
+          .deck:has(.breadcrumbs),
           .deck:has(.card ~ .card),
           .deck:has(.list):has(.yaml) {
             display: inline-flex;
+            flex-direction: column;
+            align-items: flex-start;
             gap: 0.25em;
             border: 1px solid var(--border-color);
             border-radius: 0.5em;
@@ -1550,11 +1553,21 @@ local nodesChartLib =
           (function () {
             if (typeof HTMLElement === 'undefined') return;
 
+            var GROUPS = [
+              { key: 'breadcrumbs', title: 'breadcrumbs' },
+              { key: 'links', title: 'links' },
+              { key: 'table', title: 'table' },
+            ];
+
             function scrapeItems() {
               var items = [];
+              document.querySelectorAll('.breadcrumbs a[href]').forEach(function (a) {
+                var text = a.textContent.trim();
+                if (text) items.push({ text: text, link: a.href, group: 'breadcrumbs' });
+              });
               document.querySelectorAll('.list a[href]').forEach(function (a) {
                 var text = a.textContent.trim();
-                if (text) items.push({ text: text, link: a.href });
+                if (text) items.push({ text: text, link: a.href, group: 'links' });
               });
               document.querySelectorAll('.table tbody tr').forEach(function (tr) {
                 var a = tr.querySelector('a[href]');
@@ -1563,7 +1576,7 @@ local nodesChartLib =
                   .call(tr.querySelectorAll('td'), function (td) { return td.textContent.trim(); })
                   .filter(Boolean)
                   .join('  ');
-                if (text) items.push({ text: text, link: a.href });
+                if (text) items.push({ text: text, link: a.href, group: 'table' });
               });
               return items;
             }
@@ -1637,6 +1650,15 @@ local nodesChartLib =
                 }
                 li.selected { background: var(--container-low-color); }
                 li.empty { opacity: 0.6; cursor: default; }
+                li.group {
+                  cursor: default;
+                  padding: 0.5em 0.5em 0.15em;
+                  opacity: 0.5;
+                  font-size: 0.85em;
+                  text-transform: uppercase;
+                  letter-spacing: 0.05em;
+                }
+                li.group:first-child { padding-top: 0.15em; }
               </style>
               <dialog part="modal">
                 <input type="text" autocomplete="off" spellcheck="false" placeholder="Jump to…" />
@@ -1653,6 +1675,7 @@ local nodesChartLib =
                 this.results = this.shadowRoot.querySelector('ul');
                 this.items = [];
                 this.matches = [];
+                this.itemEls = [];
                 this.selected = 0;
 
                 this.input.addEventListener('input', function () {
@@ -1735,38 +1758,52 @@ local nodesChartLib =
               }
 
               highlight() {
-                var lis = this.results.children;
-                for (var i = 0; i < lis.length; i++) {
+                for (var i = 0; i < this.itemEls.length; i++) {
                   var on = i === this.selected;
-                  lis[i].classList.toggle('selected', on);
-                  if (on) lis[i].scrollIntoView({ block: 'nearest' });
+                  this.itemEls[i].classList.toggle('selected', on);
+                  if (on) this.itemEls[i].scrollIntoView({ block: 'nearest' });
                 }
               }
 
               render() {
-                this.matches = rank(this.input.value.trim(), this.items);
+                var self = this;
+                var ranked = rank(this.input.value.trim(), this.items);
                 this.results.innerHTML = '';
+                this.matches = [];
+                this.itemEls = [];
+
+                GROUPS.forEach(function (group) {
+                  var groupItems = ranked.filter(function (m) { return m.group === group.key; });
+                  if (groupItems.length === 0) return;
+                  var header = document.createElement('li');
+                  header.className = 'group';
+                  header.textContent = group.title;
+                  self.results.appendChild(header);
+                  groupItems.forEach(function (match) {
+                    var index = self.matches.length;
+                    self.matches.push(match);
+                    var li = document.createElement('li');
+                    li.textContent = match.text;
+                    if (index === self.selected) li.classList.add('selected');
+                    li.addEventListener('mousemove', function () {
+                      self.selected = index;
+                      self.highlight();
+                    });
+                    li.addEventListener('click', function () {
+                      self.selected = index;
+                      self.choose();
+                    });
+                    self.results.appendChild(li);
+                    self.itemEls.push(li);
+                  });
+                });
+
                 if (this.matches.length === 0) {
                   var empty = document.createElement('li');
                   empty.className = 'empty';
                   empty.textContent = 'No matches';
                   this.results.appendChild(empty);
-                  return;
                 }
-                this.matches.forEach(function (match, i) {
-                  var li = document.createElement('li');
-                  li.textContent = match.text;
-                  if (i === this.selected) li.classList.add('selected');
-                  li.addEventListener('mousemove', function () {
-                    this.selected = i;
-                    this.highlight();
-                  }.bind(this));
-                  li.addEventListener('click', function () {
-                    this.selected = i;
-                    this.choose();
-                  }.bind(this));
-                  this.results.appendChild(li);
-                }.bind(this));
               }
             }
 
@@ -1777,6 +1814,7 @@ local nodesChartLib =
         {
           local c = self,
           fragment:: error 'HtmlPage requires a fragment',
+          breadcrumbs:: { html: [] },
           html: [
             { doctype: 'html' },
             {
@@ -1792,7 +1830,7 @@ local nodesChartLib =
                 {
                   element: 'body',
                   children: [
-                    { element: 'div', attributes: { class: 'deck' }, children: c.fragment },
+                    { element: 'div', attributes: { class: 'deck' }, children: [c.breadcrumbs, c.fragment] },
                     { element: 'quick-nav' },
                     { element: 'script', children: [{ html: navScript }] },
                   ],
@@ -1983,6 +2021,96 @@ local nodesChartLib =
                  else []) + [yaml { data:: c.data }],
             },
           ],
+        },
+      breadcrumbs:
+        local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
+        local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
+
+        local style = |||
+          @scope (.breadcrumbs) {
+            :scope {
+              font-family: monospace;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 0.4em;
+              width: fit-content;
+              border: 1px solid var(--border-color);
+              border-radius: 0.5em;
+              padding: 0.5em 0.75em;
+            }
+            a {
+              color: var(--primary-color);
+              text-decoration: none;
+              border-radius: 0.5em;
+            }
+            a:hover {
+              text-decoration: underline;
+            }
+            a:focus {
+              outline: 2px solid var(--primary-color);
+              outline-offset: 2px;
+            }
+            .key {
+              opacity: 0.55;
+            }
+            .sep {
+              opacity: 0.4;
+            }
+            .current {
+              color: var(--on-background-color);
+            }
+          }
+        |||;
+
+        local crumbInner = {
+          local c = self,
+          name:: null,
+          value:: error 'crumbInner requires value',
+          html:
+            if c.name == null then [c.value]
+            else [{ element: 'span', attributes: { class: 'key' }, children: [c.name + '/'] }, c.value],
+        };
+
+        {
+          local c = self,
+          pathTemplate:: [],
+          node:: {},
+          local crumbs =
+            std.foldl(
+              function(acc, seg)
+                local entry =
+                  if isVar(seg) then
+                    local v = varName(seg);
+                    local val = std.toString(std.get(c.node, v, ''));
+                    { url: acc.url + '/' + v + '/' + val, name: v, value: val }
+                  else
+                    { url: acc.url + '/' + seg, name: null, value: seg };
+                {
+                  url: entry.url,
+                  crumbs: acc.crumbs + [{ name: entry.name, value: entry.value, queryPath: entry.url }],
+                },
+              c.pathTemplate,
+              { url: '/root', crumbs: [{ name: null, value: 'root', queryPath: '/root' }] }
+            ).crumbs,
+          html:
+            if std.length(c.pathTemplate) == 0 then []
+            else [
+              { element: 'style', children: [style] },
+              {
+                element: 'nav',
+                attributes: { class: 'breadcrumbs' },
+                children: std.flattenArrays([
+                  (if i > 0 then [{ element: 'span', attributes: { class: 'sep' }, children: ['›'] }] else []) +
+                  [
+                    if i == std.length(crumbs) - 1
+                    then { element: 'span', attributes: { class: 'current' }, children: [crumbInner { name:: crumbs[i].name, value:: crumbs[i].value }] }
+                    else { element: 'a', attributes: { href: crumbs[i].queryPath }, children: [crumbInner { name:: crumbs[i].name, value:: crumbs[i].value }] },
+                  ]
+                  for i in std.range(0, std.length(crumbs) - 1)
+                ]),
+              },
+            ],
         },
     };
     local html = {
@@ -2821,9 +2949,12 @@ local nodesListLib =
           .deck {
             display: contents;
           }
+          .deck:has(.breadcrumbs),
           .deck:has(.card ~ .card),
           .deck:has(.list):has(.yaml) {
             display: inline-flex;
+            flex-direction: column;
+            align-items: flex-start;
             gap: 0.25em;
             border: 1px solid var(--border-color);
             border-radius: 0.5em;
@@ -2876,11 +3007,21 @@ local nodesListLib =
           (function () {
             if (typeof HTMLElement === 'undefined') return;
 
+            var GROUPS = [
+              { key: 'breadcrumbs', title: 'breadcrumbs' },
+              { key: 'links', title: 'links' },
+              { key: 'table', title: 'table' },
+            ];
+
             function scrapeItems() {
               var items = [];
+              document.querySelectorAll('.breadcrumbs a[href]').forEach(function (a) {
+                var text = a.textContent.trim();
+                if (text) items.push({ text: text, link: a.href, group: 'breadcrumbs' });
+              });
               document.querySelectorAll('.list a[href]').forEach(function (a) {
                 var text = a.textContent.trim();
-                if (text) items.push({ text: text, link: a.href });
+                if (text) items.push({ text: text, link: a.href, group: 'links' });
               });
               document.querySelectorAll('.table tbody tr').forEach(function (tr) {
                 var a = tr.querySelector('a[href]');
@@ -2889,7 +3030,7 @@ local nodesListLib =
                   .call(tr.querySelectorAll('td'), function (td) { return td.textContent.trim(); })
                   .filter(Boolean)
                   .join('  ');
-                if (text) items.push({ text: text, link: a.href });
+                if (text) items.push({ text: text, link: a.href, group: 'table' });
               });
               return items;
             }
@@ -2963,6 +3104,15 @@ local nodesListLib =
                 }
                 li.selected { background: var(--container-low-color); }
                 li.empty { opacity: 0.6; cursor: default; }
+                li.group {
+                  cursor: default;
+                  padding: 0.5em 0.5em 0.15em;
+                  opacity: 0.5;
+                  font-size: 0.85em;
+                  text-transform: uppercase;
+                  letter-spacing: 0.05em;
+                }
+                li.group:first-child { padding-top: 0.15em; }
               </style>
               <dialog part="modal">
                 <input type="text" autocomplete="off" spellcheck="false" placeholder="Jump to…" />
@@ -2979,6 +3129,7 @@ local nodesListLib =
                 this.results = this.shadowRoot.querySelector('ul');
                 this.items = [];
                 this.matches = [];
+                this.itemEls = [];
                 this.selected = 0;
 
                 this.input.addEventListener('input', function () {
@@ -3061,38 +3212,52 @@ local nodesListLib =
               }
 
               highlight() {
-                var lis = this.results.children;
-                for (var i = 0; i < lis.length; i++) {
+                for (var i = 0; i < this.itemEls.length; i++) {
                   var on = i === this.selected;
-                  lis[i].classList.toggle('selected', on);
-                  if (on) lis[i].scrollIntoView({ block: 'nearest' });
+                  this.itemEls[i].classList.toggle('selected', on);
+                  if (on) this.itemEls[i].scrollIntoView({ block: 'nearest' });
                 }
               }
 
               render() {
-                this.matches = rank(this.input.value.trim(), this.items);
+                var self = this;
+                var ranked = rank(this.input.value.trim(), this.items);
                 this.results.innerHTML = '';
+                this.matches = [];
+                this.itemEls = [];
+
+                GROUPS.forEach(function (group) {
+                  var groupItems = ranked.filter(function (m) { return m.group === group.key; });
+                  if (groupItems.length === 0) return;
+                  var header = document.createElement('li');
+                  header.className = 'group';
+                  header.textContent = group.title;
+                  self.results.appendChild(header);
+                  groupItems.forEach(function (match) {
+                    var index = self.matches.length;
+                    self.matches.push(match);
+                    var li = document.createElement('li');
+                    li.textContent = match.text;
+                    if (index === self.selected) li.classList.add('selected');
+                    li.addEventListener('mousemove', function () {
+                      self.selected = index;
+                      self.highlight();
+                    });
+                    li.addEventListener('click', function () {
+                      self.selected = index;
+                      self.choose();
+                    });
+                    self.results.appendChild(li);
+                    self.itemEls.push(li);
+                  });
+                });
+
                 if (this.matches.length === 0) {
                   var empty = document.createElement('li');
                   empty.className = 'empty';
                   empty.textContent = 'No matches';
                   this.results.appendChild(empty);
-                  return;
                 }
-                this.matches.forEach(function (match, i) {
-                  var li = document.createElement('li');
-                  li.textContent = match.text;
-                  if (i === this.selected) li.classList.add('selected');
-                  li.addEventListener('mousemove', function () {
-                    this.selected = i;
-                    this.highlight();
-                  }.bind(this));
-                  li.addEventListener('click', function () {
-                    this.selected = i;
-                    this.choose();
-                  }.bind(this));
-                  this.results.appendChild(li);
-                }.bind(this));
               }
             }
 
@@ -3103,6 +3268,7 @@ local nodesListLib =
         {
           local c = self,
           fragment:: error 'HtmlPage requires a fragment',
+          breadcrumbs:: { html: [] },
           html: [
             { doctype: 'html' },
             {
@@ -3118,7 +3284,7 @@ local nodesListLib =
                 {
                   element: 'body',
                   children: [
-                    { element: 'div', attributes: { class: 'deck' }, children: c.fragment },
+                    { element: 'div', attributes: { class: 'deck' }, children: [c.breadcrumbs, c.fragment] },
                     { element: 'quick-nav' },
                     { element: 'script', children: [{ html: navScript }] },
                   ],
@@ -3309,6 +3475,96 @@ local nodesListLib =
                  else []) + [yaml { data:: c.data }],
             },
           ],
+        },
+      breadcrumbs:
+        local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
+        local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
+
+        local style = |||
+          @scope (.breadcrumbs) {
+            :scope {
+              font-family: monospace;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 0.4em;
+              width: fit-content;
+              border: 1px solid var(--border-color);
+              border-radius: 0.5em;
+              padding: 0.5em 0.75em;
+            }
+            a {
+              color: var(--primary-color);
+              text-decoration: none;
+              border-radius: 0.5em;
+            }
+            a:hover {
+              text-decoration: underline;
+            }
+            a:focus {
+              outline: 2px solid var(--primary-color);
+              outline-offset: 2px;
+            }
+            .key {
+              opacity: 0.55;
+            }
+            .sep {
+              opacity: 0.4;
+            }
+            .current {
+              color: var(--on-background-color);
+            }
+          }
+        |||;
+
+        local crumbInner = {
+          local c = self,
+          name:: null,
+          value:: error 'crumbInner requires value',
+          html:
+            if c.name == null then [c.value]
+            else [{ element: 'span', attributes: { class: 'key' }, children: [c.name + '/'] }, c.value],
+        };
+
+        {
+          local c = self,
+          pathTemplate:: [],
+          node:: {},
+          local crumbs =
+            std.foldl(
+              function(acc, seg)
+                local entry =
+                  if isVar(seg) then
+                    local v = varName(seg);
+                    local val = std.toString(std.get(c.node, v, ''));
+                    { url: acc.url + '/' + v + '/' + val, name: v, value: val }
+                  else
+                    { url: acc.url + '/' + seg, name: null, value: seg };
+                {
+                  url: entry.url,
+                  crumbs: acc.crumbs + [{ name: entry.name, value: entry.value, queryPath: entry.url }],
+                },
+              c.pathTemplate,
+              { url: '/root', crumbs: [{ name: null, value: 'root', queryPath: '/root' }] }
+            ).crumbs,
+          html:
+            if std.length(c.pathTemplate) == 0 then []
+            else [
+              { element: 'style', children: [style] },
+              {
+                element: 'nav',
+                attributes: { class: 'breadcrumbs' },
+                children: std.flattenArrays([
+                  (if i > 0 then [{ element: 'span', attributes: { class: 'sep' }, children: ['›'] }] else []) +
+                  [
+                    if i == std.length(crumbs) - 1
+                    then { element: 'span', attributes: { class: 'current' }, children: [crumbInner { name:: crumbs[i].name, value:: crumbs[i].value }] }
+                    else { element: 'a', attributes: { href: crumbs[i].queryPath }, children: [crumbInner { name:: crumbs[i].name, value:: crumbs[i].value }] },
+                  ]
+                  for i in std.range(0, std.length(crumbs) - 1)
+                ]),
+              },
+            ],
         },
     };
     local html = {
@@ -3510,16 +3766,6 @@ local nodesListLib =
     local isNode(value) =
       std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');
 
-    local directNeighbors(obj, exclude=[]) =
-      std.flatMap(
-        function(k)
-          if std.member(exclude, k) || std.substr(k, 0, 1) == '_' then []
-          else
-            local value = obj[k];
-            if isNode(value) then [{ link: value._queryPath, text: k }] else [],
-        std.objectFields(obj)
-      );
-
     local linksItems(obj) =
       local links = std.get(obj, 'links', {});
       if std.type(links) != 'object' then []
@@ -3543,7 +3789,7 @@ local nodesListLib =
         std.objectFields(links)
       );
 
-    local neighborItems(obj) = directNeighbors(obj, exclude=['data', '_view', 'links']) + linksItems(obj);
+    local neighborItems(obj) = collectNeighbors(obj, '', ['data', '_view', 'links']) + linksItems(obj);
 
     local safeGet(obj, path) =
       std.foldl(
@@ -3557,7 +3803,10 @@ local nodesListLib =
       local n = self,
       _view:: {
         fragment: error 'view requires a fragment',
-        page: c.page { fragment:: n._view.fragment },
+        page: c.page {
+          fragment:: n._view.fragment,
+          breadcrumbs:: c.breadcrumbs { pathTemplate:: std.get($, '_pathTemplate', []), node:: $ },
+        },
         html: html.manifestHtml(self.page),
       },
     };
@@ -4173,9 +4422,12 @@ local nodesLabelsLib =
           .deck {
             display: contents;
           }
+          .deck:has(.breadcrumbs),
           .deck:has(.card ~ .card),
           .deck:has(.list):has(.yaml) {
             display: inline-flex;
+            flex-direction: column;
+            align-items: flex-start;
             gap: 0.25em;
             border: 1px solid var(--border-color);
             border-radius: 0.5em;
@@ -4228,11 +4480,21 @@ local nodesLabelsLib =
           (function () {
             if (typeof HTMLElement === 'undefined') return;
 
+            var GROUPS = [
+              { key: 'breadcrumbs', title: 'breadcrumbs' },
+              { key: 'links', title: 'links' },
+              { key: 'table', title: 'table' },
+            ];
+
             function scrapeItems() {
               var items = [];
+              document.querySelectorAll('.breadcrumbs a[href]').forEach(function (a) {
+                var text = a.textContent.trim();
+                if (text) items.push({ text: text, link: a.href, group: 'breadcrumbs' });
+              });
               document.querySelectorAll('.list a[href]').forEach(function (a) {
                 var text = a.textContent.trim();
-                if (text) items.push({ text: text, link: a.href });
+                if (text) items.push({ text: text, link: a.href, group: 'links' });
               });
               document.querySelectorAll('.table tbody tr').forEach(function (tr) {
                 var a = tr.querySelector('a[href]');
@@ -4241,7 +4503,7 @@ local nodesLabelsLib =
                   .call(tr.querySelectorAll('td'), function (td) { return td.textContent.trim(); })
                   .filter(Boolean)
                   .join('  ');
-                if (text) items.push({ text: text, link: a.href });
+                if (text) items.push({ text: text, link: a.href, group: 'table' });
               });
               return items;
             }
@@ -4315,6 +4577,15 @@ local nodesLabelsLib =
                 }
                 li.selected { background: var(--container-low-color); }
                 li.empty { opacity: 0.6; cursor: default; }
+                li.group {
+                  cursor: default;
+                  padding: 0.5em 0.5em 0.15em;
+                  opacity: 0.5;
+                  font-size: 0.85em;
+                  text-transform: uppercase;
+                  letter-spacing: 0.05em;
+                }
+                li.group:first-child { padding-top: 0.15em; }
               </style>
               <dialog part="modal">
                 <input type="text" autocomplete="off" spellcheck="false" placeholder="Jump to…" />
@@ -4331,6 +4602,7 @@ local nodesLabelsLib =
                 this.results = this.shadowRoot.querySelector('ul');
                 this.items = [];
                 this.matches = [];
+                this.itemEls = [];
                 this.selected = 0;
 
                 this.input.addEventListener('input', function () {
@@ -4413,38 +4685,52 @@ local nodesLabelsLib =
               }
 
               highlight() {
-                var lis = this.results.children;
-                for (var i = 0; i < lis.length; i++) {
+                for (var i = 0; i < this.itemEls.length; i++) {
                   var on = i === this.selected;
-                  lis[i].classList.toggle('selected', on);
-                  if (on) lis[i].scrollIntoView({ block: 'nearest' });
+                  this.itemEls[i].classList.toggle('selected', on);
+                  if (on) this.itemEls[i].scrollIntoView({ block: 'nearest' });
                 }
               }
 
               render() {
-                this.matches = rank(this.input.value.trim(), this.items);
+                var self = this;
+                var ranked = rank(this.input.value.trim(), this.items);
                 this.results.innerHTML = '';
+                this.matches = [];
+                this.itemEls = [];
+
+                GROUPS.forEach(function (group) {
+                  var groupItems = ranked.filter(function (m) { return m.group === group.key; });
+                  if (groupItems.length === 0) return;
+                  var header = document.createElement('li');
+                  header.className = 'group';
+                  header.textContent = group.title;
+                  self.results.appendChild(header);
+                  groupItems.forEach(function (match) {
+                    var index = self.matches.length;
+                    self.matches.push(match);
+                    var li = document.createElement('li');
+                    li.textContent = match.text;
+                    if (index === self.selected) li.classList.add('selected');
+                    li.addEventListener('mousemove', function () {
+                      self.selected = index;
+                      self.highlight();
+                    });
+                    li.addEventListener('click', function () {
+                      self.selected = index;
+                      self.choose();
+                    });
+                    self.results.appendChild(li);
+                    self.itemEls.push(li);
+                  });
+                });
+
                 if (this.matches.length === 0) {
                   var empty = document.createElement('li');
                   empty.className = 'empty';
                   empty.textContent = 'No matches';
                   this.results.appendChild(empty);
-                  return;
                 }
-                this.matches.forEach(function (match, i) {
-                  var li = document.createElement('li');
-                  li.textContent = match.text;
-                  if (i === this.selected) li.classList.add('selected');
-                  li.addEventListener('mousemove', function () {
-                    this.selected = i;
-                    this.highlight();
-                  }.bind(this));
-                  li.addEventListener('click', function () {
-                    this.selected = i;
-                    this.choose();
-                  }.bind(this));
-                  this.results.appendChild(li);
-                }.bind(this));
               }
             }
 
@@ -4455,6 +4741,7 @@ local nodesLabelsLib =
         {
           local c = self,
           fragment:: error 'HtmlPage requires a fragment',
+          breadcrumbs:: { html: [] },
           html: [
             { doctype: 'html' },
             {
@@ -4470,7 +4757,7 @@ local nodesLabelsLib =
                 {
                   element: 'body',
                   children: [
-                    { element: 'div', attributes: { class: 'deck' }, children: c.fragment },
+                    { element: 'div', attributes: { class: 'deck' }, children: [c.breadcrumbs, c.fragment] },
                     { element: 'quick-nav' },
                     { element: 'script', children: [{ html: navScript }] },
                   ],
@@ -4661,6 +4948,96 @@ local nodesLabelsLib =
                  else []) + [yaml { data:: c.data }],
             },
           ],
+        },
+      breadcrumbs:
+        local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
+        local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
+
+        local style = |||
+          @scope (.breadcrumbs) {
+            :scope {
+              font-family: monospace;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 0.4em;
+              width: fit-content;
+              border: 1px solid var(--border-color);
+              border-radius: 0.5em;
+              padding: 0.5em 0.75em;
+            }
+            a {
+              color: var(--primary-color);
+              text-decoration: none;
+              border-radius: 0.5em;
+            }
+            a:hover {
+              text-decoration: underline;
+            }
+            a:focus {
+              outline: 2px solid var(--primary-color);
+              outline-offset: 2px;
+            }
+            .key {
+              opacity: 0.55;
+            }
+            .sep {
+              opacity: 0.4;
+            }
+            .current {
+              color: var(--on-background-color);
+            }
+          }
+        |||;
+
+        local crumbInner = {
+          local c = self,
+          name:: null,
+          value:: error 'crumbInner requires value',
+          html:
+            if c.name == null then [c.value]
+            else [{ element: 'span', attributes: { class: 'key' }, children: [c.name + '/'] }, c.value],
+        };
+
+        {
+          local c = self,
+          pathTemplate:: [],
+          node:: {},
+          local crumbs =
+            std.foldl(
+              function(acc, seg)
+                local entry =
+                  if isVar(seg) then
+                    local v = varName(seg);
+                    local val = std.toString(std.get(c.node, v, ''));
+                    { url: acc.url + '/' + v + '/' + val, name: v, value: val }
+                  else
+                    { url: acc.url + '/' + seg, name: null, value: seg };
+                {
+                  url: entry.url,
+                  crumbs: acc.crumbs + [{ name: entry.name, value: entry.value, queryPath: entry.url }],
+                },
+              c.pathTemplate,
+              { url: '/root', crumbs: [{ name: null, value: 'root', queryPath: '/root' }] }
+            ).crumbs,
+          html:
+            if std.length(c.pathTemplate) == 0 then []
+            else [
+              { element: 'style', children: [style] },
+              {
+                element: 'nav',
+                attributes: { class: 'breadcrumbs' },
+                children: std.flattenArrays([
+                  (if i > 0 then [{ element: 'span', attributes: { class: 'sep' }, children: ['›'] }] else []) +
+                  [
+                    if i == std.length(crumbs) - 1
+                    then { element: 'span', attributes: { class: 'current' }, children: [crumbInner { name:: crumbs[i].name, value:: crumbs[i].value }] }
+                    else { element: 'a', attributes: { href: crumbs[i].queryPath }, children: [crumbInner { name:: crumbs[i].name, value:: crumbs[i].value }] },
+                  ]
+                  for i in std.range(0, std.length(crumbs) - 1)
+                ]),
+              },
+            ],
         },
     };
     local html = {
@@ -4862,16 +5239,6 @@ local nodesLabelsLib =
     local isNode(value) =
       std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');
 
-    local directNeighbors(obj, exclude=[]) =
-      std.flatMap(
-        function(k)
-          if std.member(exclude, k) || std.substr(k, 0, 1) == '_' then []
-          else
-            local value = obj[k];
-            if isNode(value) then [{ link: value._queryPath, text: k }] else [],
-        std.objectFields(obj)
-      );
-
     local linksItems(obj) =
       local links = std.get(obj, 'links', {});
       if std.type(links) != 'object' then []
@@ -4895,7 +5262,7 @@ local nodesLabelsLib =
         std.objectFields(links)
       );
 
-    local neighborItems(obj) = directNeighbors(obj, exclude=['data', '_view', 'links']) + linksItems(obj);
+    local neighborItems(obj) = collectNeighbors(obj, '', ['data', '_view', 'links']) + linksItems(obj);
 
     local safeGet(obj, path) =
       std.foldl(
@@ -4909,7 +5276,10 @@ local nodesLabelsLib =
       local n = self,
       _view:: {
         fragment: error 'view requires a fragment',
-        page: c.page { fragment:: n._view.fragment },
+        page: c.page {
+          fragment:: n._view.fragment,
+          breadcrumbs:: c.breadcrumbs { pathTemplate:: std.get($, '_pathTemplate', []), node:: $ },
+        },
         html: html.manifestHtml(self.page),
       },
     };
@@ -5524,9 +5894,12 @@ local nodesValuesLib =
           .deck {
             display: contents;
           }
+          .deck:has(.breadcrumbs),
           .deck:has(.card ~ .card),
           .deck:has(.list):has(.yaml) {
             display: inline-flex;
+            flex-direction: column;
+            align-items: flex-start;
             gap: 0.25em;
             border: 1px solid var(--border-color);
             border-radius: 0.5em;
@@ -5579,11 +5952,21 @@ local nodesValuesLib =
           (function () {
             if (typeof HTMLElement === 'undefined') return;
 
+            var GROUPS = [
+              { key: 'breadcrumbs', title: 'breadcrumbs' },
+              { key: 'links', title: 'links' },
+              { key: 'table', title: 'table' },
+            ];
+
             function scrapeItems() {
               var items = [];
+              document.querySelectorAll('.breadcrumbs a[href]').forEach(function (a) {
+                var text = a.textContent.trim();
+                if (text) items.push({ text: text, link: a.href, group: 'breadcrumbs' });
+              });
               document.querySelectorAll('.list a[href]').forEach(function (a) {
                 var text = a.textContent.trim();
-                if (text) items.push({ text: text, link: a.href });
+                if (text) items.push({ text: text, link: a.href, group: 'links' });
               });
               document.querySelectorAll('.table tbody tr').forEach(function (tr) {
                 var a = tr.querySelector('a[href]');
@@ -5592,7 +5975,7 @@ local nodesValuesLib =
                   .call(tr.querySelectorAll('td'), function (td) { return td.textContent.trim(); })
                   .filter(Boolean)
                   .join('  ');
-                if (text) items.push({ text: text, link: a.href });
+                if (text) items.push({ text: text, link: a.href, group: 'table' });
               });
               return items;
             }
@@ -5666,6 +6049,15 @@ local nodesValuesLib =
                 }
                 li.selected { background: var(--container-low-color); }
                 li.empty { opacity: 0.6; cursor: default; }
+                li.group {
+                  cursor: default;
+                  padding: 0.5em 0.5em 0.15em;
+                  opacity: 0.5;
+                  font-size: 0.85em;
+                  text-transform: uppercase;
+                  letter-spacing: 0.05em;
+                }
+                li.group:first-child { padding-top: 0.15em; }
               </style>
               <dialog part="modal">
                 <input type="text" autocomplete="off" spellcheck="false" placeholder="Jump to…" />
@@ -5682,6 +6074,7 @@ local nodesValuesLib =
                 this.results = this.shadowRoot.querySelector('ul');
                 this.items = [];
                 this.matches = [];
+                this.itemEls = [];
                 this.selected = 0;
 
                 this.input.addEventListener('input', function () {
@@ -5764,38 +6157,52 @@ local nodesValuesLib =
               }
 
               highlight() {
-                var lis = this.results.children;
-                for (var i = 0; i < lis.length; i++) {
+                for (var i = 0; i < this.itemEls.length; i++) {
                   var on = i === this.selected;
-                  lis[i].classList.toggle('selected', on);
-                  if (on) lis[i].scrollIntoView({ block: 'nearest' });
+                  this.itemEls[i].classList.toggle('selected', on);
+                  if (on) this.itemEls[i].scrollIntoView({ block: 'nearest' });
                 }
               }
 
               render() {
-                this.matches = rank(this.input.value.trim(), this.items);
+                var self = this;
+                var ranked = rank(this.input.value.trim(), this.items);
                 this.results.innerHTML = '';
+                this.matches = [];
+                this.itemEls = [];
+
+                GROUPS.forEach(function (group) {
+                  var groupItems = ranked.filter(function (m) { return m.group === group.key; });
+                  if (groupItems.length === 0) return;
+                  var header = document.createElement('li');
+                  header.className = 'group';
+                  header.textContent = group.title;
+                  self.results.appendChild(header);
+                  groupItems.forEach(function (match) {
+                    var index = self.matches.length;
+                    self.matches.push(match);
+                    var li = document.createElement('li');
+                    li.textContent = match.text;
+                    if (index === self.selected) li.classList.add('selected');
+                    li.addEventListener('mousemove', function () {
+                      self.selected = index;
+                      self.highlight();
+                    });
+                    li.addEventListener('click', function () {
+                      self.selected = index;
+                      self.choose();
+                    });
+                    self.results.appendChild(li);
+                    self.itemEls.push(li);
+                  });
+                });
+
                 if (this.matches.length === 0) {
                   var empty = document.createElement('li');
                   empty.className = 'empty';
                   empty.textContent = 'No matches';
                   this.results.appendChild(empty);
-                  return;
                 }
-                this.matches.forEach(function (match, i) {
-                  var li = document.createElement('li');
-                  li.textContent = match.text;
-                  if (i === this.selected) li.classList.add('selected');
-                  li.addEventListener('mousemove', function () {
-                    this.selected = i;
-                    this.highlight();
-                  }.bind(this));
-                  li.addEventListener('click', function () {
-                    this.selected = i;
-                    this.choose();
-                  }.bind(this));
-                  this.results.appendChild(li);
-                }.bind(this));
               }
             }
 
@@ -5806,6 +6213,7 @@ local nodesValuesLib =
         {
           local c = self,
           fragment:: error 'HtmlPage requires a fragment',
+          breadcrumbs:: { html: [] },
           html: [
             { doctype: 'html' },
             {
@@ -5821,7 +6229,7 @@ local nodesValuesLib =
                 {
                   element: 'body',
                   children: [
-                    { element: 'div', attributes: { class: 'deck' }, children: c.fragment },
+                    { element: 'div', attributes: { class: 'deck' }, children: [c.breadcrumbs, c.fragment] },
                     { element: 'quick-nav' },
                     { element: 'script', children: [{ html: navScript }] },
                   ],
@@ -6012,6 +6420,96 @@ local nodesValuesLib =
                  else []) + [yaml { data:: c.data }],
             },
           ],
+        },
+      breadcrumbs:
+        local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
+        local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
+
+        local style = |||
+          @scope (.breadcrumbs) {
+            :scope {
+              font-family: monospace;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 0.4em;
+              width: fit-content;
+              border: 1px solid var(--border-color);
+              border-radius: 0.5em;
+              padding: 0.5em 0.75em;
+            }
+            a {
+              color: var(--primary-color);
+              text-decoration: none;
+              border-radius: 0.5em;
+            }
+            a:hover {
+              text-decoration: underline;
+            }
+            a:focus {
+              outline: 2px solid var(--primary-color);
+              outline-offset: 2px;
+            }
+            .key {
+              opacity: 0.55;
+            }
+            .sep {
+              opacity: 0.4;
+            }
+            .current {
+              color: var(--on-background-color);
+            }
+          }
+        |||;
+
+        local crumbInner = {
+          local c = self,
+          name:: null,
+          value:: error 'crumbInner requires value',
+          html:
+            if c.name == null then [c.value]
+            else [{ element: 'span', attributes: { class: 'key' }, children: [c.name + '/'] }, c.value],
+        };
+
+        {
+          local c = self,
+          pathTemplate:: [],
+          node:: {},
+          local crumbs =
+            std.foldl(
+              function(acc, seg)
+                local entry =
+                  if isVar(seg) then
+                    local v = varName(seg);
+                    local val = std.toString(std.get(c.node, v, ''));
+                    { url: acc.url + '/' + v + '/' + val, name: v, value: val }
+                  else
+                    { url: acc.url + '/' + seg, name: null, value: seg };
+                {
+                  url: entry.url,
+                  crumbs: acc.crumbs + [{ name: entry.name, value: entry.value, queryPath: entry.url }],
+                },
+              c.pathTemplate,
+              { url: '/root', crumbs: [{ name: null, value: 'root', queryPath: '/root' }] }
+            ).crumbs,
+          html:
+            if std.length(c.pathTemplate) == 0 then []
+            else [
+              { element: 'style', children: [style] },
+              {
+                element: 'nav',
+                attributes: { class: 'breadcrumbs' },
+                children: std.flattenArrays([
+                  (if i > 0 then [{ element: 'span', attributes: { class: 'sep' }, children: ['›'] }] else []) +
+                  [
+                    if i == std.length(crumbs) - 1
+                    then { element: 'span', attributes: { class: 'current' }, children: [crumbInner { name:: crumbs[i].name, value:: crumbs[i].value }] }
+                    else { element: 'a', attributes: { href: crumbs[i].queryPath }, children: [crumbInner { name:: crumbs[i].name, value:: crumbs[i].value }] },
+                  ]
+                  for i in std.range(0, std.length(crumbs) - 1)
+                ]),
+              },
+            ],
         },
     };
     local html = {
@@ -6213,16 +6711,6 @@ local nodesValuesLib =
     local isNode(value) =
       std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');
 
-    local directNeighbors(obj, exclude=[]) =
-      std.flatMap(
-        function(k)
-          if std.member(exclude, k) || std.substr(k, 0, 1) == '_' then []
-          else
-            local value = obj[k];
-            if isNode(value) then [{ link: value._queryPath, text: k }] else [],
-        std.objectFields(obj)
-      );
-
     local linksItems(obj) =
       local links = std.get(obj, 'links', {});
       if std.type(links) != 'object' then []
@@ -6246,7 +6734,7 @@ local nodesValuesLib =
         std.objectFields(links)
       );
 
-    local neighborItems(obj) = directNeighbors(obj, exclude=['data', '_view', 'links']) + linksItems(obj);
+    local neighborItems(obj) = collectNeighbors(obj, '', ['data', '_view', 'links']) + linksItems(obj);
 
     local safeGet(obj, path) =
       std.foldl(
@@ -6260,7 +6748,10 @@ local nodesValuesLib =
       local n = self,
       _view:: {
         fragment: error 'view requires a fragment',
-        page: c.page { fragment:: n._view.fragment },
+        page: c.page {
+          fragment:: n._view.fragment,
+          breadcrumbs:: c.breadcrumbs { pathTemplate:: std.get($, '_pathTemplate', []), node:: $ },
+        },
         html: html.manifestHtml(self.page),
       },
     };
@@ -7365,9 +7856,12 @@ local nodesDashboardLib =
           .deck {
             display: contents;
           }
+          .deck:has(.breadcrumbs),
           .deck:has(.card ~ .card),
           .deck:has(.list):has(.yaml) {
             display: inline-flex;
+            flex-direction: column;
+            align-items: flex-start;
             gap: 0.25em;
             border: 1px solid var(--border-color);
             border-radius: 0.5em;
@@ -7420,11 +7914,21 @@ local nodesDashboardLib =
           (function () {
             if (typeof HTMLElement === 'undefined') return;
 
+            var GROUPS = [
+              { key: 'breadcrumbs', title: 'breadcrumbs' },
+              { key: 'links', title: 'links' },
+              { key: 'table', title: 'table' },
+            ];
+
             function scrapeItems() {
               var items = [];
+              document.querySelectorAll('.breadcrumbs a[href]').forEach(function (a) {
+                var text = a.textContent.trim();
+                if (text) items.push({ text: text, link: a.href, group: 'breadcrumbs' });
+              });
               document.querySelectorAll('.list a[href]').forEach(function (a) {
                 var text = a.textContent.trim();
-                if (text) items.push({ text: text, link: a.href });
+                if (text) items.push({ text: text, link: a.href, group: 'links' });
               });
               document.querySelectorAll('.table tbody tr').forEach(function (tr) {
                 var a = tr.querySelector('a[href]');
@@ -7433,7 +7937,7 @@ local nodesDashboardLib =
                   .call(tr.querySelectorAll('td'), function (td) { return td.textContent.trim(); })
                   .filter(Boolean)
                   .join('  ');
-                if (text) items.push({ text: text, link: a.href });
+                if (text) items.push({ text: text, link: a.href, group: 'table' });
               });
               return items;
             }
@@ -7507,6 +8011,15 @@ local nodesDashboardLib =
                 }
                 li.selected { background: var(--container-low-color); }
                 li.empty { opacity: 0.6; cursor: default; }
+                li.group {
+                  cursor: default;
+                  padding: 0.5em 0.5em 0.15em;
+                  opacity: 0.5;
+                  font-size: 0.85em;
+                  text-transform: uppercase;
+                  letter-spacing: 0.05em;
+                }
+                li.group:first-child { padding-top: 0.15em; }
               </style>
               <dialog part="modal">
                 <input type="text" autocomplete="off" spellcheck="false" placeholder="Jump to…" />
@@ -7523,6 +8036,7 @@ local nodesDashboardLib =
                 this.results = this.shadowRoot.querySelector('ul');
                 this.items = [];
                 this.matches = [];
+                this.itemEls = [];
                 this.selected = 0;
 
                 this.input.addEventListener('input', function () {
@@ -7605,38 +8119,52 @@ local nodesDashboardLib =
               }
 
               highlight() {
-                var lis = this.results.children;
-                for (var i = 0; i < lis.length; i++) {
+                for (var i = 0; i < this.itemEls.length; i++) {
                   var on = i === this.selected;
-                  lis[i].classList.toggle('selected', on);
-                  if (on) lis[i].scrollIntoView({ block: 'nearest' });
+                  this.itemEls[i].classList.toggle('selected', on);
+                  if (on) this.itemEls[i].scrollIntoView({ block: 'nearest' });
                 }
               }
 
               render() {
-                this.matches = rank(this.input.value.trim(), this.items);
+                var self = this;
+                var ranked = rank(this.input.value.trim(), this.items);
                 this.results.innerHTML = '';
+                this.matches = [];
+                this.itemEls = [];
+
+                GROUPS.forEach(function (group) {
+                  var groupItems = ranked.filter(function (m) { return m.group === group.key; });
+                  if (groupItems.length === 0) return;
+                  var header = document.createElement('li');
+                  header.className = 'group';
+                  header.textContent = group.title;
+                  self.results.appendChild(header);
+                  groupItems.forEach(function (match) {
+                    var index = self.matches.length;
+                    self.matches.push(match);
+                    var li = document.createElement('li');
+                    li.textContent = match.text;
+                    if (index === self.selected) li.classList.add('selected');
+                    li.addEventListener('mousemove', function () {
+                      self.selected = index;
+                      self.highlight();
+                    });
+                    li.addEventListener('click', function () {
+                      self.selected = index;
+                      self.choose();
+                    });
+                    self.results.appendChild(li);
+                    self.itemEls.push(li);
+                  });
+                });
+
                 if (this.matches.length === 0) {
                   var empty = document.createElement('li');
                   empty.className = 'empty';
                   empty.textContent = 'No matches';
                   this.results.appendChild(empty);
-                  return;
                 }
-                this.matches.forEach(function (match, i) {
-                  var li = document.createElement('li');
-                  li.textContent = match.text;
-                  if (i === this.selected) li.classList.add('selected');
-                  li.addEventListener('mousemove', function () {
-                    this.selected = i;
-                    this.highlight();
-                  }.bind(this));
-                  li.addEventListener('click', function () {
-                    this.selected = i;
-                    this.choose();
-                  }.bind(this));
-                  this.results.appendChild(li);
-                }.bind(this));
               }
             }
 
@@ -7647,6 +8175,7 @@ local nodesDashboardLib =
         {
           local c = self,
           fragment:: error 'HtmlPage requires a fragment',
+          breadcrumbs:: { html: [] },
           html: [
             { doctype: 'html' },
             {
@@ -7662,7 +8191,7 @@ local nodesDashboardLib =
                 {
                   element: 'body',
                   children: [
-                    { element: 'div', attributes: { class: 'deck' }, children: c.fragment },
+                    { element: 'div', attributes: { class: 'deck' }, children: [c.breadcrumbs, c.fragment] },
                     { element: 'quick-nav' },
                     { element: 'script', children: [{ html: navScript }] },
                   ],
@@ -7853,6 +8382,96 @@ local nodesDashboardLib =
                  else []) + [yaml { data:: c.data }],
             },
           ],
+        },
+      breadcrumbs:
+        local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
+        local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
+
+        local style = |||
+          @scope (.breadcrumbs) {
+            :scope {
+              font-family: monospace;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 0.4em;
+              width: fit-content;
+              border: 1px solid var(--border-color);
+              border-radius: 0.5em;
+              padding: 0.5em 0.75em;
+            }
+            a {
+              color: var(--primary-color);
+              text-decoration: none;
+              border-radius: 0.5em;
+            }
+            a:hover {
+              text-decoration: underline;
+            }
+            a:focus {
+              outline: 2px solid var(--primary-color);
+              outline-offset: 2px;
+            }
+            .key {
+              opacity: 0.55;
+            }
+            .sep {
+              opacity: 0.4;
+            }
+            .current {
+              color: var(--on-background-color);
+            }
+          }
+        |||;
+
+        local crumbInner = {
+          local c = self,
+          name:: null,
+          value:: error 'crumbInner requires value',
+          html:
+            if c.name == null then [c.value]
+            else [{ element: 'span', attributes: { class: 'key' }, children: [c.name + '/'] }, c.value],
+        };
+
+        {
+          local c = self,
+          pathTemplate:: [],
+          node:: {},
+          local crumbs =
+            std.foldl(
+              function(acc, seg)
+                local entry =
+                  if isVar(seg) then
+                    local v = varName(seg);
+                    local val = std.toString(std.get(c.node, v, ''));
+                    { url: acc.url + '/' + v + '/' + val, name: v, value: val }
+                  else
+                    { url: acc.url + '/' + seg, name: null, value: seg };
+                {
+                  url: entry.url,
+                  crumbs: acc.crumbs + [{ name: entry.name, value: entry.value, queryPath: entry.url }],
+                },
+              c.pathTemplate,
+              { url: '/root', crumbs: [{ name: null, value: 'root', queryPath: '/root' }] }
+            ).crumbs,
+          html:
+            if std.length(c.pathTemplate) == 0 then []
+            else [
+              { element: 'style', children: [style] },
+              {
+                element: 'nav',
+                attributes: { class: 'breadcrumbs' },
+                children: std.flattenArrays([
+                  (if i > 0 then [{ element: 'span', attributes: { class: 'sep' }, children: ['›'] }] else []) +
+                  [
+                    if i == std.length(crumbs) - 1
+                    then { element: 'span', attributes: { class: 'current' }, children: [crumbInner { name:: crumbs[i].name, value:: crumbs[i].value }] }
+                    else { element: 'a', attributes: { href: crumbs[i].queryPath }, children: [crumbInner { name:: crumbs[i].name, value:: crumbs[i].value }] },
+                  ]
+                  for i in std.range(0, std.length(crumbs) - 1)
+                ]),
+              },
+            ],
         },
     };
     local html = {
