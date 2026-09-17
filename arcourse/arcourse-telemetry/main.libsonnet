@@ -1,7 +1,8 @@
 local time = {
   now(): std.native('invoke:time')('now', []),
   addDuration(epochMs, spec): std.native('invoke:time')('addDuration', [epochMs, spec]),
-  parseRFC3339(value): std.native('invoke:time')('parseRFC3339', [value]),
+  parse(value, layout): std.native('invoke:time')('parse', [value, layout]),
+  format(epochMs, layout): std.native('invoke:time')('format', [epochMs, layout]),
 };
 local telemetry = {
   query(items): std.native('invoke:telemetry')('query', [items]),
@@ -413,12 +414,13 @@ local timeRange =
   };
 
 local queryLib = function(time, telemetry)
+  local rfc3339 = '2006-01-02T15:04:05Z07:00';
   local resolveTime(nowMs, value) =
     if value == 'now' then std.toString(nowMs)
     else if std.length(value) > 3 && std.substr(value, 0, 3) == 'now' then
       std.toString(time.addDuration(nowMs, std.substr(value, 3, std.length(value) - 3)))
     else
-      std.toString(time.parseRFC3339(value));
+      std.toString(time.parse(value, rfc3339));
 
   function(datasource, items, from='now-1h', to='now')
     local nowMs = time.now();
@@ -456,21 +458,61 @@ local browseLib = function(query)
 local nodesChartLib =
   local a =
     local c = {
-      chart:
-        local style = |||
-          @scope (.chart) {
-            :scope {
-              width: 100%;
-              box-sizing: border-box;
-            }
-          }
-        |||;
-
-        {
+      chart: {
+        local c = self,
+        option:: error 'Chart requires option',
+        links:: {},
+        width:: '100%',
+        height:: '400px',
+        darkTheme:: {
+          color: ['#4c657e', '#856350', '#677d67', '#78607b', '#44756f', '#84734c', '#546a78', '#774b4b'],
+          backgroundColor: 'transparent',
+          textStyle: { color: '#ccc' },
+          title: { textStyle: { color: '#ccc' }, subtextStyle: { color: '#999' } },
+          legend: { textStyle: { color: '#ccc' } },
+          tooltip: { backgroundColor: '#333', borderColor: '#555', textStyle: { color: '#ccc' } },
+          grid: { borderColor: '#444' },
+          categoryAxis: {
+            axisLine: { lineStyle: { color: '#666' } },
+            axisLabel: { color: '#ccc' },
+            splitLine: { lineStyle: { color: ['#333'] } },
+          },
+          valueAxis: {
+            axisLine: { lineStyle: { color: '#666' } },
+            axisLabel: { color: '#ccc' },
+            splitLine: { lineStyle: { color: ['#333'] } },
+          },
+          pie: {
+            itemStyle: { borderColor: 'transparent' },
+            label: { color: '#ccc', textBorderColor: 'transparent', textBorderWidth: 0 },
+            labelLine: { lineStyle: { color: '#666' } },
+          },
+        },
+        local payload = {
+          option: { animation: false, backgroundColor: 'transparent' } + c.option,
+          theme: c.darkTheme,
+          links: c.links,
+        },
+        local configJson = std.strReplace(std.manifestJsonMinified(payload), '<', '\\u003c'),
+        html: [
+          {
+            element: 'echarts-chart',
+            attributes: { style: 'display: block; box-sizing: border-box; width: %s; height: %s;' % [c.width, c.height] },
+            children: [
+              {
+                element: 'script',
+                attributes: { type: 'application/json', class: 'echarts-config' },
+                children: [{ html: configJson }],
+              },
+            ],
+          },
+        ],
+      },
+      dashboard:
+        local chart = {
           local c = self,
           option:: error 'Chart requires option',
           links:: {},
-          id:: 'chart',
           width:: '100%',
           height:: '400px',
           darkTheme:: {
@@ -497,352 +539,26 @@ local nodesChartLib =
               labelLine: { lineStyle: { color: '#666' } },
             },
           },
+          local payload = {
+            option: { animation: false, backgroundColor: 'transparent' } + c.option,
+            theme: c.darkTheme,
+            links: c.links,
+          },
+          local configJson = std.strReplace(std.manifestJsonMinified(payload), '<', '\\u003c'),
           html: [
-            { element: 'style', children: [style] },
             {
-              element: 'div',
-              attributes: { class: 'chart' },
+              element: 'echarts-chart',
+              attributes: { style: 'display: block; box-sizing: border-box; width: %s; height: %s;' % [c.width, c.height] },
               children: [
                 {
-                  element: 'div',
-                  attributes: { id: c.id, style: 'width: %s; height: %s;' % [c.width, c.height] },
-                },
-                {
                   element: 'script',
-                  children: [
-                    {
-                      html: |||
-                        (function () {
-                          function init() {
-                            var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                            var chart = echarts.init(document.getElementById('%s'), dark ? %s : null);
-                            var option = %s;
-                            option.tooltip = Object.assign({}, option.tooltip, { trigger: 'item' });
-
-                            option.brush = {
-                              xAxisIndex: 'all',
-                              brushStyle: {
-                                color: 'rgba(255, 255, 255, 0.08)',
-                                borderWidth: 0,
-                              },
-                            };
-                            option.toolbox = { show: false };
-
-                            chart.setOption(option);
-                            window.addEventListener('resize', function () { chart.resize(); });
-
-                            chart.dispatchAction({
-                              type: 'takeGlobalCursor',
-                              key: 'brush',
-                              brushOption: { brushType: 'lineX', brushMode: 'single' },
-                            });
-                            // Drag-select a horizontal range to navigate to it as an
-                            // absolute time range, mirroring Grafana's chart-drag zoom.
-                            // brushSelected fires continuously while dragging, so it
-                            // only tracks the pending range - navigation happens once,
-                            // on mouseup, so it doesn't fire mid-drag.
-                            var pendingRange = null;
-                            chart.on('brushSelected', function (params) {
-                              var batch = params.batch && params.batch[0];
-                              var area = batch && batch.areas && batch.areas[0];
-                              pendingRange = area && area.coordRange;
-                            });
-                            chart.getZr().on('mouseup', function () {
-                              if (!pendingRange) return;
-                              var range = pendingRange;
-                              pendingRange = null;
-                              var from = new Date(Math.min(range[0], range[1])).toISOString();
-                              var to = new Date(Math.max(range[0], range[1])).toISOString();
-                              var url = new URL(window.location.href);
-                              url.searchParams.set('from', from);
-                              url.searchParams.set('to', to);
-                              window.location.href = url.toString();
-                            });
-
-                            var links = %s;
-                            // Click: toggle. Cmd/ctrl+click: toggle all (isolate this
-                            // one / restore all). Shift+click: open link, same tab.
-                            // Shift+cmd/ctrl+click: open link, new tab.
-                            var shiftKey = false;
-                            var cmdKey = false;
-                            var prevSelected = {};
-                            var suppress = false;
-                            // Tracked ourselves instead of read from chart.getOption(),
-                            // since ECharts only lazily populates legend[0].selected
-                            // once the user has interacted with the legend at least once.
-                            var currentSelected = {};
-                            (option.legend.data || []).forEach(function (entry) {
-                              currentSelected[typeof entry === 'string' ? entry : entry.name] = true;
-                            });
-                            chart.getZr().on('mousedown', function (e) {
-                              var ev = e.event;
-                              shiftKey = !!(ev && ev.shiftKey);
-                              cmdKey = !!(ev && (ev.ctrlKey || ev.metaKey));
-                              prevSelected = Object.assign({}, currentSelected);
-                            });
-                            chart.on('legendselectchanged', function (params) {
-                              Object.assign(currentSelected, params.selected);
-                              if (suppress) return;
-
-                              function revertToggle() {
-                                var toRestore = Object.assign({}, prevSelected);
-                                suppress = true;
-                                chart.setOption({ legend: { selected: toRestore } });
-                                currentSelected = Object.assign({}, toRestore);
-                                suppress = false;
-                              }
-
-                              if (shiftKey) {
-                                if (links[params.name]) {
-                                  revertToggle();
-                                  if (cmdKey) window.open(links[params.name], '_blank');
-                                  else window.location.href = links[params.name];
-                                } else {
-                                  revertToggle();
-                                }
-                                return;
-                              }
-
-                              if (cmdKey) {
-                                var names = Object.keys(prevSelected);
-                                var wasOnlyThisSelected = names.every(function (name) {
-                                  return name === params.name ? prevSelected[name] : !prevSelected[name];
-                                });
-                                var toApply = {};
-                                if (wasOnlyThisSelected) {
-                                  names.forEach(function (name) { toApply[name] = true; });
-                                } else {
-                                  names.forEach(function (name) { toApply[name] = name === params.name; });
-                                }
-                                suppress = true;
-                                chart.setOption({ legend: { selected: toApply } });
-                                currentSelected = Object.assign({}, toApply);
-                                suppress = false;
-                                return;
-                              }
-                            });
-
-                            // Shift/shift+cmd on a data point mirrors the legend's
-                            // link-opening behavior (same tab / new tab); plain and
-                            // cmd-only clicks on items are left alone.
-                            chart.on('click', function (params) {
-                              if (params.componentType !== 'series' || !shiftKey) return;
-                              var link = links[params.seriesName];
-                              if (!link) return;
-                              if (cmdKey) window.open(link, '_blank');
-                              else window.location.href = link;
-                            });
-                          }
-                          if (document.readyState === 'complete') init();
-                          else window.addEventListener('load', init);
-                        })();
-                      ||| % [
-                        c.id,
-                        std.manifestJsonMinified(c.darkTheme),
-                        std.manifestJsonMinified({ animation: false, backgroundColor: 'transparent' } + c.option),
-                        std.manifestJsonMinified(c.links),
-                      ],
-                    },
-                  ],
+                  attributes: { type: 'application/json', class: 'echarts-config' },
+                  children: [{ html: configJson }],
                 },
               ],
             },
           ],
-        },
-      dashboard:
-        local chart =
-          local style = |||
-            @scope (.chart) {
-              :scope {
-                width: 100%;
-                box-sizing: border-box;
-              }
-            }
-          |||;
-
-          {
-            local c = self,
-            option:: error 'Chart requires option',
-            links:: {},
-            id:: 'chart',
-            width:: '100%',
-            height:: '400px',
-            darkTheme:: {
-              color: ['#4c657e', '#856350', '#677d67', '#78607b', '#44756f', '#84734c', '#546a78', '#774b4b'],
-              backgroundColor: 'transparent',
-              textStyle: { color: '#ccc' },
-              title: { textStyle: { color: '#ccc' }, subtextStyle: { color: '#999' } },
-              legend: { textStyle: { color: '#ccc' } },
-              tooltip: { backgroundColor: '#333', borderColor: '#555', textStyle: { color: '#ccc' } },
-              grid: { borderColor: '#444' },
-              categoryAxis: {
-                axisLine: { lineStyle: { color: '#666' } },
-                axisLabel: { color: '#ccc' },
-                splitLine: { lineStyle: { color: ['#333'] } },
-              },
-              valueAxis: {
-                axisLine: { lineStyle: { color: '#666' } },
-                axisLabel: { color: '#ccc' },
-                splitLine: { lineStyle: { color: ['#333'] } },
-              },
-              pie: {
-                itemStyle: { borderColor: 'transparent' },
-                label: { color: '#ccc', textBorderColor: 'transparent', textBorderWidth: 0 },
-                labelLine: { lineStyle: { color: '#666' } },
-              },
-            },
-            html: [
-              { element: 'style', children: [style] },
-              {
-                element: 'div',
-                attributes: { class: 'chart' },
-                children: [
-                  {
-                    element: 'div',
-                    attributes: { id: c.id, style: 'width: %s; height: %s;' % [c.width, c.height] },
-                  },
-                  {
-                    element: 'script',
-                    children: [
-                      {
-                        html: |||
-                          (function () {
-                            function init() {
-                              var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                              var chart = echarts.init(document.getElementById('%s'), dark ? %s : null);
-                              var option = %s;
-                              option.tooltip = Object.assign({}, option.tooltip, { trigger: 'item' });
-
-                              option.brush = {
-                                xAxisIndex: 'all',
-                                brushStyle: {
-                                  color: 'rgba(255, 255, 255, 0.08)',
-                                  borderWidth: 0,
-                                },
-                              };
-                              option.toolbox = { show: false };
-
-                              chart.setOption(option);
-                              window.addEventListener('resize', function () { chart.resize(); });
-
-                              chart.dispatchAction({
-                                type: 'takeGlobalCursor',
-                                key: 'brush',
-                                brushOption: { brushType: 'lineX', brushMode: 'single' },
-                              });
-                              // Drag-select a horizontal range to navigate to it as an
-                              // absolute time range, mirroring Grafana's chart-drag zoom.
-                              // brushSelected fires continuously while dragging, so it
-                              // only tracks the pending range - navigation happens once,
-                              // on mouseup, so it doesn't fire mid-drag.
-                              var pendingRange = null;
-                              chart.on('brushSelected', function (params) {
-                                var batch = params.batch && params.batch[0];
-                                var area = batch && batch.areas && batch.areas[0];
-                                pendingRange = area && area.coordRange;
-                              });
-                              chart.getZr().on('mouseup', function () {
-                                if (!pendingRange) return;
-                                var range = pendingRange;
-                                pendingRange = null;
-                                var from = new Date(Math.min(range[0], range[1])).toISOString();
-                                var to = new Date(Math.max(range[0], range[1])).toISOString();
-                                var url = new URL(window.location.href);
-                                url.searchParams.set('from', from);
-                                url.searchParams.set('to', to);
-                                window.location.href = url.toString();
-                              });
-
-                              var links = %s;
-                              // Click: toggle. Cmd/ctrl+click: toggle all (isolate this
-                              // one / restore all). Shift+click: open link, same tab.
-                              // Shift+cmd/ctrl+click: open link, new tab.
-                              var shiftKey = false;
-                              var cmdKey = false;
-                              var prevSelected = {};
-                              var suppress = false;
-                              // Tracked ourselves instead of read from chart.getOption(),
-                              // since ECharts only lazily populates legend[0].selected
-                              // once the user has interacted with the legend at least once.
-                              var currentSelected = {};
-                              (option.legend.data || []).forEach(function (entry) {
-                                currentSelected[typeof entry === 'string' ? entry : entry.name] = true;
-                              });
-                              chart.getZr().on('mousedown', function (e) {
-                                var ev = e.event;
-                                shiftKey = !!(ev && ev.shiftKey);
-                                cmdKey = !!(ev && (ev.ctrlKey || ev.metaKey));
-                                prevSelected = Object.assign({}, currentSelected);
-                              });
-                              chart.on('legendselectchanged', function (params) {
-                                Object.assign(currentSelected, params.selected);
-                                if (suppress) return;
-
-                                function revertToggle() {
-                                  var toRestore = Object.assign({}, prevSelected);
-                                  suppress = true;
-                                  chart.setOption({ legend: { selected: toRestore } });
-                                  currentSelected = Object.assign({}, toRestore);
-                                  suppress = false;
-                                }
-
-                                if (shiftKey) {
-                                  if (links[params.name]) {
-                                    revertToggle();
-                                    if (cmdKey) window.open(links[params.name], '_blank');
-                                    else window.location.href = links[params.name];
-                                  } else {
-                                    revertToggle();
-                                  }
-                                  return;
-                                }
-
-                                if (cmdKey) {
-                                  var names = Object.keys(prevSelected);
-                                  var wasOnlyThisSelected = names.every(function (name) {
-                                    return name === params.name ? prevSelected[name] : !prevSelected[name];
-                                  });
-                                  var toApply = {};
-                                  if (wasOnlyThisSelected) {
-                                    names.forEach(function (name) { toApply[name] = true; });
-                                  } else {
-                                    names.forEach(function (name) { toApply[name] = name === params.name; });
-                                  }
-                                  suppress = true;
-                                  chart.setOption({ legend: { selected: toApply } });
-                                  currentSelected = Object.assign({}, toApply);
-                                  suppress = false;
-                                  return;
-                                }
-                              });
-
-                              // Shift/shift+cmd on a data point mirrors the legend's
-                              // link-opening behavior (same tab / new tab); plain and
-                              // cmd-only clicks on items are left alone.
-                              chart.on('click', function (params) {
-                                if (params.componentType !== 'series' || !shiftKey) return;
-                                var link = links[params.seriesName];
-                                if (!link) return;
-                                if (cmdKey) window.open(link, '_blank');
-                                else window.location.href = link;
-                              });
-                            }
-                            if (document.readyState === 'complete') init();
-                            else window.addEventListener('load', init);
-                          })();
-                        ||| % [
-                          c.id,
-                          std.manifestJsonMinified(c.darkTheme),
-                          std.manifestJsonMinified({ animation: false, backgroundColor: 'transparent' } + c.option),
-                          std.manifestJsonMinified(c.links),
-                        ],
-                      },
-                    ],
-                  },
-                ],
-              },
-            ],
-          };
+        };
 
         local style = |||
           @scope (.dashboard) {
@@ -873,7 +589,6 @@ local nodesChartLib =
         local layoutNode = {
           local c = self,
           node:: error 'LayoutNode requires node',
-          path:: [],
           html::
             if c.node.type == 'panel' then
               {
@@ -883,7 +598,6 @@ local nodesChartLib =
                   chart {
                     option:: c.node.chart.option,
                     links:: c.node.chart.links,
-                    id:: 'chart-' + std.join('-', [std.toString(p) for p in c.path]),
                     width:: '100%',
                     height:: '100%',
                   },
@@ -897,7 +611,7 @@ local nodesChartLib =
                   style: 'flex: %s 1 0%%; flex-direction: %s;' % [c.node.flex, direction(c.node)],
                 },
                 children: [
-                  (layoutNode { node:: c.node.children[i], path:: c.path + [i] }).html
+                  (layoutNode { node:: c.node.children[i] }).html
                   for i in std.range(0, std.length(c.node.children) - 1)
                 ],
               },
@@ -916,7 +630,7 @@ local nodesChartLib =
                 style: 'flex-direction: %s; height: %s;' % [direction(c.layout), c.height],
               },
               children: [
-                (layoutNode { node:: c.layout.children[i], path:: [i] }).html
+                (layoutNode { node:: c.layout.children[i] }).html
                 for i in std.range(0, std.length(c.layout.children) - 1)
               ],
             },
@@ -2116,17 +1830,204 @@ local nodesChartLib =
     local html = {
       manifestHtml(tree): std.native('invoke:html')('manifestHtml', [tree]),
     };
+    local charts =
+      local line =
+        local common =
+          local round(v, decimals) =
+            if v == null || decimals == null then v
+            else
+              local factor = std.pow(10, decimals);
+              std.round(v * factor) / factor;
+
+          local siPrefixes = [
+            { factor: 1e12, suffix: 'TB' },
+            { factor: 1e9, suffix: 'GB' },
+            { factor: 1e6, suffix: 'MB' },
+            { factor: 1e3, suffix: 'KB' },
+            { factor: 1, suffix: 'B' },
+          ];
+
+          local maxAbsValue(series) =
+            std.foldl(
+              function(acc, s) std.foldl(
+                function(acc2, point) if point[1] == null then acc2 else std.max(acc2, std.abs(point[1])),
+                s.data,
+                acc
+              ),
+              series,
+              0
+            );
+
+          local siScale(maxAbs) =
+            local matches = [p for p in siPrefixes if maxAbs >= p.factor];
+            if std.length(matches) > 0 then matches[0] else siPrefixes[std.length(siPrefixes) - 1];
+
+          local scaleSeries(series, factor, decimals) = [
+            s { data: [[point[0], round(if point[1] == null then null else point[1] / factor, decimals)] for point in s.data] }
+            for s in series
+          ];
+
+          {
+            timeAxis: {
+              type: 'time',
+              axisLabel: {
+                formatter: {
+                  year: '{yyyy}',
+                  month: '{MMM}',
+                  day: '{MMM} {d}',
+                  hour: '{HH}:{mm}',
+                  minute: '{HH}:{mm}',
+                  second: '{HH}:{mm}:{ss}',
+                  none: '{yyyy}-{MM}-{dd}',
+                },
+              },
+            },
+            round: round,
+            maxAbsValue: maxAbsValue,
+            siScale: siScale,
+            scaleSeries: scaleSeries,
+          };
+
+        {
+          local c = self,
+          title:: null,
+          series:: [],
+          unit:: null,
+          decimals:: 2,
+          option::
+            local styled = [
+              s { type: 'line', showSymbol: true, symbolSize: 16, itemStyle: { opacity: 0 } }
+              for s in c.series
+            ];
+            local scale = if c.unit == 'bytes' then common.siScale(common.maxAbsValue(styled)) else { factor: 1, suffix: null };
+            local allSeries = common.scaleSeries(styled, scale.factor, c.decimals);
+            {
+              title: { text: c.title },
+              tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'cross', z: 100, lineStyle: { color: '#888', type: 'dashed' } },
+              },
+              legend: {
+                data: [{ name: s.name, itemStyle: { opacity: 1 } } for s in allSeries],
+                type: 'scroll',
+                bottom: 0,
+                icon: 'roundRect',
+              },
+              grid: { top: 40, bottom: 40, containLabel: true },
+              xAxis: common.timeAxis,
+              yAxis: { type: 'value' } + (
+                if scale.suffix != null then { axisLabel: { formatter: '{value} ' + scale.suffix } } else {}
+              ),
+              series: allSeries,
+            },
+        };
+      local stateTimeline =
+        local common =
+          local round(v, decimals) =
+            if v == null || decimals == null then v
+            else
+              local factor = std.pow(10, decimals);
+              std.round(v * factor) / factor;
+
+          local siPrefixes = [
+            { factor: 1e12, suffix: 'TB' },
+            { factor: 1e9, suffix: 'GB' },
+            { factor: 1e6, suffix: 'MB' },
+            { factor: 1e3, suffix: 'KB' },
+            { factor: 1, suffix: 'B' },
+          ];
+
+          local maxAbsValue(series) =
+            std.foldl(
+              function(acc, s) std.foldl(
+                function(acc2, point) if point[1] == null then acc2 else std.max(acc2, std.abs(point[1])),
+                s.data,
+                acc
+              ),
+              series,
+              0
+            );
+
+          local siScale(maxAbs) =
+            local matches = [p for p in siPrefixes if maxAbs >= p.factor];
+            if std.length(matches) > 0 then matches[0] else siPrefixes[std.length(siPrefixes) - 1];
+
+          local scaleSeries(series, factor, decimals) = [
+            s { data: [[point[0], round(if point[1] == null then null else point[1] / factor, decimals)] for point in s.data] }
+            for s in series
+          ];
+
+          {
+            timeAxis: {
+              type: 'time',
+              axisLabel: {
+                formatter: {
+                  year: '{yyyy}',
+                  month: '{MMM}',
+                  day: '{MMM} {d}',
+                  hour: '{HH}:{mm}',
+                  minute: '{HH}:{mm}',
+                  second: '{HH}:{mm}:{ss}',
+                  none: '{yyyy}-{MM}-{dd}',
+                },
+              },
+            },
+            round: round,
+            maxAbsValue: maxAbsValue,
+            siScale: siScale,
+            scaleSeries: scaleSeries,
+          };
+
+        {
+          local c = self,
+          title:: null,
+          rows:: [],
+          segments:: [],
+          option::
+            local rowIndex = { [c.rows[i]]: i for i in std.range(0, std.length(c.rows) - 1) };
+            {
+              title: { text: c.title },
+              tooltip: { trigger: 'item', formatter: '{b}' },
+              grid: { top: 40, bottom: 40, containLabel: true },
+              xAxis: common.timeAxis,
+              yAxis: { type: 'category', data: c.rows },
+              series: [{
+                type: 'custom',
+                renderItem: 'stateTimeline',
+                encode: { x: [1, 2], y: 0 },
+                data: [
+                  { value: [rowIndex[s.row], s.start, s.end, std.get(s, 'label', null)] }
+                  + (if std.get(s, 'color', null) != null then { itemStyle: { color: s.color } } else {})
+                  + (if std.get(s, 'link', null) != null then { link: s.link } else {})
+                  + (local nm = if std.get(s, 'tooltip', null) != null then s.tooltip else std.get(s, 'label', null); if nm != null then { name: nm } else {})
+                  for s in c.segments
+                ],
+              }],
+            },
+        };
+
+      {
+        line: { chart: line },
+        stateTimeline: { chart: stateTimeline },
+      };
 
     local echartsSrc = 'https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js';
     local echartsScript = { element: 'script', attributes: { src: echartsSrc } };
+    local componentScript = { element: 'script', children: [{ html: importstr 'components/chart.js' }] };
 
     local baseView = {
       local n = self,
       _view:: {
         fragment: error 'view requires a fragment',
-        page: ui.page { fragment:: [echartsScript, n._view.fragment] },
+        page: ui.page { fragment:: [echartsScript, componentScript, n._view.fragment] },
         html: html.manifestHtml(self.page),
       },
+    };
+
+    local linkPaths(links) = {
+      [k]: links[k]._queryPath
+      for k in std.objectFields(links)
+      if std.isObject(links[k]) && std.objectHasAll(links[k], '_queryPath')
     };
 
     local chartView = baseView {
@@ -2135,8 +2036,7 @@ local nodesChartLib =
           c.panel {
             child:: c.chart {
               option:: $.option,
-              links:: std.get($, 'links', {}),
-              id:: std.get($, 'chartId', 'chart'),
+              links:: linkPaths(std.get($, 'links', {})),
               width:: std.get($, 'width', '100%'),
               height:: std.get($, 'height', '400px'),
             },
@@ -2163,43 +2063,15 @@ local nodesChartLib =
       row(flex, children):: { type: 'row', flex: flex, children: children },
       column(flex, children):: { type: 'column', flex: flex, children: children },
       panel(flex, chart):: { type: 'panel', flex: flex, chart: chart },
-    };
+    } + charts;
+  local time = {
+    now(): std.native('invoke:time')('now', []),
+    addDuration(epochMs, spec): std.native('invoke:time')('addDuration', [epochMs, spec]),
+    parse(value, layout): std.native('invoke:time')('parse', [value, layout]),
+    format(epochMs, layout): std.native('invoke:time')('format', [epochMs, layout]),
+  };
 
   function(query, timeRange)
-    local round(v, decimals) =
-      if v == null || decimals == null then v
-      else
-        local factor = std.pow(10, decimals);
-        std.round(v * factor) / factor;
-
-    local siPrefixes = [
-      { factor: 1e12, suffix: 'TB' },
-      { factor: 1e9, suffix: 'GB' },
-      { factor: 1e6, suffix: 'MB' },
-      { factor: 1e3, suffix: 'KB' },
-      { factor: 1, suffix: 'B' },
-    ];
-
-    local maxAbsValue(series) =
-      std.foldl(
-        function(acc, s) std.foldl(
-          function(acc2, point) if point[1] == null then acc2 else std.max(acc2, std.abs(point[1])),
-          s.data,
-          acc
-        ),
-        series,
-        0
-      );
-
-    local siScale(maxAbs) =
-      local matches = [p for p in siPrefixes if maxAbs >= p.factor];
-      if std.length(matches) > 0 then matches[0] else siPrefixes[std.length(siPrefixes) - 1];
-
-    local scaleSeries(series, factor, decimals) = [
-      s { data: [[point[0], round(if point[1] == null then null else point[1] / factor, decimals)] for point in s.data] }
-      for s in series
-    ];
-
     local defaultSeriesName(labels) =
       local name = std.get(labels, '__name__', null);
       local rest = std.join(', ', ['%s="%s"' % [k, labels[k]] for k in std.objectFields(labels) if k != '__name__']);
@@ -2221,94 +2093,118 @@ local nodesChartLib =
 
     local hasPoints(series) = std.length(series.points) > 0;
 
-    local seriesFromResult(result, type, decimals, legendFormat) = [
-      {
-        name: seriesName(s.labels, legendFormat),
-        type: type,
-        showSymbol: true,
-        symbolSize: 16,
-        itemStyle: { opacity: 0 },
-        data: [[p[0], round(p[1], decimals)] for p in s.points],
-      }
-      for s in result.series
-      if hasPoints(s)
-    ];
+    local minList(l) = std.foldl(function(a, b) if b < a then b else a, l[1:], l[0]);
+
+    local stepFor(points) =
+      local ts = [p[0] for p in points];
+      local deltas = [ts[j + 1] - ts[j] for j in std.range(0, std.length(ts) - 2) if ts[j + 1] > ts[j]];
+      if std.length(deltas) > 0 then minList(deltas) else 60000;
+
+    local segmentsFor(points, step) =
+      local active = [p for p in points if p[1] != null && p[1] != 0];
+      if std.length(active) == 0 then []
+      else
+        local res = std.foldl(
+          function(acc, p)
+            local ts = p[0];
+            local v = p[1];
+            if acc.cur == null then acc { cur: { start: ts, end: ts + step, value: v } }
+            else if v == acc.cur.value && ts <= acc.cur.end + step * 0.5 then acc { cur: acc.cur { end: ts + step } }
+            else acc { segs: acc.segs + [acc.cur], cur: { start: ts, end: ts + step, value: v } },
+          active,
+          { segs: [], cur: null }
+        );
+        res.segs + (if res.cur != null then [res.cur] else []);
 
     local linksFromResult(result, linkFn, legendFormat) =
       if linkFn == null then {}
       else {
-        [seriesName(s.labels, legendFormat)]: linkFn(s.labels)._queryPath
+        [seriesName(s.labels, legendFormat)]: linkFn(s.labels)
         for s in result.series
         if hasPoints(s) && linkFn(s.labels) != null
       };
 
-    a.chart.view {
-      type:: 'line',
-      decimals:: 2,
-      unit:: null,
-      datasource:: 'default',
-      queries:: error 'Chart requires queries',
-      _paramSpecs: timeRange.paramSpecs,
-      _telemetryItems:: [
-        { type: 'promql', expr: qr.expr, instant: std.get(qr, 'instant', false) }
-        for qr in $.queries
-      ],
-      data: query($.datasource, $._telemetryItems, $._params.from, $._params.to),
-      links::
-        std.foldl(
+    {
+      base: a.chart.view {
+        local n = self,
+        datasource:: 'default',
+        queries:: error 'Chart requires queries',
+        _paramSpecs: timeRange.paramSpecs,
+        _telemetryItems:: [
+          { type: 'promql', expr: qr.expr, instant: std.get(qr, 'instant', false) }
+          for qr in n.queries
+        ],
+        data: query(n.datasource, n._telemetryItems, n._params.from, n._params.to),
+        _view+:: {
+          local baseFragment = super.fragment,
+          fragment: baseFragment { child:: [(timeRange.nav { from:: n._params.from, to:: n._params.to }).html, baseFragment.child] },
+        },
+      },
+
+      line: a.line.chart {
+        local n = self,
+        links: std.foldl(
           function(acc, i) acc + linksFromResult(
-            $.data.results[i],
-            std.get($.queries[i], 'link', null),
-            std.get($.queries[i], 'legendFormat', null)
+            n.data.results[i],
+            std.get(n.queries[i], 'link', null),
+            std.get(n.queries[i], 'legendFormat', null)
           ),
-          std.range(0, std.length($.queries) - 1),
+          std.range(0, std.length(n.queries) - 1),
           {}
         ),
-      option::
+        series:: std.flattenArrays([
+          [
+            { name: seriesName(s.labels, std.get(n.queries[i], 'legendFormat', null)), data: [[p[0], p[1]] for p in s.points] }
+            for s in n.data.results[i].series
+            if hasPoints(s)
+          ]
+          for i in std.range(0, std.length(n.queries) - 1)
+        ]),
+      },
+
+      stateTimeline: a.stateTimeline.chart {
+        local n = self,
+        local render(template, labels, value) =
+          if template != null then applyLegendFormat(template, labels { value: std.toString(value) }) else null,
+        local linkFor(linkFn, labels) = if linkFn == null then null else linkFn(labels),
         local rawSeries = std.flattenArrays([
-          seriesFromResult($.data.results[i], $.type, null, std.get($.queries[i], 'legendFormat', null))
-          for i in std.range(0, std.length($.queries) - 1)
-        ]);
-        local scale = if $.unit == 'bytes' then siScale(maxAbsValue(rawSeries)) else { factor: 1, suffix: null };
-        local allSeries = scaleSeries(rawSeries, scale.factor, $.decimals);
-        {
-          title: { text: $.title },
-          tooltip: {
-            trigger: 'axis',
-            axisPointer: { type: 'cross', z: 100, lineStyle: { color: '#888', type: 'dashed' } },
-          },
-          legend: {
-            data: [{ name: s.name, itemStyle: { opacity: 1 } } for s in allSeries],
-            type: 'scroll',
-            bottom: 0,
-            icon: 'roundRect',
-          },
-          grid: { top: 40, bottom: 40, containLabel: true },
-          xAxis: {
-            type: 'time',
-            axisLabel: {
-              formatter: {
-                year: '{yyyy}',
-                month: '{MMM}',
-                day: '{MMM} {d}',
-                hour: '{HH}:{mm}',
-                minute: '{HH}:{mm}',
-                second: '{HH}:{mm}:{ss}',
-                none: '{yyyy}-{MM}-{dd}',
-              },
-            },
-          },
-          yAxis: { type: 'value' } + (
-            if scale.suffix != null then { axisLabel: { formatter: '{value} ' + scale.suffix } } else {}
-          ),
-          series: allSeries,
-        },
-      _view+:: {
-        local base = super.fragment,
-        fragment: base { child:: [(timeRange.nav { from:: $._params.from, to:: $._params.to }).html, base.child] },
+          [
+            {
+              row: if n.rowBy != null then applyLegendFormat(n.rowBy, s.labels) else seriesName(s.labels, std.get(n.queries[i], 'legendFormat', null)),
+              color: if n.colorBy != null then std.get(n.colors, applyLegendFormat(n.colorBy, s.labels), null) else null,
+              linkNode: linkFor(std.get(n.queries[i], 'link', null), s.labels),
+              labels: s.labels,
+              segments: segmentsFor(s.points, stepFor(s.points)),
+            }
+            for s in n.data.results[i].series
+            if hasPoints(s)
+          ]
+          for i in std.range(0, std.length(n.queries) - 1)
+        ]),
+        local active = [s for s in rawSeries if std.length(s.segments) > 0],
+        rowBy:: null,
+        colorBy:: null,
+        colors:: {},
+        labelBy:: null,
+        tooltip:: null,
+        timeFormat:: '2006-01-02 15:04',
+        rows:: std.foldl(function(acc, s) if std.member(acc, s.row) then acc else acc + [s.row], active, []),
+        links: std.foldl(function(acc, s) if s.linkNode != null then acc { [s.row]: s.linkNode } else acc, active, {}),
+        segments:: std.flattenArrays([
+          [{
+            row: s.row,
+            start: seg.start,
+            end: seg.end,
+            color: s.color,
+            label: render(n.labelBy, s.labels, seg.value),
+            tooltip: render(n.tooltip, s.labels { from: time.format(seg.start, n.timeFormat), to: time.format(seg.end, n.timeFormat) }, seg.value),
+            link: if s.linkNode != null then s.linkNode._queryPath else null,
+          } for seg in s.segments]
+          for s in active
+        ]),
       },
     };
-local nodeListsDrilldownLib = function(c, chartNode)
+local nodeListsDrilldownLib = function(c)
   function(params)
     local base = params.base;
     local rootNode = c.chainFields(c.root, base);
@@ -2316,7 +2212,6 @@ local nodeListsDrilldownLib = function(c, chartNode)
     local vars = std.get(params, 'vars', names);
     local titles = std.get(params, 'titles', [c.capitalize(v) for v in vars]);
     local metric = params.metric;
-    local unit = std.get(params, 'unit', null);
     local n = std.length(names);
 
     local pathSuffixes = [
@@ -2347,9 +2242,9 @@ local nodeListsDrilldownLib = function(c, chartNode)
         matchers:: li.matchers,
         titleGroupBy:: if li.isLeaf then '' else 'by %s ' % li.title,
       };
-      [li.path, chartNode {
-        title: ctx.title,
-        unit:: unit,
+      local override = std.get(std.get(ctx, 'levels', {}), ctx.groupBy, {});
+      [li.path, ctx + override {
+        title:: ctx.title,
         queries: [
           {
             expr: ctx.expr % $,
@@ -6811,21 +6706,61 @@ local nodesValuesLib =
 local nodesDashboardLib =
   local a =
     local c = {
-      chart:
-        local style = |||
-          @scope (.chart) {
-            :scope {
-              width: 100%;
-              box-sizing: border-box;
-            }
-          }
-        |||;
-
-        {
+      chart: {
+        local c = self,
+        option:: error 'Chart requires option',
+        links:: {},
+        width:: '100%',
+        height:: '400px',
+        darkTheme:: {
+          color: ['#4c657e', '#856350', '#677d67', '#78607b', '#44756f', '#84734c', '#546a78', '#774b4b'],
+          backgroundColor: 'transparent',
+          textStyle: { color: '#ccc' },
+          title: { textStyle: { color: '#ccc' }, subtextStyle: { color: '#999' } },
+          legend: { textStyle: { color: '#ccc' } },
+          tooltip: { backgroundColor: '#333', borderColor: '#555', textStyle: { color: '#ccc' } },
+          grid: { borderColor: '#444' },
+          categoryAxis: {
+            axisLine: { lineStyle: { color: '#666' } },
+            axisLabel: { color: '#ccc' },
+            splitLine: { lineStyle: { color: ['#333'] } },
+          },
+          valueAxis: {
+            axisLine: { lineStyle: { color: '#666' } },
+            axisLabel: { color: '#ccc' },
+            splitLine: { lineStyle: { color: ['#333'] } },
+          },
+          pie: {
+            itemStyle: { borderColor: 'transparent' },
+            label: { color: '#ccc', textBorderColor: 'transparent', textBorderWidth: 0 },
+            labelLine: { lineStyle: { color: '#666' } },
+          },
+        },
+        local payload = {
+          option: { animation: false, backgroundColor: 'transparent' } + c.option,
+          theme: c.darkTheme,
+          links: c.links,
+        },
+        local configJson = std.strReplace(std.manifestJsonMinified(payload), '<', '\\u003c'),
+        html: [
+          {
+            element: 'echarts-chart',
+            attributes: { style: 'display: block; box-sizing: border-box; width: %s; height: %s;' % [c.width, c.height] },
+            children: [
+              {
+                element: 'script',
+                attributes: { type: 'application/json', class: 'echarts-config' },
+                children: [{ html: configJson }],
+              },
+            ],
+          },
+        ],
+      },
+      dashboard:
+        local chart = {
           local c = self,
           option:: error 'Chart requires option',
           links:: {},
-          id:: 'chart',
           width:: '100%',
           height:: '400px',
           darkTheme:: {
@@ -6852,352 +6787,26 @@ local nodesDashboardLib =
               labelLine: { lineStyle: { color: '#666' } },
             },
           },
+          local payload = {
+            option: { animation: false, backgroundColor: 'transparent' } + c.option,
+            theme: c.darkTheme,
+            links: c.links,
+          },
+          local configJson = std.strReplace(std.manifestJsonMinified(payload), '<', '\\u003c'),
           html: [
-            { element: 'style', children: [style] },
             {
-              element: 'div',
-              attributes: { class: 'chart' },
+              element: 'echarts-chart',
+              attributes: { style: 'display: block; box-sizing: border-box; width: %s; height: %s;' % [c.width, c.height] },
               children: [
                 {
-                  element: 'div',
-                  attributes: { id: c.id, style: 'width: %s; height: %s;' % [c.width, c.height] },
-                },
-                {
                   element: 'script',
-                  children: [
-                    {
-                      html: |||
-                        (function () {
-                          function init() {
-                            var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                            var chart = echarts.init(document.getElementById('%s'), dark ? %s : null);
-                            var option = %s;
-                            option.tooltip = Object.assign({}, option.tooltip, { trigger: 'item' });
-
-                            option.brush = {
-                              xAxisIndex: 'all',
-                              brushStyle: {
-                                color: 'rgba(255, 255, 255, 0.08)',
-                                borderWidth: 0,
-                              },
-                            };
-                            option.toolbox = { show: false };
-
-                            chart.setOption(option);
-                            window.addEventListener('resize', function () { chart.resize(); });
-
-                            chart.dispatchAction({
-                              type: 'takeGlobalCursor',
-                              key: 'brush',
-                              brushOption: { brushType: 'lineX', brushMode: 'single' },
-                            });
-                            // Drag-select a horizontal range to navigate to it as an
-                            // absolute time range, mirroring Grafana's chart-drag zoom.
-                            // brushSelected fires continuously while dragging, so it
-                            // only tracks the pending range - navigation happens once,
-                            // on mouseup, so it doesn't fire mid-drag.
-                            var pendingRange = null;
-                            chart.on('brushSelected', function (params) {
-                              var batch = params.batch && params.batch[0];
-                              var area = batch && batch.areas && batch.areas[0];
-                              pendingRange = area && area.coordRange;
-                            });
-                            chart.getZr().on('mouseup', function () {
-                              if (!pendingRange) return;
-                              var range = pendingRange;
-                              pendingRange = null;
-                              var from = new Date(Math.min(range[0], range[1])).toISOString();
-                              var to = new Date(Math.max(range[0], range[1])).toISOString();
-                              var url = new URL(window.location.href);
-                              url.searchParams.set('from', from);
-                              url.searchParams.set('to', to);
-                              window.location.href = url.toString();
-                            });
-
-                            var links = %s;
-                            // Click: toggle. Cmd/ctrl+click: toggle all (isolate this
-                            // one / restore all). Shift+click: open link, same tab.
-                            // Shift+cmd/ctrl+click: open link, new tab.
-                            var shiftKey = false;
-                            var cmdKey = false;
-                            var prevSelected = {};
-                            var suppress = false;
-                            // Tracked ourselves instead of read from chart.getOption(),
-                            // since ECharts only lazily populates legend[0].selected
-                            // once the user has interacted with the legend at least once.
-                            var currentSelected = {};
-                            (option.legend.data || []).forEach(function (entry) {
-                              currentSelected[typeof entry === 'string' ? entry : entry.name] = true;
-                            });
-                            chart.getZr().on('mousedown', function (e) {
-                              var ev = e.event;
-                              shiftKey = !!(ev && ev.shiftKey);
-                              cmdKey = !!(ev && (ev.ctrlKey || ev.metaKey));
-                              prevSelected = Object.assign({}, currentSelected);
-                            });
-                            chart.on('legendselectchanged', function (params) {
-                              Object.assign(currentSelected, params.selected);
-                              if (suppress) return;
-
-                              function revertToggle() {
-                                var toRestore = Object.assign({}, prevSelected);
-                                suppress = true;
-                                chart.setOption({ legend: { selected: toRestore } });
-                                currentSelected = Object.assign({}, toRestore);
-                                suppress = false;
-                              }
-
-                              if (shiftKey) {
-                                if (links[params.name]) {
-                                  revertToggle();
-                                  if (cmdKey) window.open(links[params.name], '_blank');
-                                  else window.location.href = links[params.name];
-                                } else {
-                                  revertToggle();
-                                }
-                                return;
-                              }
-
-                              if (cmdKey) {
-                                var names = Object.keys(prevSelected);
-                                var wasOnlyThisSelected = names.every(function (name) {
-                                  return name === params.name ? prevSelected[name] : !prevSelected[name];
-                                });
-                                var toApply = {};
-                                if (wasOnlyThisSelected) {
-                                  names.forEach(function (name) { toApply[name] = true; });
-                                } else {
-                                  names.forEach(function (name) { toApply[name] = name === params.name; });
-                                }
-                                suppress = true;
-                                chart.setOption({ legend: { selected: toApply } });
-                                currentSelected = Object.assign({}, toApply);
-                                suppress = false;
-                                return;
-                              }
-                            });
-
-                            // Shift/shift+cmd on a data point mirrors the legend's
-                            // link-opening behavior (same tab / new tab); plain and
-                            // cmd-only clicks on items are left alone.
-                            chart.on('click', function (params) {
-                              if (params.componentType !== 'series' || !shiftKey) return;
-                              var link = links[params.seriesName];
-                              if (!link) return;
-                              if (cmdKey) window.open(link, '_blank');
-                              else window.location.href = link;
-                            });
-                          }
-                          if (document.readyState === 'complete') init();
-                          else window.addEventListener('load', init);
-                        })();
-                      ||| % [
-                        c.id,
-                        std.manifestJsonMinified(c.darkTheme),
-                        std.manifestJsonMinified({ animation: false, backgroundColor: 'transparent' } + c.option),
-                        std.manifestJsonMinified(c.links),
-                      ],
-                    },
-                  ],
+                  attributes: { type: 'application/json', class: 'echarts-config' },
+                  children: [{ html: configJson }],
                 },
               ],
             },
           ],
-        },
-      dashboard:
-        local chart =
-          local style = |||
-            @scope (.chart) {
-              :scope {
-                width: 100%;
-                box-sizing: border-box;
-              }
-            }
-          |||;
-
-          {
-            local c = self,
-            option:: error 'Chart requires option',
-            links:: {},
-            id:: 'chart',
-            width:: '100%',
-            height:: '400px',
-            darkTheme:: {
-              color: ['#4c657e', '#856350', '#677d67', '#78607b', '#44756f', '#84734c', '#546a78', '#774b4b'],
-              backgroundColor: 'transparent',
-              textStyle: { color: '#ccc' },
-              title: { textStyle: { color: '#ccc' }, subtextStyle: { color: '#999' } },
-              legend: { textStyle: { color: '#ccc' } },
-              tooltip: { backgroundColor: '#333', borderColor: '#555', textStyle: { color: '#ccc' } },
-              grid: { borderColor: '#444' },
-              categoryAxis: {
-                axisLine: { lineStyle: { color: '#666' } },
-                axisLabel: { color: '#ccc' },
-                splitLine: { lineStyle: { color: ['#333'] } },
-              },
-              valueAxis: {
-                axisLine: { lineStyle: { color: '#666' } },
-                axisLabel: { color: '#ccc' },
-                splitLine: { lineStyle: { color: ['#333'] } },
-              },
-              pie: {
-                itemStyle: { borderColor: 'transparent' },
-                label: { color: '#ccc', textBorderColor: 'transparent', textBorderWidth: 0 },
-                labelLine: { lineStyle: { color: '#666' } },
-              },
-            },
-            html: [
-              { element: 'style', children: [style] },
-              {
-                element: 'div',
-                attributes: { class: 'chart' },
-                children: [
-                  {
-                    element: 'div',
-                    attributes: { id: c.id, style: 'width: %s; height: %s;' % [c.width, c.height] },
-                  },
-                  {
-                    element: 'script',
-                    children: [
-                      {
-                        html: |||
-                          (function () {
-                            function init() {
-                              var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                              var chart = echarts.init(document.getElementById('%s'), dark ? %s : null);
-                              var option = %s;
-                              option.tooltip = Object.assign({}, option.tooltip, { trigger: 'item' });
-
-                              option.brush = {
-                                xAxisIndex: 'all',
-                                brushStyle: {
-                                  color: 'rgba(255, 255, 255, 0.08)',
-                                  borderWidth: 0,
-                                },
-                              };
-                              option.toolbox = { show: false };
-
-                              chart.setOption(option);
-                              window.addEventListener('resize', function () { chart.resize(); });
-
-                              chart.dispatchAction({
-                                type: 'takeGlobalCursor',
-                                key: 'brush',
-                                brushOption: { brushType: 'lineX', brushMode: 'single' },
-                              });
-                              // Drag-select a horizontal range to navigate to it as an
-                              // absolute time range, mirroring Grafana's chart-drag zoom.
-                              // brushSelected fires continuously while dragging, so it
-                              // only tracks the pending range - navigation happens once,
-                              // on mouseup, so it doesn't fire mid-drag.
-                              var pendingRange = null;
-                              chart.on('brushSelected', function (params) {
-                                var batch = params.batch && params.batch[0];
-                                var area = batch && batch.areas && batch.areas[0];
-                                pendingRange = area && area.coordRange;
-                              });
-                              chart.getZr().on('mouseup', function () {
-                                if (!pendingRange) return;
-                                var range = pendingRange;
-                                pendingRange = null;
-                                var from = new Date(Math.min(range[0], range[1])).toISOString();
-                                var to = new Date(Math.max(range[0], range[1])).toISOString();
-                                var url = new URL(window.location.href);
-                                url.searchParams.set('from', from);
-                                url.searchParams.set('to', to);
-                                window.location.href = url.toString();
-                              });
-
-                              var links = %s;
-                              // Click: toggle. Cmd/ctrl+click: toggle all (isolate this
-                              // one / restore all). Shift+click: open link, same tab.
-                              // Shift+cmd/ctrl+click: open link, new tab.
-                              var shiftKey = false;
-                              var cmdKey = false;
-                              var prevSelected = {};
-                              var suppress = false;
-                              // Tracked ourselves instead of read from chart.getOption(),
-                              // since ECharts only lazily populates legend[0].selected
-                              // once the user has interacted with the legend at least once.
-                              var currentSelected = {};
-                              (option.legend.data || []).forEach(function (entry) {
-                                currentSelected[typeof entry === 'string' ? entry : entry.name] = true;
-                              });
-                              chart.getZr().on('mousedown', function (e) {
-                                var ev = e.event;
-                                shiftKey = !!(ev && ev.shiftKey);
-                                cmdKey = !!(ev && (ev.ctrlKey || ev.metaKey));
-                                prevSelected = Object.assign({}, currentSelected);
-                              });
-                              chart.on('legendselectchanged', function (params) {
-                                Object.assign(currentSelected, params.selected);
-                                if (suppress) return;
-
-                                function revertToggle() {
-                                  var toRestore = Object.assign({}, prevSelected);
-                                  suppress = true;
-                                  chart.setOption({ legend: { selected: toRestore } });
-                                  currentSelected = Object.assign({}, toRestore);
-                                  suppress = false;
-                                }
-
-                                if (shiftKey) {
-                                  if (links[params.name]) {
-                                    revertToggle();
-                                    if (cmdKey) window.open(links[params.name], '_blank');
-                                    else window.location.href = links[params.name];
-                                  } else {
-                                    revertToggle();
-                                  }
-                                  return;
-                                }
-
-                                if (cmdKey) {
-                                  var names = Object.keys(prevSelected);
-                                  var wasOnlyThisSelected = names.every(function (name) {
-                                    return name === params.name ? prevSelected[name] : !prevSelected[name];
-                                  });
-                                  var toApply = {};
-                                  if (wasOnlyThisSelected) {
-                                    names.forEach(function (name) { toApply[name] = true; });
-                                  } else {
-                                    names.forEach(function (name) { toApply[name] = name === params.name; });
-                                  }
-                                  suppress = true;
-                                  chart.setOption({ legend: { selected: toApply } });
-                                  currentSelected = Object.assign({}, toApply);
-                                  suppress = false;
-                                  return;
-                                }
-                              });
-
-                              // Shift/shift+cmd on a data point mirrors the legend's
-                              // link-opening behavior (same tab / new tab); plain and
-                              // cmd-only clicks on items are left alone.
-                              chart.on('click', function (params) {
-                                if (params.componentType !== 'series' || !shiftKey) return;
-                                var link = links[params.seriesName];
-                                if (!link) return;
-                                if (cmdKey) window.open(link, '_blank');
-                                else window.location.href = link;
-                              });
-                            }
-                            if (document.readyState === 'complete') init();
-                            else window.addEventListener('load', init);
-                          })();
-                        ||| % [
-                          c.id,
-                          std.manifestJsonMinified(c.darkTheme),
-                          std.manifestJsonMinified({ animation: false, backgroundColor: 'transparent' } + c.option),
-                          std.manifestJsonMinified(c.links),
-                        ],
-                      },
-                    ],
-                  },
-                ],
-              },
-            ],
-          };
+        };
 
         local style = |||
           @scope (.dashboard) {
@@ -7228,7 +6837,6 @@ local nodesDashboardLib =
         local layoutNode = {
           local c = self,
           node:: error 'LayoutNode requires node',
-          path:: [],
           html::
             if c.node.type == 'panel' then
               {
@@ -7238,7 +6846,6 @@ local nodesDashboardLib =
                   chart {
                     option:: c.node.chart.option,
                     links:: c.node.chart.links,
-                    id:: 'chart-' + std.join('-', [std.toString(p) for p in c.path]),
                     width:: '100%',
                     height:: '100%',
                   },
@@ -7252,7 +6859,7 @@ local nodesDashboardLib =
                   style: 'flex: %s 1 0%%; flex-direction: %s;' % [c.node.flex, direction(c.node)],
                 },
                 children: [
-                  (layoutNode { node:: c.node.children[i], path:: c.path + [i] }).html
+                  (layoutNode { node:: c.node.children[i] }).html
                   for i in std.range(0, std.length(c.node.children) - 1)
                 ],
               },
@@ -7271,7 +6878,7 @@ local nodesDashboardLib =
                 style: 'flex-direction: %s; height: %s;' % [direction(c.layout), c.height],
               },
               children: [
-                (layoutNode { node:: c.layout.children[i], path:: [i] }).html
+                (layoutNode { node:: c.layout.children[i] }).html
                 for i in std.range(0, std.length(c.layout.children) - 1)
               ],
             },
@@ -8471,17 +8078,204 @@ local nodesDashboardLib =
     local html = {
       manifestHtml(tree): std.native('invoke:html')('manifestHtml', [tree]),
     };
+    local charts =
+      local line =
+        local common =
+          local round(v, decimals) =
+            if v == null || decimals == null then v
+            else
+              local factor = std.pow(10, decimals);
+              std.round(v * factor) / factor;
+
+          local siPrefixes = [
+            { factor: 1e12, suffix: 'TB' },
+            { factor: 1e9, suffix: 'GB' },
+            { factor: 1e6, suffix: 'MB' },
+            { factor: 1e3, suffix: 'KB' },
+            { factor: 1, suffix: 'B' },
+          ];
+
+          local maxAbsValue(series) =
+            std.foldl(
+              function(acc, s) std.foldl(
+                function(acc2, point) if point[1] == null then acc2 else std.max(acc2, std.abs(point[1])),
+                s.data,
+                acc
+              ),
+              series,
+              0
+            );
+
+          local siScale(maxAbs) =
+            local matches = [p for p in siPrefixes if maxAbs >= p.factor];
+            if std.length(matches) > 0 then matches[0] else siPrefixes[std.length(siPrefixes) - 1];
+
+          local scaleSeries(series, factor, decimals) = [
+            s { data: [[point[0], round(if point[1] == null then null else point[1] / factor, decimals)] for point in s.data] }
+            for s in series
+          ];
+
+          {
+            timeAxis: {
+              type: 'time',
+              axisLabel: {
+                formatter: {
+                  year: '{yyyy}',
+                  month: '{MMM}',
+                  day: '{MMM} {d}',
+                  hour: '{HH}:{mm}',
+                  minute: '{HH}:{mm}',
+                  second: '{HH}:{mm}:{ss}',
+                  none: '{yyyy}-{MM}-{dd}',
+                },
+              },
+            },
+            round: round,
+            maxAbsValue: maxAbsValue,
+            siScale: siScale,
+            scaleSeries: scaleSeries,
+          };
+
+        {
+          local c = self,
+          title:: null,
+          series:: [],
+          unit:: null,
+          decimals:: 2,
+          option::
+            local styled = [
+              s { type: 'line', showSymbol: true, symbolSize: 16, itemStyle: { opacity: 0 } }
+              for s in c.series
+            ];
+            local scale = if c.unit == 'bytes' then common.siScale(common.maxAbsValue(styled)) else { factor: 1, suffix: null };
+            local allSeries = common.scaleSeries(styled, scale.factor, c.decimals);
+            {
+              title: { text: c.title },
+              tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'cross', z: 100, lineStyle: { color: '#888', type: 'dashed' } },
+              },
+              legend: {
+                data: [{ name: s.name, itemStyle: { opacity: 1 } } for s in allSeries],
+                type: 'scroll',
+                bottom: 0,
+                icon: 'roundRect',
+              },
+              grid: { top: 40, bottom: 40, containLabel: true },
+              xAxis: common.timeAxis,
+              yAxis: { type: 'value' } + (
+                if scale.suffix != null then { axisLabel: { formatter: '{value} ' + scale.suffix } } else {}
+              ),
+              series: allSeries,
+            },
+        };
+      local stateTimeline =
+        local common =
+          local round(v, decimals) =
+            if v == null || decimals == null then v
+            else
+              local factor = std.pow(10, decimals);
+              std.round(v * factor) / factor;
+
+          local siPrefixes = [
+            { factor: 1e12, suffix: 'TB' },
+            { factor: 1e9, suffix: 'GB' },
+            { factor: 1e6, suffix: 'MB' },
+            { factor: 1e3, suffix: 'KB' },
+            { factor: 1, suffix: 'B' },
+          ];
+
+          local maxAbsValue(series) =
+            std.foldl(
+              function(acc, s) std.foldl(
+                function(acc2, point) if point[1] == null then acc2 else std.max(acc2, std.abs(point[1])),
+                s.data,
+                acc
+              ),
+              series,
+              0
+            );
+
+          local siScale(maxAbs) =
+            local matches = [p for p in siPrefixes if maxAbs >= p.factor];
+            if std.length(matches) > 0 then matches[0] else siPrefixes[std.length(siPrefixes) - 1];
+
+          local scaleSeries(series, factor, decimals) = [
+            s { data: [[point[0], round(if point[1] == null then null else point[1] / factor, decimals)] for point in s.data] }
+            for s in series
+          ];
+
+          {
+            timeAxis: {
+              type: 'time',
+              axisLabel: {
+                formatter: {
+                  year: '{yyyy}',
+                  month: '{MMM}',
+                  day: '{MMM} {d}',
+                  hour: '{HH}:{mm}',
+                  minute: '{HH}:{mm}',
+                  second: '{HH}:{mm}:{ss}',
+                  none: '{yyyy}-{MM}-{dd}',
+                },
+              },
+            },
+            round: round,
+            maxAbsValue: maxAbsValue,
+            siScale: siScale,
+            scaleSeries: scaleSeries,
+          };
+
+        {
+          local c = self,
+          title:: null,
+          rows:: [],
+          segments:: [],
+          option::
+            local rowIndex = { [c.rows[i]]: i for i in std.range(0, std.length(c.rows) - 1) };
+            {
+              title: { text: c.title },
+              tooltip: { trigger: 'item', formatter: '{b}' },
+              grid: { top: 40, bottom: 40, containLabel: true },
+              xAxis: common.timeAxis,
+              yAxis: { type: 'category', data: c.rows },
+              series: [{
+                type: 'custom',
+                renderItem: 'stateTimeline',
+                encode: { x: [1, 2], y: 0 },
+                data: [
+                  { value: [rowIndex[s.row], s.start, s.end, std.get(s, 'label', null)] }
+                  + (if std.get(s, 'color', null) != null then { itemStyle: { color: s.color } } else {})
+                  + (if std.get(s, 'link', null) != null then { link: s.link } else {})
+                  + (local nm = if std.get(s, 'tooltip', null) != null then s.tooltip else std.get(s, 'label', null); if nm != null then { name: nm } else {})
+                  for s in c.segments
+                ],
+              }],
+            },
+        };
+
+      {
+        line: { chart: line },
+        stateTimeline: { chart: stateTimeline },
+      };
 
     local echartsSrc = 'https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js';
     local echartsScript = { element: 'script', attributes: { src: echartsSrc } };
+    local componentScript = { element: 'script', children: [{ html: importstr 'components/chart.js' }] };
 
     local baseView = {
       local n = self,
       _view:: {
         fragment: error 'view requires a fragment',
-        page: ui.page { fragment:: [echartsScript, n._view.fragment] },
+        page: ui.page { fragment:: [echartsScript, componentScript, n._view.fragment] },
         html: html.manifestHtml(self.page),
       },
+    };
+
+    local linkPaths(links) = {
+      [k]: links[k]._queryPath
+      for k in std.objectFields(links)
+      if std.isObject(links[k]) && std.objectHasAll(links[k], '_queryPath')
     };
 
     local chartView = baseView {
@@ -8490,8 +8284,7 @@ local nodesDashboardLib =
           c.panel {
             child:: c.chart {
               option:: $.option,
-              links:: std.get($, 'links', {}),
-              id:: std.get($, 'chartId', 'chart'),
+              links:: linkPaths(std.get($, 'links', {})),
               width:: std.get($, 'width', '100%'),
               height:: std.get($, 'height', '400px'),
             },
@@ -8518,7 +8311,7 @@ local nodesDashboardLib =
       row(flex, children):: { type: 'row', flex: flex, children: children },
       column(flex, children):: { type: 'column', flex: flex, children: children },
       panel(flex, chart):: { type: 'panel', flex: flex, chart: chart },
-    };
+    } + charts;
 
   function(query, timeRange)
     local collectItems(node) =
@@ -8555,14 +8348,15 @@ local nodesDashboardLib =
 
 local query = queryLib(time, telemetry);
 local browse = browseLib(query);
+local chartLib = nodesChartLib(query, timeRange);
 
 {
   promql: {
-    chart: {
-      node: nodesChartLib(query, timeRange),
-      drillDown: { nodeList: nodeListsDrilldownLib(chain, $.promql.chart.node) },
-      entity: { nodeList: nodeListsEntityLib(chain, $.promql.list.node, $.promql.chart.drillDown.nodeList) },
-    },
+    chart: { base: chartLib.base },
+    line: { chart: $.promql.chart.base + chartLib.line },
+    stateTimeline: { chart: $.promql.chart.base + chartLib.stateTimeline },
+    drilldown: { nodeList: nodeListsDrilldownLib(chain) },
+    entity: { nodeList: nodeListsEntityLib(chain, $.promql.list.node, $.promql.drilldown.nodeList) },
     list: { node: nodesListLib(browse) },
     labels: { node: nodesLabelsLib(browse) },
     values: { node: nodesValuesLib(browse) },
