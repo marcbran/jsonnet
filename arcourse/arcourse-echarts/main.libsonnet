@@ -1,19 +1,59 @@
 local c = {
-  chart:
-    local style = |||
-      @scope (.chart) {
-        :scope {
-          width: 100%;
-          box-sizing: border-box;
-        }
-      }
-    |||;
-
-    {
+  chart: {
+    local c = self,
+    option:: error 'Chart requires option',
+    links:: {},
+    width:: '100%',
+    height:: '400px',
+    darkTheme:: {
+      color: ['#4c657e', '#856350', '#677d67', '#78607b', '#44756f', '#84734c', '#546a78', '#774b4b'],
+      backgroundColor: 'transparent',
+      textStyle: { color: '#ccc' },
+      title: { textStyle: { color: '#ccc' }, subtextStyle: { color: '#999' } },
+      legend: { textStyle: { color: '#ccc' } },
+      tooltip: { backgroundColor: '#333', borderColor: '#555', textStyle: { color: '#ccc' } },
+      grid: { borderColor: '#444' },
+      categoryAxis: {
+        axisLine: { lineStyle: { color: '#666' } },
+        axisLabel: { color: '#ccc' },
+        splitLine: { lineStyle: { color: ['#333'] } },
+      },
+      valueAxis: {
+        axisLine: { lineStyle: { color: '#666' } },
+        axisLabel: { color: '#ccc' },
+        splitLine: { lineStyle: { color: ['#333'] } },
+      },
+      pie: {
+        itemStyle: { borderColor: 'transparent' },
+        label: { color: '#ccc', textBorderColor: 'transparent', textBorderWidth: 0 },
+        labelLine: { lineStyle: { color: '#666' } },
+      },
+    },
+    local payload = {
+      option: { animation: false, backgroundColor: 'transparent' } + c.option,
+      theme: c.darkTheme,
+      links: c.links,
+    },
+    local configJson = std.strReplace(std.manifestJsonMinified(payload), '<', '\\u003c'),
+    html: [
+      {
+        element: 'echarts-chart',
+        attributes: { style: 'display: block; box-sizing: border-box; width: %s; height: %s;' % [c.width, c.height] },
+        children: [
+          {
+            element: 'script',
+            attributes: { type: 'application/json', class: 'echarts-config' },
+            children: [{ html: configJson }],
+          },
+        ],
+      },
+    ],
+  },
+  dashboard:
+    local chart = {
       local c = self,
       option:: error 'Chart requires option',
       links:: {},
-      id:: 'chart',
       width:: '100%',
       height:: '400px',
       darkTheme:: {
@@ -40,352 +80,26 @@ local c = {
           labelLine: { lineStyle: { color: '#666' } },
         },
       },
+      local payload = {
+        option: { animation: false, backgroundColor: 'transparent' } + c.option,
+        theme: c.darkTheme,
+        links: c.links,
+      },
+      local configJson = std.strReplace(std.manifestJsonMinified(payload), '<', '\\u003c'),
       html: [
-        { element: 'style', children: [style] },
         {
-          element: 'div',
-          attributes: { class: 'chart' },
+          element: 'echarts-chart',
+          attributes: { style: 'display: block; box-sizing: border-box; width: %s; height: %s;' % [c.width, c.height] },
           children: [
             {
-              element: 'div',
-              attributes: { id: c.id, style: 'width: %s; height: %s;' % [c.width, c.height] },
-            },
-            {
               element: 'script',
-              children: [
-                {
-                  html: |||
-                    (function () {
-                      function init() {
-                        var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                        var chart = echarts.init(document.getElementById('%s'), dark ? %s : null);
-                        var option = %s;
-                        option.tooltip = Object.assign({}, option.tooltip, { trigger: 'item' });
-
-                        option.brush = {
-                          xAxisIndex: 'all',
-                          brushStyle: {
-                            color: 'rgba(255, 255, 255, 0.08)',
-                            borderWidth: 0,
-                          },
-                        };
-                        option.toolbox = { show: false };
-
-                        chart.setOption(option);
-                        window.addEventListener('resize', function () { chart.resize(); });
-
-                        chart.dispatchAction({
-                          type: 'takeGlobalCursor',
-                          key: 'brush',
-                          brushOption: { brushType: 'lineX', brushMode: 'single' },
-                        });
-                        // Drag-select a horizontal range to navigate to it as an
-                        // absolute time range, mirroring Grafana's chart-drag zoom.
-                        // brushSelected fires continuously while dragging, so it
-                        // only tracks the pending range - navigation happens once,
-                        // on mouseup, so it doesn't fire mid-drag.
-                        var pendingRange = null;
-                        chart.on('brushSelected', function (params) {
-                          var batch = params.batch && params.batch[0];
-                          var area = batch && batch.areas && batch.areas[0];
-                          pendingRange = area && area.coordRange;
-                        });
-                        chart.getZr().on('mouseup', function () {
-                          if (!pendingRange) return;
-                          var range = pendingRange;
-                          pendingRange = null;
-                          var from = new Date(Math.min(range[0], range[1])).toISOString();
-                          var to = new Date(Math.max(range[0], range[1])).toISOString();
-                          var url = new URL(window.location.href);
-                          url.searchParams.set('from', from);
-                          url.searchParams.set('to', to);
-                          window.location.href = url.toString();
-                        });
-
-                        var links = %s;
-                        // Click: toggle. Cmd/ctrl+click: toggle all (isolate this
-                        // one / restore all). Shift+click: open link, same tab.
-                        // Shift+cmd/ctrl+click: open link, new tab.
-                        var shiftKey = false;
-                        var cmdKey = false;
-                        var prevSelected = {};
-                        var suppress = false;
-                        // Tracked ourselves instead of read from chart.getOption(),
-                        // since ECharts only lazily populates legend[0].selected
-                        // once the user has interacted with the legend at least once.
-                        var currentSelected = {};
-                        (option.legend.data || []).forEach(function (entry) {
-                          currentSelected[typeof entry === 'string' ? entry : entry.name] = true;
-                        });
-                        chart.getZr().on('mousedown', function (e) {
-                          var ev = e.event;
-                          shiftKey = !!(ev && ev.shiftKey);
-                          cmdKey = !!(ev && (ev.ctrlKey || ev.metaKey));
-                          prevSelected = Object.assign({}, currentSelected);
-                        });
-                        chart.on('legendselectchanged', function (params) {
-                          Object.assign(currentSelected, params.selected);
-                          if (suppress) return;
-
-                          function revertToggle() {
-                            var toRestore = Object.assign({}, prevSelected);
-                            suppress = true;
-                            chart.setOption({ legend: { selected: toRestore } });
-                            currentSelected = Object.assign({}, toRestore);
-                            suppress = false;
-                          }
-
-                          if (shiftKey) {
-                            if (links[params.name]) {
-                              revertToggle();
-                              if (cmdKey) window.open(links[params.name], '_blank');
-                              else window.location.href = links[params.name];
-                            } else {
-                              revertToggle();
-                            }
-                            return;
-                          }
-
-                          if (cmdKey) {
-                            var names = Object.keys(prevSelected);
-                            var wasOnlyThisSelected = names.every(function (name) {
-                              return name === params.name ? prevSelected[name] : !prevSelected[name];
-                            });
-                            var toApply = {};
-                            if (wasOnlyThisSelected) {
-                              names.forEach(function (name) { toApply[name] = true; });
-                            } else {
-                              names.forEach(function (name) { toApply[name] = name === params.name; });
-                            }
-                            suppress = true;
-                            chart.setOption({ legend: { selected: toApply } });
-                            currentSelected = Object.assign({}, toApply);
-                            suppress = false;
-                            return;
-                          }
-                        });
-
-                        // Shift/shift+cmd on a data point mirrors the legend's
-                        // link-opening behavior (same tab / new tab); plain and
-                        // cmd-only clicks on items are left alone.
-                        chart.on('click', function (params) {
-                          if (params.componentType !== 'series' || !shiftKey) return;
-                          var link = links[params.seriesName];
-                          if (!link) return;
-                          if (cmdKey) window.open(link, '_blank');
-                          else window.location.href = link;
-                        });
-                      }
-                      if (document.readyState === 'complete') init();
-                      else window.addEventListener('load', init);
-                    })();
-                  ||| % [
-                    c.id,
-                    std.manifestJsonMinified(c.darkTheme),
-                    std.manifestJsonMinified({ animation: false, backgroundColor: 'transparent' } + c.option),
-                    std.manifestJsonMinified(c.links),
-                  ],
-                },
-              ],
+              attributes: { type: 'application/json', class: 'echarts-config' },
+              children: [{ html: configJson }],
             },
           ],
         },
       ],
-    },
-  dashboard:
-    local chart =
-      local style = |||
-        @scope (.chart) {
-          :scope {
-            width: 100%;
-            box-sizing: border-box;
-          }
-        }
-      |||;
-
-      {
-        local c = self,
-        option:: error 'Chart requires option',
-        links:: {},
-        id:: 'chart',
-        width:: '100%',
-        height:: '400px',
-        darkTheme:: {
-          color: ['#4c657e', '#856350', '#677d67', '#78607b', '#44756f', '#84734c', '#546a78', '#774b4b'],
-          backgroundColor: 'transparent',
-          textStyle: { color: '#ccc' },
-          title: { textStyle: { color: '#ccc' }, subtextStyle: { color: '#999' } },
-          legend: { textStyle: { color: '#ccc' } },
-          tooltip: { backgroundColor: '#333', borderColor: '#555', textStyle: { color: '#ccc' } },
-          grid: { borderColor: '#444' },
-          categoryAxis: {
-            axisLine: { lineStyle: { color: '#666' } },
-            axisLabel: { color: '#ccc' },
-            splitLine: { lineStyle: { color: ['#333'] } },
-          },
-          valueAxis: {
-            axisLine: { lineStyle: { color: '#666' } },
-            axisLabel: { color: '#ccc' },
-            splitLine: { lineStyle: { color: ['#333'] } },
-          },
-          pie: {
-            itemStyle: { borderColor: 'transparent' },
-            label: { color: '#ccc', textBorderColor: 'transparent', textBorderWidth: 0 },
-            labelLine: { lineStyle: { color: '#666' } },
-          },
-        },
-        html: [
-          { element: 'style', children: [style] },
-          {
-            element: 'div',
-            attributes: { class: 'chart' },
-            children: [
-              {
-                element: 'div',
-                attributes: { id: c.id, style: 'width: %s; height: %s;' % [c.width, c.height] },
-              },
-              {
-                element: 'script',
-                children: [
-                  {
-                    html: |||
-                      (function () {
-                        function init() {
-                          var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                          var chart = echarts.init(document.getElementById('%s'), dark ? %s : null);
-                          var option = %s;
-                          option.tooltip = Object.assign({}, option.tooltip, { trigger: 'item' });
-
-                          option.brush = {
-                            xAxisIndex: 'all',
-                            brushStyle: {
-                              color: 'rgba(255, 255, 255, 0.08)',
-                              borderWidth: 0,
-                            },
-                          };
-                          option.toolbox = { show: false };
-
-                          chart.setOption(option);
-                          window.addEventListener('resize', function () { chart.resize(); });
-
-                          chart.dispatchAction({
-                            type: 'takeGlobalCursor',
-                            key: 'brush',
-                            brushOption: { brushType: 'lineX', brushMode: 'single' },
-                          });
-                          // Drag-select a horizontal range to navigate to it as an
-                          // absolute time range, mirroring Grafana's chart-drag zoom.
-                          // brushSelected fires continuously while dragging, so it
-                          // only tracks the pending range - navigation happens once,
-                          // on mouseup, so it doesn't fire mid-drag.
-                          var pendingRange = null;
-                          chart.on('brushSelected', function (params) {
-                            var batch = params.batch && params.batch[0];
-                            var area = batch && batch.areas && batch.areas[0];
-                            pendingRange = area && area.coordRange;
-                          });
-                          chart.getZr().on('mouseup', function () {
-                            if (!pendingRange) return;
-                            var range = pendingRange;
-                            pendingRange = null;
-                            var from = new Date(Math.min(range[0], range[1])).toISOString();
-                            var to = new Date(Math.max(range[0], range[1])).toISOString();
-                            var url = new URL(window.location.href);
-                            url.searchParams.set('from', from);
-                            url.searchParams.set('to', to);
-                            window.location.href = url.toString();
-                          });
-
-                          var links = %s;
-                          // Click: toggle. Cmd/ctrl+click: toggle all (isolate this
-                          // one / restore all). Shift+click: open link, same tab.
-                          // Shift+cmd/ctrl+click: open link, new tab.
-                          var shiftKey = false;
-                          var cmdKey = false;
-                          var prevSelected = {};
-                          var suppress = false;
-                          // Tracked ourselves instead of read from chart.getOption(),
-                          // since ECharts only lazily populates legend[0].selected
-                          // once the user has interacted with the legend at least once.
-                          var currentSelected = {};
-                          (option.legend.data || []).forEach(function (entry) {
-                            currentSelected[typeof entry === 'string' ? entry : entry.name] = true;
-                          });
-                          chart.getZr().on('mousedown', function (e) {
-                            var ev = e.event;
-                            shiftKey = !!(ev && ev.shiftKey);
-                            cmdKey = !!(ev && (ev.ctrlKey || ev.metaKey));
-                            prevSelected = Object.assign({}, currentSelected);
-                          });
-                          chart.on('legendselectchanged', function (params) {
-                            Object.assign(currentSelected, params.selected);
-                            if (suppress) return;
-
-                            function revertToggle() {
-                              var toRestore = Object.assign({}, prevSelected);
-                              suppress = true;
-                              chart.setOption({ legend: { selected: toRestore } });
-                              currentSelected = Object.assign({}, toRestore);
-                              suppress = false;
-                            }
-
-                            if (shiftKey) {
-                              if (links[params.name]) {
-                                revertToggle();
-                                if (cmdKey) window.open(links[params.name], '_blank');
-                                else window.location.href = links[params.name];
-                              } else {
-                                revertToggle();
-                              }
-                              return;
-                            }
-
-                            if (cmdKey) {
-                              var names = Object.keys(prevSelected);
-                              var wasOnlyThisSelected = names.every(function (name) {
-                                return name === params.name ? prevSelected[name] : !prevSelected[name];
-                              });
-                              var toApply = {};
-                              if (wasOnlyThisSelected) {
-                                names.forEach(function (name) { toApply[name] = true; });
-                              } else {
-                                names.forEach(function (name) { toApply[name] = name === params.name; });
-                              }
-                              suppress = true;
-                              chart.setOption({ legend: { selected: toApply } });
-                              currentSelected = Object.assign({}, toApply);
-                              suppress = false;
-                              return;
-                            }
-                          });
-
-                          // Shift/shift+cmd on a data point mirrors the legend's
-                          // link-opening behavior (same tab / new tab); plain and
-                          // cmd-only clicks on items are left alone.
-                          chart.on('click', function (params) {
-                            if (params.componentType !== 'series' || !shiftKey) return;
-                            var link = links[params.seriesName];
-                            if (!link) return;
-                            if (cmdKey) window.open(link, '_blank');
-                            else window.location.href = link;
-                          });
-                        }
-                        if (document.readyState === 'complete') init();
-                        else window.addEventListener('load', init);
-                      })();
-                    ||| % [
-                      c.id,
-                      std.manifestJsonMinified(c.darkTheme),
-                      std.manifestJsonMinified({ animation: false, backgroundColor: 'transparent' } + c.option),
-                      std.manifestJsonMinified(c.links),
-                    ],
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
+    };
 
     local style = |||
       @scope (.dashboard) {
@@ -416,7 +130,6 @@ local c = {
     local layoutNode = {
       local c = self,
       node:: error 'LayoutNode requires node',
-      path:: [],
       html::
         if c.node.type == 'panel' then
           {
@@ -426,7 +139,6 @@ local c = {
               chart {
                 option:: c.node.chart.option,
                 links:: c.node.chart.links,
-                id:: 'chart-' + std.join('-', [std.toString(p) for p in c.path]),
                 width:: '100%',
                 height:: '100%',
               },
@@ -440,7 +152,7 @@ local c = {
               style: 'flex: %s 1 0%%; flex-direction: %s;' % [c.node.flex, direction(c.node)],
             },
             children: [
-              (layoutNode { node:: c.node.children[i], path:: c.path + [i] }).html
+              (layoutNode { node:: c.node.children[i] }).html
               for i in std.range(0, std.length(c.node.children) - 1)
             ],
           },
@@ -459,7 +171,7 @@ local c = {
             style: 'flex-direction: %s; height: %s;' % [direction(c.layout), c.height],
           },
           children: [
-            (layoutNode { node:: c.layout.children[i], path:: [i] }).html
+            (layoutNode { node:: c.layout.children[i] }).html
             for i in std.range(0, std.length(c.layout.children) - 1)
           ],
         },
@@ -1659,17 +1371,204 @@ local ui = {
 local html = {
   manifestHtml(tree): std.native('invoke:html')('manifestHtml', [tree]),
 };
+local charts =
+  local line =
+    local common =
+      local round(v, decimals) =
+        if v == null || decimals == null then v
+        else
+          local factor = std.pow(10, decimals);
+          std.round(v * factor) / factor;
+
+      local siPrefixes = [
+        { factor: 1e12, suffix: 'TB' },
+        { factor: 1e9, suffix: 'GB' },
+        { factor: 1e6, suffix: 'MB' },
+        { factor: 1e3, suffix: 'KB' },
+        { factor: 1, suffix: 'B' },
+      ];
+
+      local maxAbsValue(series) =
+        std.foldl(
+          function(acc, s) std.foldl(
+            function(acc2, point) if point[1] == null then acc2 else std.max(acc2, std.abs(point[1])),
+            s.data,
+            acc
+          ),
+          series,
+          0
+        );
+
+      local siScale(maxAbs) =
+        local matches = [p for p in siPrefixes if maxAbs >= p.factor];
+        if std.length(matches) > 0 then matches[0] else siPrefixes[std.length(siPrefixes) - 1];
+
+      local scaleSeries(series, factor, decimals) = [
+        s { data: [[point[0], round(if point[1] == null then null else point[1] / factor, decimals)] for point in s.data] }
+        for s in series
+      ];
+
+      {
+        timeAxis: {
+          type: 'time',
+          axisLabel: {
+            formatter: {
+              year: '{yyyy}',
+              month: '{MMM}',
+              day: '{MMM} {d}',
+              hour: '{HH}:{mm}',
+              minute: '{HH}:{mm}',
+              second: '{HH}:{mm}:{ss}',
+              none: '{yyyy}-{MM}-{dd}',
+            },
+          },
+        },
+        round: round,
+        maxAbsValue: maxAbsValue,
+        siScale: siScale,
+        scaleSeries: scaleSeries,
+      };
+
+    {
+      local c = self,
+      title:: null,
+      series:: [],
+      unit:: null,
+      decimals:: 2,
+      option::
+        local styled = [
+          s { type: 'line', showSymbol: true, symbolSize: 16, itemStyle: { opacity: 0 } }
+          for s in c.series
+        ];
+        local scale = if c.unit == 'bytes' then common.siScale(common.maxAbsValue(styled)) else { factor: 1, suffix: null };
+        local allSeries = common.scaleSeries(styled, scale.factor, c.decimals);
+        {
+          title: { text: c.title },
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'cross', z: 100, lineStyle: { color: '#888', type: 'dashed' } },
+          },
+          legend: {
+            data: [{ name: s.name, itemStyle: { opacity: 1 } } for s in allSeries],
+            type: 'scroll',
+            bottom: 0,
+            icon: 'roundRect',
+          },
+          grid: { top: 40, bottom: 40, containLabel: true },
+          xAxis: common.timeAxis,
+          yAxis: { type: 'value' } + (
+            if scale.suffix != null then { axisLabel: { formatter: '{value} ' + scale.suffix } } else {}
+          ),
+          series: allSeries,
+        },
+    };
+  local stateTimeline =
+    local common =
+      local round(v, decimals) =
+        if v == null || decimals == null then v
+        else
+          local factor = std.pow(10, decimals);
+          std.round(v * factor) / factor;
+
+      local siPrefixes = [
+        { factor: 1e12, suffix: 'TB' },
+        { factor: 1e9, suffix: 'GB' },
+        { factor: 1e6, suffix: 'MB' },
+        { factor: 1e3, suffix: 'KB' },
+        { factor: 1, suffix: 'B' },
+      ];
+
+      local maxAbsValue(series) =
+        std.foldl(
+          function(acc, s) std.foldl(
+            function(acc2, point) if point[1] == null then acc2 else std.max(acc2, std.abs(point[1])),
+            s.data,
+            acc
+          ),
+          series,
+          0
+        );
+
+      local siScale(maxAbs) =
+        local matches = [p for p in siPrefixes if maxAbs >= p.factor];
+        if std.length(matches) > 0 then matches[0] else siPrefixes[std.length(siPrefixes) - 1];
+
+      local scaleSeries(series, factor, decimals) = [
+        s { data: [[point[0], round(if point[1] == null then null else point[1] / factor, decimals)] for point in s.data] }
+        for s in series
+      ];
+
+      {
+        timeAxis: {
+          type: 'time',
+          axisLabel: {
+            formatter: {
+              year: '{yyyy}',
+              month: '{MMM}',
+              day: '{MMM} {d}',
+              hour: '{HH}:{mm}',
+              minute: '{HH}:{mm}',
+              second: '{HH}:{mm}:{ss}',
+              none: '{yyyy}-{MM}-{dd}',
+            },
+          },
+        },
+        round: round,
+        maxAbsValue: maxAbsValue,
+        siScale: siScale,
+        scaleSeries: scaleSeries,
+      };
+
+    {
+      local c = self,
+      title:: null,
+      rows:: [],
+      segments:: [],
+      option::
+        local rowIndex = { [c.rows[i]]: i for i in std.range(0, std.length(c.rows) - 1) };
+        {
+          title: { text: c.title },
+          tooltip: { trigger: 'item', formatter: '{b}' },
+          grid: { top: 40, bottom: 40, containLabel: true },
+          xAxis: common.timeAxis,
+          yAxis: { type: 'category', data: c.rows },
+          series: [{
+            type: 'custom',
+            renderItem: 'stateTimeline',
+            encode: { x: [1, 2], y: 0 },
+            data: [
+              { value: [rowIndex[s.row], s.start, s.end, std.get(s, 'label', null)] }
+              + (if std.get(s, 'color', null) != null then { itemStyle: { color: s.color } } else {})
+              + (if std.get(s, 'link', null) != null then { link: s.link } else {})
+              + (local nm = if std.get(s, 'tooltip', null) != null then s.tooltip else std.get(s, 'label', null); if nm != null then { name: nm } else {})
+              for s in c.segments
+            ],
+          }],
+        },
+    };
+
+  {
+    line: { chart: line },
+    stateTimeline: { chart: stateTimeline },
+  };
 
 local echartsSrc = 'https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js';
 local echartsScript = { element: 'script', attributes: { src: echartsSrc } };
+local componentScript = { element: 'script', children: [{ html: importstr 'components/chart.js' }] };
 
 local baseView = {
   local n = self,
   _view:: {
     fragment: error 'view requires a fragment',
-    page: ui.page { fragment:: [echartsScript, n._view.fragment] },
+    page: ui.page { fragment:: [echartsScript, componentScript, n._view.fragment] },
     html: html.manifestHtml(self.page),
   },
+};
+
+local linkPaths(links) = {
+  [k]: links[k]._queryPath
+  for k in std.objectFields(links)
+  if std.isObject(links[k]) && std.objectHasAll(links[k], '_queryPath')
 };
 
 local chartView = baseView {
@@ -1678,8 +1577,7 @@ local chartView = baseView {
       c.panel {
         child:: c.chart {
           option:: $.option,
-          links:: std.get($, 'links', {}),
-          id:: std.get($, 'chartId', 'chart'),
+          links:: linkPaths(std.get($, 'links', {})),
           width:: std.get($, 'width', '100%'),
           height:: std.get($, 'height', '400px'),
         },
@@ -1706,4 +1604,4 @@ local dashboardView = baseView {
   row(flex, children):: { type: 'row', flex: flex, children: children },
   column(flex, children):: { type: 'column', flex: flex, children: children },
   panel(flex, chart):: { type: 'panel', flex: flex, chart: chart },
-}
+} + charts
