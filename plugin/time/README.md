@@ -34,6 +34,15 @@ time.addDuration()
 ```
 
 
+### format
+
+Formats `epochMs` using a Go reference-time layout (e.g. `2006-01-02 15:04`), returning a string.
+
+```jsonnet
+time.format()
+```
+
+
 ### now
 
 Returns the current time as epoch milliseconds.
@@ -43,11 +52,11 @@ time.now()
 ```
 
 
-### parseRFC3339
+### parse
 
-Parses an RFC3339 timestamp (e.g. `2026-08-04T00:00:00Z`) into epoch milliseconds.
+Parses a timestamp string using a Go reference-time layout (e.g. `2006-01-02T15:04:05Z07:00`) into epoch milliseconds.
 
 ```jsonnet
-time.parseRFC3339()
+time.parse()
 ```
 
