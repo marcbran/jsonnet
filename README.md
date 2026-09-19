@@ -58,6 +58,15 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-openapi): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-openapi/arcourse/arcourse-openapi/main.libsonnet): Inlined code published for usage in other projects
+## arcourse/arcourse-telemetry-kubernetes
+
+> Ready-made Kubernetes telemetry entities for arcourse-telemetry, mounted under
+
+- [Readme](arcourse/arcourse-telemetry-kubernetes/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-telemetry-kubernetes): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-telemetry-kubernetes/arcourse/arcourse-telemetry-kubernetes/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/arcourse-telemetry
 
 > Backend-agnostic `chart`/`dashboard` nodes rendering telemetry queries as
