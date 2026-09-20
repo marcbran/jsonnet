@@ -24,7 +24,15 @@ local arcourse-telemetry-kubernetes = import 'arcourse/arcourse-telemetry-kubern
 
 `pod`, `container`, `pvc`, `deployment`, `node`) via kube-state-metrics and
 cAdvisor queries, with drilldown charts and cross-links to the matching
-`arcourse-kubernetes` resource nodes (and back).
+`arcourse-kubernetes` resource nodes (and back). The `context`, `namespace`,
+`pod`, and `container` entities also expose a `logs` view.
+
+This is an opinionated, backend-coupled convenience layer: metric drilldowns
+assume Prometheus/PromQL (kube-state-metrics + cAdvisor), and the `logs`
+selectors assume Loki/LogQL, with `cluster`/`namespace`/`container` as indexed
+labels and `pod` as structured metadata (`| pod="..."`). Each entity's queries
+are overridable fields, so a different metrics or logs backend can be swapped
+in per entity.
 
 Assumes a `cluster` label identifies the context and that the resource tree is
 mounted at `root.kubernetes`. Each entity is exposed as an overridable field;
@@ -34,7 +42,7 @@ mounted at `root.kubernetes`. Each entity is exposed as an overridable field;
 
 ### container
 
-Entity spec for the container dimension, with restarts/cpu/memory drilldowns.
+Entity spec for the container dimension, with restarts/cpu/memory drilldowns and a logs view.
 
 ```jsonnet
 arcourse-telemetry-kubernetes.container
@@ -43,7 +51,7 @@ arcourse-telemetry-kubernetes.container
 
 ### context
 
-Entity spec for the cluster/context dimension.
+Entity spec for the cluster/context dimension, with a logs view.
 
 ```jsonnet
 arcourse-telemetry-kubernetes.context
@@ -61,7 +69,7 @@ arcourse-telemetry-kubernetes.deployment
 
 ### namespace
 
-Entity spec for the namespace dimension.
+Entity spec for the namespace dimension, with a logs view.
 
 ```jsonnet
 arcourse-telemetry-kubernetes.namespace
@@ -88,7 +96,7 @@ arcourse-telemetry-kubernetes.nodeList
 
 ### pod
 
-Entity spec for the pod dimension, with a pod-phase state timeline drilldown.
+Entity spec for the pod dimension, with a pod-phase state timeline drilldown and a logs view.
 
 ```jsonnet
 arcourse-telemetry-kubernetes.pod
