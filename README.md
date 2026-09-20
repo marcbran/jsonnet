@@ -69,7 +69,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-telemetry-kubernetes/arcourse/arcourse-telemetry-kubernetes/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/arcourse-telemetry
 
-> Backend-agnostic `chart`/`dashboard` nodes rendering telemetry queries as
+> Backend-agnostic `chart`/`logs`/`dashboard` nodes rendering telemetry
 
 - [Readme](arcourse/arcourse-telemetry/README.md): Documentation of installation and usage
 
