@@ -1,6 +1,6 @@
 # arcourse/arcourse-telemetry
 
-> Backend-agnostic `chart`/`dashboard` nodes rendering telemetry queries as
+> Backend-agnostic `chart`/`logs`/`dashboard` nodes rendering telemetry
 
 - [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-telemetry): Original source code
 
@@ -22,8 +22,9 @@ local arcourse-telemetry = import 'arcourse/arcourse-telemetry/main.libsonnet';
 
 ## Description
 
-host's `telemetry` invocation (see jsonnet-plugin-telemetry), resolving
-relative time ranges (via jsonnet-plugin-time).
+batched through the host's `telemetry` invocation (see
+jsonnet-plugin-telemetry), resolving relative time ranges (via
+jsonnet-plugin-time).
 
 Each chart node queries exactly one telemetry type (a chart can't mix
 metric and log series in one rendering), but `dashboard.node` is type-
@@ -41,6 +42,17 @@ arcourse-telemetry.dashboard
 
 type's chart node - the dashboard only needs each panel's chart to
 expose `_telemetryItems` and its own `option`/`links` rendering.
+
+### logs
+
+Backend-generic `logs` node: batches a telemetry item (query language set
+
+```jsonnet
+arcourse-telemetry.logs
+```
+
+the returned records as a time-sorted log view (severity accent,
+click-to-expand fields).
 
 ### promql
 
