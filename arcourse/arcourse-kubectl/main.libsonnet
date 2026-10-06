@@ -842,6 +842,7 @@ local generate(resources, manifest=true) =
   if manifest then j.manifestJsonnet(generated) else generated;
 
 local graph = {
+  _record: false,
   manifest:: true,
   data:: {
     contexts: configuredContexts($),
