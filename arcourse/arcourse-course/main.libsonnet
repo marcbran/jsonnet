@@ -436,6 +436,105 @@ local a =
           { element: 'script', children: [{ html: sortScript }] },
         ],
       },
+    tree:
+      local style = |||
+        @scope (.tree) {
+          :scope {
+            font-family: monospace;
+            display: block;
+            overflow-x: auto;
+            line-height: 1.3;
+          }
+          ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+          }
+          li {
+            white-space: pre;
+          }
+          a {
+            color: var(--primary-color);
+          }
+          a:hover {
+            text-decoration: none;
+          }
+          .prefix {
+            opacity: 0.4;
+            user-select: none;
+          }
+          .detail {
+            opacity: 0.55;
+            margin-left: 0.75em;
+            font-size: 0.85em;
+          }
+        }
+      |||;
+
+      local link = {
+        local c = self,
+        node:: error 'Link requires a node',
+        html: {
+          element: 'a',
+          attributes: { href: c.node.link },
+          children: [c.node.text],
+        },
+      };
+
+      local rowsOf(nodes, indent, root) = std.flatMap(
+        function(i)
+          local node = nodes[i];
+          local last = i == std.length(nodes) - 1;
+          [{
+            node: node,
+            prefix: if root then '' else indent + (if last then '╰─ ' else '├─ '),
+          }] + rowsOf(
+            std.get(node, 'children', []),
+            if root then '' else indent + (if last then '   ' else '│  '),
+            false,
+          ),
+        std.range(0, std.length(nodes) - 1)
+      );
+
+      local row = {
+        local c = self,
+        prefix:: error 'Row requires a prefix',
+        item:: error 'Row requires an item',
+        html: {
+          element: 'li',
+          children: [
+            { element: 'span', attributes: { class: 'prefix' }, children: [c.prefix] },
+            c.item,
+          ],
+        },
+      };
+
+      local rowList = {
+        local c = self,
+        rows:: error 'RowList requires rows',
+        item:: error 'RowList requires an item',
+        html: {
+          element: 'ul',
+          children: [
+            row { prefix:: r.prefix, item:: c.item { node:: r.node } }
+            for r in c.rows
+          ],
+        },
+      };
+
+      {
+        local c = self,
+        nodes:: error 'Tree requires nodes',
+        item:: link,
+        html: [
+          { element: 'style', children: [style] },
+          {
+            element: 'section',
+            attributes: { class: 'tree card' },
+            children: [rowList { rows:: rowsOf(c.nodes, '', true), item:: c.item }],
+          },
+        ],
+      },
     yaml:
       local yaml = {
         local c = self,
@@ -748,6 +847,7 @@ local a =
                 document.addEventListener('keydown', function (e) {
                   if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
                   var el = document.activeElement;
+                  while (el && el.shadowRoot && el.shadowRoot.activeElement) el = el.shadowRoot.activeElement;
                   var tag = el && el.tagName;
                   if (tag === 'INPUT' || tag === 'TEXTAREA' || (el && el.isContentEditable)) return;
                   var nav = document.querySelector('quick-nav');
@@ -1051,7 +1151,8 @@ local a =
           align-items: flex-start;
           gap: 0.25em;
         }
-        .resource > .yaml {
+        .resource > .yaml,
+        .resource > .tree {
           flex: 1 1 0;
           min-width: 0;
         }
@@ -1060,6 +1161,7 @@ local a =
       {
         local c = self,
         data:: error 'Resource requires data',
+        content:: yaml { data:: c.data },
         items:: [],
         groups:: [],
         html: [
@@ -1070,7 +1172,7 @@ local a =
             children:
               (if std.length(c.items) > 0 || std.length(c.groups) > 0 then
                  [list { items:: c.items, groups:: c.groups, style:: ' min-width: 8em;' }]
-               else []) + [yaml { data:: c.data }],
+               else []) + [c.content],
           },
         ],
       },
@@ -1449,7 +1551,19 @@ local a =
       std.objectFields(links)
     );
 
-  local neighborItems(obj) = collectNeighbors(obj, '', ['data', '_view', 'links']) + linksItems(obj);
+  local curatedLinks(obj) =
+    std.set([
+      item.link
+      for item in linksItems(obj) + std.flatMap(function(group) group.items, linksGroups(obj))
+    ]);
+
+  local neighborItems(obj) =
+    local curated = curatedLinks(obj);
+    [
+      item
+      for item in collectNeighbors(obj, '', ['data', '_view', 'links'])
+      if !std.setMember(item.link, curated)
+    ] + linksItems(obj);
 
   local safeGet(obj, path) =
     std.foldl(
@@ -1501,6 +1615,21 @@ local a =
     },
   };
 
+  local treeView = baseView {
+    _view+:: {
+      fragment:
+        local tree = std.get($, 'tree', {});
+        c.resource {
+          items:: neighborItems($),
+          groups:: linksGroups($),
+          content:: c.tree {
+            nodes:: std.get(tree, 'nodes', []),
+            item:: std.get(tree, 'item', super.item),
+          },
+        },
+    },
+  };
+
   local resourceView = baseView {
     _view+:: {
       fragment: c.resource {
@@ -1526,15 +1655,104 @@ local a =
     default: { view: listView } + withNode,
     list: { view: listView } + withNode,
     table: { view: tableView } + withNode,
+    tree: { view: treeView } + withNode,
     yaml: { view: yamlView } + withNode,
     resource: { view: resourceView } + withNode,
     action: { view: actionView } + withNode,
   };
 local root = import 'root';
 local invoke(name, args=[]) = std.native('invoke:course')(name, args);
+local unrecorded = { _record: false };
+
+local evaluationContentStyle = |||
+  .evaluation-content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25em;
+    width: 75vw;
+  }
+  .evaluation-preview {
+    box-sizing: border-box;
+    width: 100%;
+    height: 70vh;
+    border: 1px solid var(--border-color);
+    background: var(--background-color);
+  }
+|||;
+
+local evaluationContent = {
+  local c = self,
+  content:: error 'EvaluationContent requires content',
+  src:: error 'EvaluationContent requires a src',
+  html: [
+    { element: 'style', children: [evaluationContentStyle] },
+    {
+      element: 'div',
+      attributes: { class: 'evaluation-content' },
+      children: [
+        c.content,
+        {
+          element: 'iframe',
+          attributes: {
+            class: 'evaluation-preview card',
+            src: c.src,
+            sandbox: '',
+            loading: 'lazy',
+          },
+          children: [],
+        },
+      ],
+    },
+  ],
+};
+
+local visitItem = {
+  local c = self,
+  node:: error 'VisitItem requires a node',
+  html: [
+    {
+      element: 'a',
+      attributes: { href: c.node.link },
+      children: [c.node.address],
+    },
+    {
+      element: 'span',
+      attributes: { class: 'detail' },
+      children: [
+        if c.node.remarks == 0 then c.node.time
+        else if c.node.remarks == 1 then '%s 1 remark' % c.node.time
+        else '%s %d remarks' % [c.node.time, c.node.remarks],
+      ],
+    },
+  ],
+};
+
+local executionItem = {
+  local c = self,
+  node:: error 'ExecutionItem requires a node',
+  html: [
+    {
+      element: 'a',
+      attributes: { href: c.node.link },
+      children: ['execution'],
+    },
+    {
+      element: 'span',
+      attributes: { class: 'detail' },
+      children: ['%s %s' % [c.node.time, c.node.status]],
+    },
+  ],
+};
+
+local courseItem = {
+  local c = self,
+  node:: error 'CourseItem requires a node',
+  html: (if c.node.kind == 'execution' then executionItem else visitItem) { node:: c.node }.html,
+};
 
 [
-  [['arcourse', 'sessions'], a.table.node {
+  [['arcourse', 'sessions'], a.table.node + unrecorded {
     data: { items: invoke('sessions') },
     table:: {
       at: ['items'],
@@ -1553,29 +1771,225 @@ local invoke(name, args=[]) = std.native('invoke:course')(name, args);
       },
     ],
   }],
-  [['arcourse', '$session'], a.resource.node {
+  [['arcourse', '$session'], a.tree.node + unrecorded {
     data: invoke('session', [$.session]),
-    links: {
-      [visit.visitId]: root.arcourse.session($.session).visit(visit.visitId)
-      for visit in $.data.visits
+    local session = root.arcourse.session($.session),
+    local visitIds = { [visit.visitId]: true for visit in $.data.visits },
+    local executionIds = { [execution.executionId]: true for execution in $.data.executions },
+    local branches(visits, executions) = [
+      entry.branch
+      for entry in std.sort(
+        [{ timestamp: visit.timestamp, branch: visitBranch(visit) } for visit in visits] +
+        [{ timestamp: execution.timestamp, branch: executionBranch(execution) } for execution in executions],
+        function(entry) entry.timestamp,
+      )
+    ],
+    local visitBranch(visit) = {
+      kind: 'visit',
+      address: visit.address,
+      time: std.substr(visit.timestamp, 11, 8),
+      remarks: visit.remarks,
+      link: session.visit(visit.visitId)._queryPath,
+      children: branches(
+        [child for child in $.data.visits if child.parent.visit == visit.visitId],
+        [execution for execution in $.data.executions if execution.visitId == visit.visitId],
+      ),
+    },
+    local executionBranch(execution) = {
+      kind: 'execution',
+      status: execution.status,
+      time: std.substr(execution.timestamp, 11, 8),
+      link: session.execution(execution.executionId)._queryPath,
+      children: branches(
+        [child for child in $.data.visits if child.parent.execution == execution.executionId],
+        [],
+      ),
+    },
+    tree:: {
+      nodes: branches(
+        [
+          visit
+          for visit in $.data.visits
+          if !std.objectHas(visitIds, visit.parent.visit)
+             && !std.objectHas(executionIds, visit.parent.execution)
+        ],
+        [
+          execution
+          for execution in $.data.executions
+          if !std.objectHas(visitIds, execution.visitId)
+        ],
+      ),
+      item: courseItem,
     },
   }],
-  [['arcourse', '$session', '$visit'], a.resource.node {
-    data: invoke('visit', [$.visit]),
+  [['arcourse', '$session', '$visit'], a.resource.node + unrecorded {
+    local visit = invoke('visit', [$.visit]),
+    local session = invoke('session', [$.session]),
+    local sessionNode = root.arcourse.session($.session),
+    local visitOf = { [v.visitId]: v for v in session.visits },
+    local parent = std.get(visitOf, $.visit, { parent: { visit: '', execution: '' } }).parent,
+    local childIds = [v.visitId for v in session.visits if v.parent.visit == $.visit],
+    local evaluations = visit.evaluations,
+    local executions = visit.executions,
+    data: {
+      address: visit.address,
+      versions: visit.versions,
+      first: evaluations[0].timestamp,
+      last: evaluations[std.length(evaluations) - 1].timestamp,
+    } + (
+      if std.length(visit.remarks) > 0
+      then { remarks: [{ time: remark.timestamp, text: remark.text } for remark in visit.remarks] }
+      else {}
+    ),
     links: {
-      [evaluation.evaluationId]: root.arcourse.session($.session).visit($.visit).evaluation(evaluation.evaluationId)
-      for evaluation in $.data.evaluations
-    } + {
-      node: { _node: true, _queryPath: '/' + $.data.address },
-      session: root.arcourse.session($.session),
+      course: {
+        node: { _node: true, _queryPath: '/' + visit.address },
+        session: sessionNode,
+      },
+    } + (
+      if std.objectHas(visitOf, parent.visit)
+      then { from: { [visitOf[parent.visit].address]: sessionNode.visit(parent.visit) } }
+      else if parent.execution != ''
+      then { from: { execution: sessionNode.execution(parent.execution) } }
+      else {}
+    ) + (
+      if std.length(childIds) > 0
+      then {
+        next: {
+          ['%02d %s' % [i + 1, visitOf[childIds[i]].address]]:
+            sessionNode.visit(childIds[i])
+          for i in std.range(0, std.length(childIds) - 1)
+        },
+      }
+      else {}
+    ) + (
+      if std.length(executions) > 0
+      then {
+        executions: {
+          ['%02d %s %s' % [i + 1, std.substr(executions[i].timestamp, 11, 8), executions[i].status]]:
+            sessionNode.execution(executions[i].executionId)
+          for i in std.range(0, std.length(executions) - 1)
+        },
+      }
+      else {}
+    ) + {
+      versions: {
+        ['%02d %s' % [i + 1, std.substr(evaluations[i].timestamp, 11, 8)]]:
+          sessionNode.visit($.visit).evaluation(evaluations[i].evaluationId)
+        for i in std.range(0, std.length(evaluations) - 1)
+      },
     },
   }],
-  [['arcourse', '$session', '$visit', '$evaluation'], a.resource.node {
-    data: invoke('evaluation', [$.evaluation]),
+  [['arcourse', '$session', '$visit', '$evaluation'], a.resource.node + unrecorded {
+    local evaluation = invoke('evaluation', [$.evaluation]),
+    local visit = invoke('visit', [$.visit]),
+    local evaluations = visit.evaluations,
+    local remarks = [remark for remark in visit.remarks if remark.from == $.evaluation],
+    local positions = [
+      i
+      for i in std.range(0, std.length(evaluations) - 1)
+      if evaluations[i].evaluationId == $.evaluation
+    ],
+    local position = if std.length(positions) > 0 then positions[0] else -1,
+    local adjacent = (
+      if position > 0
+      then {
+        prev: root.arcourse.session($.session).visit($.visit)
+              .evaluation(evaluations[position - 1].evaluationId),
+      }
+      else {}
+    ) + (
+      if position >= 0 && position < std.length(evaluations) - 1
+      then {
+        next: root.arcourse.session($.session).visit($.visit)
+              .evaluation(evaluations[position + 1].evaluationId),
+      }
+      else {}
+    ),
+    data: {
+      address: evaluation.address,
+      timestamp: evaluation.timestamp,
+      version: '%d of %d' % [position + 1, std.length(evaluations)],
+    } + (
+      if std.length(remarks) > 0
+      then { remarks: [{ time: remark.timestamp, text: remark.text } for remark in remarks] }
+      else {}
+    ),
     links: {
-      node: { _node: true, _queryPath: '/' + $.data.address },
-      visit: root.arcourse.session($.session).visit($.visit),
-      session: root.arcourse.session($.session),
+      format: {
+        html: $.html,
+        json: $.json,
+      },
+      course: {
+        node: { _node: true, _queryPath: '/' + evaluation.address },
+        visit: root.arcourse.session($.session).visit($.visit),
+        session: root.arcourse.session($.session),
+      },
+    } + (
+      if std.length(adjacent) > 0
+      then { versions: adjacent }
+      else {}
+    ),
+    _view+:: {
+      fragment: super.fragment {
+        local yamlContent = super.content,
+        content:: evaluationContent {
+          content:: yamlContent,
+          src:: $.html._queryPath,
+        },
+      },
     },
+  }],
+  [['arcourse', '$session', '$visit', '$evaluation', 'html'], unrecorded {
+    _view:: { html: invoke('content', [$.evaluation, 'html']) },
+  }],
+  [['arcourse', '$session', '$visit', '$evaluation', 'json'], a.yaml.node + unrecorded {
+    local content = std.parseJson(invoke('content', [$.evaluation, 'json'])),
+    data: {
+      [key]: content[key]
+      for key in std.objectFields(content)
+      if key != '_node'
+    },
+  }],
+  [['arcourse', '$session', '$execution'], a.resource.node + unrecorded {
+    local execution = invoke('execution', [$.execution]),
+    local session = invoke('session', [$.session]),
+    local sessionNode = root.arcourse.session($.session),
+    local content = std.parseJson(invoke('content', [execution.from, 'json'])),
+    local visitOf = { [v.visitId]: v for v in session.visits },
+    local nextIds = [v.visitId for v in session.visits if v.parent.execution == $.execution],
+    data: {
+      address: execution.address,
+      action: std.get(content, '_action', {}),
+      status: execution.status,
+      started: execution.timestamp,
+    } + (
+      if execution.finished != '' then { finished: execution.finished } else {}
+    ) + (
+      if execution['error'] != '' then { 'error': execution['error'] } else {}
+    ),
+    links: {
+      course: {
+        node: { _node: true, _queryPath: '/' + execution.address },
+        evaluation: sessionNode.visit(execution.visitId).evaluation(execution.from),
+        visit: sessionNode.visit(execution.visitId),
+        session: sessionNode,
+      },
+    } + (
+      if execution.hasOutput then { content: { output: $.output } } else {}
+    ) + (
+      if std.length(nextIds) > 0
+      then {
+        next: {
+          ['%02d %s' % [i + 1, visitOf[nextIds[i]].address]]:
+            sessionNode.visit(nextIds[i])
+          for i in std.range(0, std.length(nextIds) - 1)
+        },
+      }
+      else {}
+    ),
+  }],
+  [['arcourse', '$session', '$execution', 'output'], a.yaml.node + unrecorded {
+    data: { output: invoke('output', [$.execution]) },
   }],
 ]
