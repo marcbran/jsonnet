@@ -1056,6 +1056,7 @@ local groupsFromSpecs(specs, columns, links) =
   ]);
 
 local graph = {
+  _record: false,
   manifest:: true,
   contexts:: [],
   specs:: {},
