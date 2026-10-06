@@ -435,6 +435,105 @@ local c = {
         { element: 'script', children: [{ html: sortScript }] },
       ],
     },
+  tree:
+    local style = |||
+      @scope (.tree) {
+        :scope {
+          font-family: monospace;
+          display: block;
+          overflow-x: auto;
+          line-height: 1.3;
+        }
+        ul {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+        }
+        li {
+          white-space: pre;
+        }
+        a {
+          color: var(--primary-color);
+        }
+        a:hover {
+          text-decoration: none;
+        }
+        .prefix {
+          opacity: 0.4;
+          user-select: none;
+        }
+        .detail {
+          opacity: 0.55;
+          margin-left: 0.75em;
+          font-size: 0.85em;
+        }
+      }
+    |||;
+
+    local link = {
+      local c = self,
+      node:: error 'Link requires a node',
+      html: {
+        element: 'a',
+        attributes: { href: c.node.link },
+        children: [c.node.text],
+      },
+    };
+
+    local rowsOf(nodes, indent, root) = std.flatMap(
+      function(i)
+        local node = nodes[i];
+        local last = i == std.length(nodes) - 1;
+        [{
+          node: node,
+          prefix: if root then '' else indent + (if last then '╰─ ' else '├─ '),
+        }] + rowsOf(
+          std.get(node, 'children', []),
+          if root then '' else indent + (if last then '   ' else '│  '),
+          false,
+        ),
+      std.range(0, std.length(nodes) - 1)
+    );
+
+    local row = {
+      local c = self,
+      prefix:: error 'Row requires a prefix',
+      item:: error 'Row requires an item',
+      html: {
+        element: 'li',
+        children: [
+          { element: 'span', attributes: { class: 'prefix' }, children: [c.prefix] },
+          c.item,
+        ],
+      },
+    };
+
+    local rowList = {
+      local c = self,
+      rows:: error 'RowList requires rows',
+      item:: error 'RowList requires an item',
+      html: {
+        element: 'ul',
+        children: [
+          row { prefix:: r.prefix, item:: c.item { node:: r.node } }
+          for r in c.rows
+        ],
+      },
+    };
+
+    {
+      local c = self,
+      nodes:: error 'Tree requires nodes',
+      item:: link,
+      html: [
+        { element: 'style', children: [style] },
+        {
+          element: 'section',
+          attributes: { class: 'tree card' },
+          children: [rowList { rows:: rowsOf(c.nodes, '', true), item:: c.item }],
+        },
+      ],
+    },
   yaml:
     local yaml = {
       local c = self,
@@ -747,6 +846,7 @@ local c = {
               document.addEventListener('keydown', function (e) {
                 if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
                 var el = document.activeElement;
+                while (el && el.shadowRoot && el.shadowRoot.activeElement) el = el.shadowRoot.activeElement;
                 var tag = el && el.tagName;
                 if (tag === 'INPUT' || tag === 'TEXTAREA' || (el && el.isContentEditable)) return;
                 var nav = document.querySelector('quick-nav');
@@ -1050,7 +1150,8 @@ local c = {
         align-items: flex-start;
         gap: 0.25em;
       }
-      .resource > .yaml {
+      .resource > .yaml,
+      .resource > .tree {
         flex: 1 1 0;
         min-width: 0;
       }
@@ -1059,6 +1160,7 @@ local c = {
     {
       local c = self,
       data:: error 'Resource requires data',
+      content:: yaml { data:: c.data },
       items:: [],
       groups:: [],
       html: [
@@ -1069,7 +1171,7 @@ local c = {
           children:
             (if std.length(c.items) > 0 || std.length(c.groups) > 0 then
                [list { items:: c.items, groups:: c.groups, style:: ' min-width: 8em;' }]
-             else []) + [yaml { data:: c.data }],
+             else []) + [c.content],
         },
       ],
     },
@@ -1448,7 +1550,19 @@ local linksGroups(obj) =
     std.objectFields(links)
   );
 
-local neighborItems(obj) = collectNeighbors(obj, '', ['data', '_view', 'links']) + linksItems(obj);
+local curatedLinks(obj) =
+  std.set([
+    item.link
+    for item in linksItems(obj) + std.flatMap(function(group) group.items, linksGroups(obj))
+  ]);
+
+local neighborItems(obj) =
+  local curated = curatedLinks(obj);
+  [
+    item
+    for item in collectNeighbors(obj, '', ['data', '_view', 'links'])
+    if !std.setMember(item.link, curated)
+  ] + linksItems(obj);
 
 local safeGet(obj, path) =
   std.foldl(
@@ -1500,6 +1614,21 @@ local tableView = baseView {
   },
 };
 
+local treeView = baseView {
+  _view+:: {
+    fragment:
+      local tree = std.get($, 'tree', {});
+      c.resource {
+        items:: neighborItems($),
+        groups:: linksGroups($),
+        content:: c.tree {
+          nodes:: std.get(tree, 'nodes', []),
+          item:: std.get(tree, 'item', super.item),
+        },
+      },
+  },
+};
+
 local resourceView = baseView {
   _view+:: {
     fragment: c.resource {
@@ -1525,6 +1654,7 @@ local withNode = { node: self.view + linkspecs.withLinkSpecs };
   default: { view: listView } + withNode,
   list: { view: listView } + withNode,
   table: { view: tableView } + withNode,
+  tree: { view: treeView } + withNode,
   yaml: { view: yamlView } + withNode,
   resource: { view: resourceView } + withNode,
   action: { view: actionView } + withNode,
