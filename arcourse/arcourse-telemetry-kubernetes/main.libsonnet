@@ -2359,6 +2359,16 @@ local telemetry =
           return { type: 'group', children: children };
         }
 
+        function withTimeRange(link) {
+          var target = new URL(link, window.location.href);
+          var current = new URL(window.location.href);
+          ['from', 'to'].forEach(function (key) {
+            var value = current.searchParams.get(key);
+            if (value !== null && !target.searchParams.has(key)) target.searchParams.set(key, value);
+          });
+          return target.pathname + target.search + target.hash;
+        }
+
         var RENDERERS = { stateTimeline: stateTimelineRenderItem };
 
         class EchartsChart extends HTMLElement {
@@ -2458,8 +2468,8 @@ local telemetry =
               if (shiftKey) {
                 if (links[params.name]) {
                   revertToggle();
-                  if (cmdKey) window.open(links[params.name], '_blank');
-                  else window.location.href = links[params.name];
+                  if (cmdKey) window.open(withTimeRange(links[params.name]), '_blank');
+                  else window.location.href = withTimeRange(links[params.name]);
                 } else {
                   revertToggle();
                 }
@@ -2489,6 +2499,7 @@ local telemetry =
               if (params.componentType !== 'series' || !shiftKey) return;
               var link = (params.data && params.data.link) || links[params.seriesName];
               if (!link) return;
+              link = withTimeRange(link);
               if (cmdKey) window.open(link, '_blank');
               else window.location.href = link;
             });
@@ -12881,6 +12892,16 @@ local telemetry =
           return { type: 'group', children: children };
         }
 
+        function withTimeRange(link) {
+          var target = new URL(link, window.location.href);
+          var current = new URL(window.location.href);
+          ['from', 'to'].forEach(function (key) {
+            var value = current.searchParams.get(key);
+            if (value !== null && !target.searchParams.has(key)) target.searchParams.set(key, value);
+          });
+          return target.pathname + target.search + target.hash;
+        }
+
         var RENDERERS = { stateTimeline: stateTimelineRenderItem };
 
         class EchartsChart extends HTMLElement {
@@ -12980,8 +13001,8 @@ local telemetry =
               if (shiftKey) {
                 if (links[params.name]) {
                   revertToggle();
-                  if (cmdKey) window.open(links[params.name], '_blank');
-                  else window.location.href = links[params.name];
+                  if (cmdKey) window.open(withTimeRange(links[params.name]), '_blank');
+                  else window.location.href = withTimeRange(links[params.name]);
                 } else {
                   revertToggle();
                 }
@@ -13011,6 +13032,7 @@ local telemetry =
               if (params.componentType !== 'series' || !shiftKey) return;
               var link = (params.data && params.data.link) || links[params.seriesName];
               if (!link) return;
+              link = withTimeRange(link);
               if (cmdKey) window.open(link, '_blank');
               else window.location.href = link;
             });
