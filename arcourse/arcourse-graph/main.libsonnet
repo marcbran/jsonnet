@@ -1,3 +1,38 @@
+local url =
+  local hexDigits = '0123456789ABCDEF';
+
+  local unreserved(b) =
+    (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
+    || b == 45 || b == 95 || b == 46 || b == 126;
+
+  local percentEncode(s) =
+    std.join('', [
+      if unreserved(b) then std.char(b)
+      else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
+      for b in std.encodeUTF8(s)
+    ]);
+
+  local queryValue(value) =
+    if std.isString(value) then value
+    else if std.isArray(value) then std.manifestJsonMinified(value)
+    else std.toString(value);
+
+  local query(params) =
+    local keys = std.objectFields(params);
+    if std.length(keys) == 0 then ''
+    else '?' + std.join('&', [
+      percentEncode(k) + '=' + percentEncode(queryValue(params[k]))
+      for k in keys
+    ]);
+
+  function(u)
+    local scheme = std.get(u, 'scheme', null);
+    local path = std.get(u, 'path', []);
+    (if scheme != null then scheme + '://' else '')
+    + std.get(u, 'host', '')
+    + (if std.length(path) > 0 then '/' + std.join('/', [percentEncode(seg) for seg in path]) else '')
+    + query(std.get(u, 'params', {}));
+
 local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
 local varNameOf(seg) = std.substr(seg, 1, std.length(seg) - 1);
 
@@ -8,13 +43,23 @@ local resolvePath(node, path) =
     for p in path
   ]);
 
-local resolveUrlPath(node, path) =
-  std.join('/', ['/root'] + std.flatMap(
+local urlPathSegments(node, path) =
+  ['root'] + std.flatMap(
     function(p)
       if isVar(p) then [varNameOf(p), node[varNameOf(p)]]
       else [p],
     path
-  ));
+  );
+
+local nonDefaultParams(node) =
+  local params = if std.objectHasAll(node, '_params') then node._params else {};
+  local specs = if std.objectHasAll(node, '_paramSpecs') then node._paramSpecs else [];
+  local defaults = { [spec.name]: spec.default for spec in specs if std.objectHas(spec, 'default') };
+  {
+    [k]: params[k]
+    for k in std.objectFields(params)
+    if !std.objectHas(defaults, k) || defaults[k] != params[k]
+  };
 
 local mergeLayers(layers) =
   std.foldl(function(acc, l) acc + l, layers, {});
@@ -28,7 +73,7 @@ local node(path, body={}) =
     _vars:: vars,
     _pathTemplate:: path,
     _evalPath:: resolvePath(self, path),
-    _queryPath:: resolveUrlPath(self, path),
+    _queryPath:: local n = self; url({ path: urlPathSegments(n, path), params: nonDefaultParams(n) }),
   } +
   mergeLayers(layers);
 
