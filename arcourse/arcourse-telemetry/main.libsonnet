@@ -466,6 +466,41 @@ local timeRange =
     },
   };
 local g =
+  local url =
+    local hexDigits = '0123456789ABCDEF';
+
+    local unreserved(b) =
+      (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
+      || b == 45 || b == 95 || b == 46 || b == 126;
+
+    local percentEncode(s) =
+      std.join('', [
+        if unreserved(b) then std.char(b)
+        else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
+        for b in std.encodeUTF8(s)
+      ]);
+
+    local queryValue(value) =
+      if std.isString(value) then value
+      else if std.isArray(value) then std.manifestJsonMinified(value)
+      else std.toString(value);
+
+    local query(params) =
+      local keys = std.objectFields(params);
+      if std.length(keys) == 0 then ''
+      else '?' + std.join('&', [
+        percentEncode(k) + '=' + percentEncode(queryValue(params[k]))
+        for k in keys
+      ]);
+
+    function(u)
+      local scheme = std.get(u, 'scheme', null);
+      local path = std.get(u, 'path', []);
+      (if scheme != null then scheme + '://' else '')
+      + std.get(u, 'host', '')
+      + (if std.length(path) > 0 then '/' + std.join('/', [percentEncode(seg) for seg in path]) else '')
+      + query(std.get(u, 'params', {}));
+
   local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
   local varNameOf(seg) = std.substr(seg, 1, std.length(seg) - 1);
 
@@ -476,13 +511,23 @@ local g =
       for p in path
     ]);
 
-  local resolveUrlPath(node, path) =
-    std.join('/', ['/root'] + std.flatMap(
+  local urlPathSegments(node, path) =
+    ['root'] + std.flatMap(
       function(p)
         if isVar(p) then [varNameOf(p), node[varNameOf(p)]]
         else [p],
       path
-    ));
+    );
+
+  local nonDefaultParams(node) =
+    local params = if std.objectHasAll(node, '_params') then node._params else {};
+    local specs = if std.objectHasAll(node, '_paramSpecs') then node._paramSpecs else [];
+    local defaults = { [spec.name]: spec.default for spec in specs if std.objectHas(spec, 'default') };
+    {
+      [k]: params[k]
+      for k in std.objectFields(params)
+      if !std.objectHas(defaults, k) || defaults[k] != params[k]
+    };
 
   local mergeLayers(layers) =
     std.foldl(function(acc, l) acc + l, layers, {});
@@ -496,7 +541,7 @@ local g =
       _vars:: vars,
       _pathTemplate:: path,
       _evalPath:: resolvePath(self, path),
-      _queryPath:: resolveUrlPath(self, path),
+      _queryPath:: local n = self; url({ path: urlPathSegments(n, path), params: nonDefaultParams(n) }),
     } +
     mergeLayers(layers);
 
@@ -1360,46 +1405,76 @@ local nodesChartLib =
             else if std.type(v) == 'array' then '[]'
             else '%s' % v,
 
-          key(k)::
-            { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+          at(links, k)::
+            if std.isObject(links) && std.isString(k) then std.get(links, k, null)
+            else if std.isArray(links) && std.isNumber(k) && k < std.length(links) then links[k]
+            else null,
 
-          row(key, value, depth, bullet)::
-            local hasChildren =
-              (std.type(value) == 'object' || std.type(value) == 'array')
-              && std.length(value) > 0;
-            if hasChildren then
+          href(target)::
+            if std.isString(target) then target
+            else if std.isObject(target) && std.objectHasAll(target, '_queryPath') then target._queryPath
+            else null,
+
+          link(target, children, style)::
+            local href = c.href(target);
+            if href == null then { element: 'span', attributes: { style: style }, children: children }
+            else { element: 'a', attributes: { href: href, style: style }, children: children },
+
+          key(k, target)::
+            c.link(target, [k], 'color: var(--primary-color); font-weight: bold'),
+
+          value(v, target)::
+            if c.href(target) == null then c.scalar(v)
+            else c.link(target, [c.scalar(v)], 'color: inherit'),
+
+          isLeaf(value)::
+            !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
+
+          mapLeaves(value, fn, path=[])::
+            if c.isLeaf(value) then fn(path, value)
+            else if std.isObject(value) then { [k]: c.mapLeaves(value[k], fn, path + [k]) for k in std.objectFields(value) }
+            else [c.mapLeaves(value[i], fn, path + [i]) for i in std.range(0, std.length(value) - 1)],
+
+          row(key, value, links, depth, bullet)::
+            if !c.isLeaf(value) then
               [{ element: 'div', children: [
                 c.indent(depth),
                 bullet,
-                c.key(key),
+                c.key(key, null),
                 ':',
-              ] }] + c.children(value, depth + 1)
+              ] }] + c.children(value, links, depth + 1)
             else
               [{ element: 'div', children: [
                 c.indent(depth),
                 bullet,
-                c.key(key),
-                ': ' + c.scalar(value),
+                c.key(key, c.at(links, 'key')),
+                ': ',
+                c.value(value, c.at(links, 'value')),
               ] }],
 
-          children(value, depth)::
+          children(value, links, depth)::
             if std.type(value) == 'object' then
               std.flatMap(
-                function(kv) c.row(kv.key, kv.value, depth, ''),
+                function(kv) c.row(kv.key, kv.value, c.at(links, kv.key), depth, ''),
                 std.objectKeysValues(value)
               )
             else
-              std.flatMap(function(item)
-                if std.type(item) == 'object' then
-                  local kvs = std.objectKeysValues(item);
-                  c.row(kvs[0].key, kvs[0].value, depth, '- ') +
-                  std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
-                else
-                  [{ element: 'div', children: [
-                    c.indent(depth),
-                    '- ' + c.scalar(item),
-                  ] }]
-                          , value),
+              std.flatMap(
+                function(i)
+                  local item = value[i];
+                  local itemLinks = c.at(links, i);
+                  if std.type(item) == 'object' then
+                    local kvs = std.objectKeysValues(item);
+                    c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
+                    std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
+                  else
+                    [{ element: 'div', children: [
+                      c.indent(depth),
+                      '- ',
+                      c.value(item, c.at(itemLinks, 'value')),
+                    ] }],
+                std.range(0, std.length(value) - 1)
+              ),
         };
 
         local style = |||
@@ -1407,14 +1482,22 @@ local nodesChartLib =
             white-space: pre-wrap;
             word-break: break-all;
           }
+          .yaml a {
+            text-decoration: none;
+          }
+          .yaml a:hover {
+            text-decoration: underline;
+          }
         |||;
 
         {
           local c = self,
           data:: error 'Yaml requires data',
+          embeddedLinks:: null,
+          mapLeaves(value, fn):: yaml.mapLeaves(value, fn),
           html: [
             { element: 'style', children: [style] },
-            { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+            { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, c.embeddedLinks, 0) },
           ],
         },
       page:
@@ -1897,46 +1980,76 @@ local nodesChartLib =
               else if std.type(v) == 'array' then '[]'
               else '%s' % v,
 
-            key(k)::
-              { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+            at(links, k)::
+              if std.isObject(links) && std.isString(k) then std.get(links, k, null)
+              else if std.isArray(links) && std.isNumber(k) && k < std.length(links) then links[k]
+              else null,
 
-            row(key, value, depth, bullet)::
-              local hasChildren =
-                (std.type(value) == 'object' || std.type(value) == 'array')
-                && std.length(value) > 0;
-              if hasChildren then
+            href(target)::
+              if std.isString(target) then target
+              else if std.isObject(target) && std.objectHasAll(target, '_queryPath') then target._queryPath
+              else null,
+
+            link(target, children, style)::
+              local href = c.href(target);
+              if href == null then { element: 'span', attributes: { style: style }, children: children }
+              else { element: 'a', attributes: { href: href, style: style }, children: children },
+
+            key(k, target)::
+              c.link(target, [k], 'color: var(--primary-color); font-weight: bold'),
+
+            value(v, target)::
+              if c.href(target) == null then c.scalar(v)
+              else c.link(target, [c.scalar(v)], 'color: inherit'),
+
+            isLeaf(value)::
+              !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
+
+            mapLeaves(value, fn, path=[])::
+              if c.isLeaf(value) then fn(path, value)
+              else if std.isObject(value) then { [k]: c.mapLeaves(value[k], fn, path + [k]) for k in std.objectFields(value) }
+              else [c.mapLeaves(value[i], fn, path + [i]) for i in std.range(0, std.length(value) - 1)],
+
+            row(key, value, links, depth, bullet)::
+              if !c.isLeaf(value) then
                 [{ element: 'div', children: [
                   c.indent(depth),
                   bullet,
-                  c.key(key),
+                  c.key(key, null),
                   ':',
-                ] }] + c.children(value, depth + 1)
+                ] }] + c.children(value, links, depth + 1)
               else
                 [{ element: 'div', children: [
                   c.indent(depth),
                   bullet,
-                  c.key(key),
-                  ': ' + c.scalar(value),
+                  c.key(key, c.at(links, 'key')),
+                  ': ',
+                  c.value(value, c.at(links, 'value')),
                 ] }],
 
-            children(value, depth)::
+            children(value, links, depth)::
               if std.type(value) == 'object' then
                 std.flatMap(
-                  function(kv) c.row(kv.key, kv.value, depth, ''),
+                  function(kv) c.row(kv.key, kv.value, c.at(links, kv.key), depth, ''),
                   std.objectKeysValues(value)
                 )
               else
-                std.flatMap(function(item)
-                  if std.type(item) == 'object' then
-                    local kvs = std.objectKeysValues(item);
-                    c.row(kvs[0].key, kvs[0].value, depth, '- ') +
-                    std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
-                  else
-                    [{ element: 'div', children: [
-                      c.indent(depth),
-                      '- ' + c.scalar(item),
-                    ] }]
-                            , value),
+                std.flatMap(
+                  function(i)
+                    local item = value[i];
+                    local itemLinks = c.at(links, i);
+                    if std.type(item) == 'object' then
+                      local kvs = std.objectKeysValues(item);
+                      c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
+                      std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
+                    else
+                      [{ element: 'div', children: [
+                        c.indent(depth),
+                        '- ',
+                        c.value(item, c.at(itemLinks, 'value')),
+                      ] }],
+                  std.range(0, std.length(value) - 1)
+                ),
           };
 
           local style = |||
@@ -1944,14 +2057,22 @@ local nodesChartLib =
               white-space: pre-wrap;
               word-break: break-all;
             }
+            .yaml a {
+              text-decoration: none;
+            }
+            .yaml a:hover {
+              text-decoration: underline;
+            }
           |||;
 
           {
             local c = self,
             data:: error 'Yaml requires data',
+            embeddedLinks:: null,
+            mapLeaves(value, fn):: yaml.mapLeaves(value, fn),
             html: [
               { element: 'style', children: [style] },
-              { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+              { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, c.embeddedLinks, 0) },
             ],
           };
 
@@ -2817,6 +2938,191 @@ local nodeListsEntitiesLib = function(entity)
     std.flattenArrays([entity(spec) for spec in specs]);
 local nodesListLib =
   local a =
+    local linkspecs =
+      local url =
+        local hexDigits = '0123456789ABCDEF';
+
+        local unreserved(b) =
+          (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
+          || b == 45 || b == 95 || b == 46 || b == 126;
+
+        local percentEncode(s) =
+          std.join('', [
+            if unreserved(b) then std.char(b)
+            else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
+            for b in std.encodeUTF8(s)
+          ]);
+
+        local queryValue(value) =
+          if std.isString(value) then value
+          else if std.isArray(value) then std.manifestJsonMinified(value)
+          else std.toString(value);
+
+        local query(params) =
+          local keys = std.objectFields(params);
+          if std.length(keys) == 0 then ''
+          else '?' + std.join('&', [
+            percentEncode(k) + '=' + percentEncode(queryValue(params[k]))
+            for k in keys
+          ]);
+
+        function(u)
+          local scheme = std.get(u, 'scheme', null);
+          local path = std.get(u, 'path', []);
+          (if scheme != null then scheme + '://' else '')
+          + std.get(u, 'host', '')
+          + (if std.length(path) > 0 then '/' + std.join('/', [percentEncode(seg) for seg in path]) else '')
+          + query(std.get(u, 'params', {}));
+
+      local walk(current, remaining, buildFn) =
+        if std.length(remaining) == 0 then
+          if std.type(current) == 'array' then
+            std.foldl(function(acc, item) acc + buildFn(item), current, {})
+          else buildFn(current)
+        else
+          local next =
+            if std.type(current) == 'object' then std.get(current, remaining[0], null)
+            else null;
+          if next == null then {}
+          else if std.type(next) == 'array' then
+            std.foldl(function(acc, item) acc + walk(item, remaining[1:], buildFn), next, {})
+          else
+            walk(next, remaining[1:], buildFn);
+
+      local itemPath(item, path) =
+        std.foldl(
+          function(acc, seg) if std.type(acc) == 'object' then std.get(acc, seg, null) else null,
+          path,
+          item
+        );
+
+      local nestValue(labels, index, value) =
+        if index == std.length(labels) - 1 then { [labels[index]]: value }
+        else { [labels[index]]+: nestValue(labels, index + 1, value) };
+
+      local nestKeys(keySegs, item, value) =
+        local labels = [
+          if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
+          for seg in keySegs
+        ];
+        nestValue(labels, 0, value);
+
+      local splitPrefix(valueSegs) =
+        if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
+        else if std.objectHas(valueSegs[0], 'param') || std.objectHas(valueSegs[0], 'path') then { prefix: [], suffix: valueSegs }
+        else
+          local rest = splitPrefix(valueSegs[1:]);
+          { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
+
+      local resolveBase(root, node, prefixSegs) =
+        std.foldl(
+          function(acc, seg)
+            if std.objectHas(seg, 'const') then acc[seg.const]
+            else acc[seg.origin](std.toString(node[seg.origin])),
+          prefixSegs,
+          root
+        );
+
+      local resolveKey(spec, item) =
+        if std.type(spec) == 'string' then spec
+        else
+          local raw = itemPath(item, spec.path);
+          if std.objectHas(spec, 'transform') then spec.transform(raw) else raw;
+
+      local resolveFromBase(base, item, suffixSegs) =
+        std.foldl(
+          function(acc, seg)
+            if std.objectHas(seg, 'param') then
+              acc[resolveKey(seg.param, item)](std.toString(itemPath(item, seg.path)))
+            else if std.objectHas(seg, 'const') then
+              acc[seg.const]
+            else
+              acc[resolveKey(seg, item)],
+          suffixSegs,
+          base
+        );
+
+      local resolvable(item, valueSegs) =
+        std.all(
+          [itemPath(item, seg.path) != null for seg in valueSegs if std.objectHas(seg, 'path')] +
+          [
+            itemPath(item, seg.param.path) != null
+            for seg in valueSegs
+            if std.objectHas(seg, 'param') && std.type(seg.param) == 'object'
+          ]
+        );
+
+      local resolveLiteralSegment(node, item, seg) =
+        if std.objectHas(seg, 'const') then seg.const
+        else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
+        else resolveKey(seg, item);
+
+      local resolveLiteralSegments(node, item, segs) =
+        std.foldl(function(acc, seg) acc + resolveLiteralSegment(node, item, seg), segs, '');
+
+      local resolveUrl(node, item, literal) =
+        local query = std.get(literal, 'query', {});
+        url({
+          scheme: std.get(literal, 'scheme', null),
+          host: resolveLiteralSegments(node, item, std.get(literal, 'host', [])),
+          path: [resolveLiteralSegment(node, item, seg) for seg in std.get(literal, 'path', [])],
+          params: { [k]: resolveLiteralSegments(node, item, query[k]) for k in std.objectFields(query) },
+        });
+
+      local urlSegments(literal) =
+        std.get(literal, 'host', []) + std.get(literal, 'path', [])
+        + std.flattenArrays([literal.query[k] for k in std.objectFields(std.get(literal, 'query', {}))]);
+
+      local buildLinks(node, specs, root=import 'root') =
+        std.foldl(
+          function(acc, spec)
+            acc + (
+              if std.type(spec.value) == 'object' then
+                walk(
+                  node.data,
+                  spec.at,
+                  function(item)
+                    if resolvable(item, urlSegments(spec.value))
+                    then nestKeys(spec.keys, item, resolveUrl(node, item, spec.value))
+                    else {}
+                )
+              else
+                local split = splitPrefix(spec.value);
+                local base = resolveBase(root, node, split.prefix);
+                walk(
+                  node.data,
+                  spec.at,
+                  function(item)
+                    if resolvable(item, spec.value)
+                    then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
+                    else {}
+                )
+            ),
+          specs,
+          {}
+        );
+
+      local rowLinkSpec(specs, at) =
+        local matches = [spec for spec in specs if spec.at == at];
+        if std.length(matches) == 0 then null else matches[0];
+
+      local rowLinkFor(node, specs, at, root=import 'root') =
+        local spec = rowLinkSpec(specs, at);
+        if spec == null then null
+        else
+          local split = splitPrefix(spec.value);
+          local base = resolveBase(root, node, split.prefix);
+          function(item)
+            if resolvable(item, spec.value) then resolveFromBase(base, item, split.suffix) else null;
+
+      {
+        buildLinks: buildLinks,
+        rowLinkFor: rowLinkFor,
+        withLinkSpecs: {
+          linkSpecs:: [],
+          links: buildLinks(self, self.linkSpecs, import 'root'),
+        },
+      };
     local c = {
       list:
         local style = |||
@@ -3367,46 +3673,76 @@ local nodesListLib =
             else if std.type(v) == 'array' then '[]'
             else '%s' % v,
 
-          key(k)::
-            { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+          at(links, k)::
+            if std.isObject(links) && std.isString(k) then std.get(links, k, null)
+            else if std.isArray(links) && std.isNumber(k) && k < std.length(links) then links[k]
+            else null,
 
-          row(key, value, depth, bullet)::
-            local hasChildren =
-              (std.type(value) == 'object' || std.type(value) == 'array')
-              && std.length(value) > 0;
-            if hasChildren then
+          href(target)::
+            if std.isString(target) then target
+            else if std.isObject(target) && std.objectHasAll(target, '_queryPath') then target._queryPath
+            else null,
+
+          link(target, children, style)::
+            local href = c.href(target);
+            if href == null then { element: 'span', attributes: { style: style }, children: children }
+            else { element: 'a', attributes: { href: href, style: style }, children: children },
+
+          key(k, target)::
+            c.link(target, [k], 'color: var(--primary-color); font-weight: bold'),
+
+          value(v, target)::
+            if c.href(target) == null then c.scalar(v)
+            else c.link(target, [c.scalar(v)], 'color: inherit'),
+
+          isLeaf(value)::
+            !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
+
+          mapLeaves(value, fn, path=[])::
+            if c.isLeaf(value) then fn(path, value)
+            else if std.isObject(value) then { [k]: c.mapLeaves(value[k], fn, path + [k]) for k in std.objectFields(value) }
+            else [c.mapLeaves(value[i], fn, path + [i]) for i in std.range(0, std.length(value) - 1)],
+
+          row(key, value, links, depth, bullet)::
+            if !c.isLeaf(value) then
               [{ element: 'div', children: [
                 c.indent(depth),
                 bullet,
-                c.key(key),
+                c.key(key, null),
                 ':',
-              ] }] + c.children(value, depth + 1)
+              ] }] + c.children(value, links, depth + 1)
             else
               [{ element: 'div', children: [
                 c.indent(depth),
                 bullet,
-                c.key(key),
-                ': ' + c.scalar(value),
+                c.key(key, c.at(links, 'key')),
+                ': ',
+                c.value(value, c.at(links, 'value')),
               ] }],
 
-          children(value, depth)::
+          children(value, links, depth)::
             if std.type(value) == 'object' then
               std.flatMap(
-                function(kv) c.row(kv.key, kv.value, depth, ''),
+                function(kv) c.row(kv.key, kv.value, c.at(links, kv.key), depth, ''),
                 std.objectKeysValues(value)
               )
             else
-              std.flatMap(function(item)
-                if std.type(item) == 'object' then
-                  local kvs = std.objectKeysValues(item);
-                  c.row(kvs[0].key, kvs[0].value, depth, '- ') +
-                  std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
-                else
-                  [{ element: 'div', children: [
-                    c.indent(depth),
-                    '- ' + c.scalar(item),
-                  ] }]
-                          , value),
+              std.flatMap(
+                function(i)
+                  local item = value[i];
+                  local itemLinks = c.at(links, i);
+                  if std.type(item) == 'object' then
+                    local kvs = std.objectKeysValues(item);
+                    c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
+                    std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
+                  else
+                    [{ element: 'div', children: [
+                      c.indent(depth),
+                      '- ',
+                      c.value(item, c.at(itemLinks, 'value')),
+                    ] }],
+                std.range(0, std.length(value) - 1)
+              ),
         };
 
         local style = |||
@@ -3414,14 +3750,22 @@ local nodesListLib =
             white-space: pre-wrap;
             word-break: break-all;
           }
+          .yaml a {
+            text-decoration: none;
+          }
+          .yaml a:hover {
+            text-decoration: underline;
+          }
         |||;
 
         {
           local c = self,
           data:: error 'Yaml requires data',
+          embeddedLinks:: null,
+          mapLeaves(value, fn):: yaml.mapLeaves(value, fn),
           html: [
             { element: 'style', children: [style] },
-            { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+            { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, c.embeddedLinks, 0) },
           ],
         },
       page:
@@ -3904,46 +4248,76 @@ local nodesListLib =
               else if std.type(v) == 'array' then '[]'
               else '%s' % v,
 
-            key(k)::
-              { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+            at(links, k)::
+              if std.isObject(links) && std.isString(k) then std.get(links, k, null)
+              else if std.isArray(links) && std.isNumber(k) && k < std.length(links) then links[k]
+              else null,
 
-            row(key, value, depth, bullet)::
-              local hasChildren =
-                (std.type(value) == 'object' || std.type(value) == 'array')
-                && std.length(value) > 0;
-              if hasChildren then
+            href(target)::
+              if std.isString(target) then target
+              else if std.isObject(target) && std.objectHasAll(target, '_queryPath') then target._queryPath
+              else null,
+
+            link(target, children, style)::
+              local href = c.href(target);
+              if href == null then { element: 'span', attributes: { style: style }, children: children }
+              else { element: 'a', attributes: { href: href, style: style }, children: children },
+
+            key(k, target)::
+              c.link(target, [k], 'color: var(--primary-color); font-weight: bold'),
+
+            value(v, target)::
+              if c.href(target) == null then c.scalar(v)
+              else c.link(target, [c.scalar(v)], 'color: inherit'),
+
+            isLeaf(value)::
+              !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
+
+            mapLeaves(value, fn, path=[])::
+              if c.isLeaf(value) then fn(path, value)
+              else if std.isObject(value) then { [k]: c.mapLeaves(value[k], fn, path + [k]) for k in std.objectFields(value) }
+              else [c.mapLeaves(value[i], fn, path + [i]) for i in std.range(0, std.length(value) - 1)],
+
+            row(key, value, links, depth, bullet)::
+              if !c.isLeaf(value) then
                 [{ element: 'div', children: [
                   c.indent(depth),
                   bullet,
-                  c.key(key),
+                  c.key(key, null),
                   ':',
-                ] }] + c.children(value, depth + 1)
+                ] }] + c.children(value, links, depth + 1)
               else
                 [{ element: 'div', children: [
                   c.indent(depth),
                   bullet,
-                  c.key(key),
-                  ': ' + c.scalar(value),
+                  c.key(key, c.at(links, 'key')),
+                  ': ',
+                  c.value(value, c.at(links, 'value')),
                 ] }],
 
-            children(value, depth)::
+            children(value, links, depth)::
               if std.type(value) == 'object' then
                 std.flatMap(
-                  function(kv) c.row(kv.key, kv.value, depth, ''),
+                  function(kv) c.row(kv.key, kv.value, c.at(links, kv.key), depth, ''),
                   std.objectKeysValues(value)
                 )
               else
-                std.flatMap(function(item)
-                  if std.type(item) == 'object' then
-                    local kvs = std.objectKeysValues(item);
-                    c.row(kvs[0].key, kvs[0].value, depth, '- ') +
-                    std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
-                  else
-                    [{ element: 'div', children: [
-                      c.indent(depth),
-                      '- ' + c.scalar(item),
-                    ] }]
-                            , value),
+                std.flatMap(
+                  function(i)
+                    local item = value[i];
+                    local itemLinks = c.at(links, i);
+                    if std.type(item) == 'object' then
+                      local kvs = std.objectKeysValues(item);
+                      c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
+                      std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
+                    else
+                      [{ element: 'div', children: [
+                        c.indent(depth),
+                        '- ',
+                        c.value(item, c.at(itemLinks, 'value')),
+                      ] }],
+                  std.range(0, std.length(value) - 1)
+                ),
           };
 
           local style = |||
@@ -3951,14 +4325,22 @@ local nodesListLib =
               white-space: pre-wrap;
               word-break: break-all;
             }
+            .yaml a {
+              text-decoration: none;
+            }
+            .yaml a:hover {
+              text-decoration: underline;
+            }
           |||;
 
           {
             local c = self,
             data:: error 'Yaml requires data',
+            embeddedLinks:: null,
+            mapLeaves(value, fn):: yaml.mapLeaves(value, fn),
             html: [
               { element: 'style', children: [style] },
-              { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+              { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, c.embeddedLinks, 0) },
             ],
           };
 
@@ -4152,182 +4534,6 @@ local nodesListLib =
     local html = {
       manifestHtml(tree): std.native('invoke:html')('manifestHtml', [tree]),
     };
-    local linkspecs =
-      local walk(current, remaining, buildFn) =
-        if std.length(remaining) == 0 then
-          if std.type(current) == 'array' then
-            std.foldl(function(acc, item) acc + buildFn(item), current, {})
-          else buildFn(current)
-        else
-          local next =
-            if std.type(current) == 'object' then std.get(current, remaining[0], null)
-            else null;
-          if next == null then {}
-          else if std.type(next) == 'array' then
-            std.foldl(function(acc, item) acc + walk(item, remaining[1:], buildFn), next, {})
-          else
-            walk(next, remaining[1:], buildFn);
-
-      local itemPath(item, path) =
-        std.foldl(
-          function(acc, seg) if std.type(acc) == 'object' then std.get(acc, seg, null) else null,
-          path,
-          item
-        );
-
-      local nestValue(labels, index, value) =
-        if index == std.length(labels) - 1 then { [labels[index]]: value }
-        else { [labels[index]]+: nestValue(labels, index + 1, value) };
-
-      local nestKeys(keySegs, item, value) =
-        local labels = [
-          if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
-          for seg in keySegs
-        ];
-        nestValue(labels, 0, value);
-
-      local splitPrefix(valueSegs) =
-        if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
-        else if std.objectHas(valueSegs[0], 'param') || std.objectHas(valueSegs[0], 'path') then { prefix: [], suffix: valueSegs }
-        else
-          local rest = splitPrefix(valueSegs[1:]);
-          { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
-
-      local resolveBase(root, node, prefixSegs) =
-        std.foldl(
-          function(acc, seg)
-            if std.objectHas(seg, 'const') then acc[seg.const]
-            else acc[seg.origin](std.toString(node[seg.origin])),
-          prefixSegs,
-          root
-        );
-
-      local resolveKey(spec, item) =
-        if std.type(spec) == 'string' then spec
-        else
-          local raw = itemPath(item, spec.path);
-          if std.objectHas(spec, 'transform') then spec.transform(raw) else raw;
-
-      local resolveFromBase(base, item, suffixSegs) =
-        std.foldl(
-          function(acc, seg)
-            if std.objectHas(seg, 'param') then
-              acc[resolveKey(seg.param, item)](std.toString(itemPath(item, seg.path)))
-            else if std.objectHas(seg, 'const') then
-              acc[seg.const]
-            else
-              acc[resolveKey(seg, item)],
-          suffixSegs,
-          base
-        );
-
-      local resolvable(item, valueSegs) =
-        std.all(
-          [itemPath(item, seg.path) != null for seg in valueSegs if std.objectHas(seg, 'path')] +
-          [
-            itemPath(item, seg.param.path) != null
-            for seg in valueSegs
-            if std.objectHas(seg, 'param') && std.type(seg.param) == 'object'
-          ]
-        );
-
-      local hexDigits = '0123456789ABCDEF';
-
-      local percentEncode(s) =
-        std.join('', [
-          local c = s[i];
-          local cp = std.codepoint(c);
-          if (cp >= 65 && cp <= 90) || (cp >= 97 && cp <= 122) || (cp >= 48 && cp <= 57)
-             || c == '-' || c == '_' || c == '.' || c == '~'
-          then c
-          else '%' + hexDigits[std.floor(cp / 16)] + hexDigits[cp % 16]
-          for i in std.range(0, std.length(s) - 1)
-        ]);
-
-      local resolveLiteralSegment(node, item, seg) =
-        if std.objectHas(seg, 'const') then seg.const
-        else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
-        else resolveKey(seg, item);
-
-      local resolveLiteralSegments(node, item, segs) =
-        std.foldl(function(acc, seg) acc + resolveLiteralSegment(node, item, seg), segs, '');
-
-      local resolveQuery(node, item, queryObj) =
-        local keys = std.objectFields(queryObj);
-        if std.length(keys) == 0 then ''
-        else '?' + std.join('&', [
-          percentEncode(k) + '=' + percentEncode(resolveLiteralSegments(node, item, queryObj[k]))
-          for k in keys
-        ]);
-
-      local resolveUrl(node, item, url) =
-        local scheme = std.get(url, 'scheme', null);
-        local host = std.get(url, 'host', []);
-        local path = std.get(url, 'path', []);
-        local query = std.get(url, 'query', {});
-        (if scheme != null then scheme + '://' else '')
-        + resolveLiteralSegments(node, item, host)
-        + (
-          if std.length(path) > 0 then
-            '/' + std.join('/', [percentEncode(resolveLiteralSegment(node, item, seg)) for seg in path])
-          else ''
-        )
-        + resolveQuery(node, item, query);
-
-      local urlSegments(url) =
-        std.get(url, 'host', []) + std.get(url, 'path', [])
-        + std.flattenArrays([url.query[k] for k in std.objectFields(std.get(url, 'query', {}))]);
-
-      local buildLinks(node, specs, root=import 'root') =
-        std.foldl(
-          function(acc, spec)
-            acc + (
-              if std.type(spec.value) == 'object' then
-                walk(
-                  node.data,
-                  spec.at,
-                  function(item)
-                    if resolvable(item, urlSegments(spec.value))
-                    then nestKeys(spec.keys, item, resolveUrl(node, item, spec.value))
-                    else {}
-                )
-              else
-                local split = splitPrefix(spec.value);
-                local base = resolveBase(root, node, split.prefix);
-                walk(
-                  node.data,
-                  spec.at,
-                  function(item)
-                    if resolvable(item, spec.value)
-                    then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
-                    else {}
-                )
-            ),
-          specs,
-          {}
-        );
-
-      local rowLinkSpec(specs, at) =
-        local matches = [spec for spec in specs if spec.at == at];
-        if std.length(matches) == 0 then null else matches[0];
-
-      local rowLinkFor(node, specs, at, root=import 'root') =
-        local spec = rowLinkSpec(specs, at);
-        if spec == null then null
-        else
-          local split = splitPrefix(spec.value);
-          local base = resolveBase(root, node, split.prefix);
-          function(item)
-            if resolvable(item, spec.value) then resolveFromBase(base, item, split.suffix) else null;
-
-      {
-        buildLinks: buildLinks,
-        rowLinkFor: rowLinkFor,
-        withLinkSpecs: {
-          linkSpecs:: [],
-          links: buildLinks(self, self.linkSpecs, import 'root'),
-        },
-      };
 
     local isNode(value) =
       std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');
@@ -4492,6 +4698,191 @@ local nodesListLib =
     };
 local nodesLabelsLib =
   local a =
+    local linkspecs =
+      local url =
+        local hexDigits = '0123456789ABCDEF';
+
+        local unreserved(b) =
+          (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
+          || b == 45 || b == 95 || b == 46 || b == 126;
+
+        local percentEncode(s) =
+          std.join('', [
+            if unreserved(b) then std.char(b)
+            else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
+            for b in std.encodeUTF8(s)
+          ]);
+
+        local queryValue(value) =
+          if std.isString(value) then value
+          else if std.isArray(value) then std.manifestJsonMinified(value)
+          else std.toString(value);
+
+        local query(params) =
+          local keys = std.objectFields(params);
+          if std.length(keys) == 0 then ''
+          else '?' + std.join('&', [
+            percentEncode(k) + '=' + percentEncode(queryValue(params[k]))
+            for k in keys
+          ]);
+
+        function(u)
+          local scheme = std.get(u, 'scheme', null);
+          local path = std.get(u, 'path', []);
+          (if scheme != null then scheme + '://' else '')
+          + std.get(u, 'host', '')
+          + (if std.length(path) > 0 then '/' + std.join('/', [percentEncode(seg) for seg in path]) else '')
+          + query(std.get(u, 'params', {}));
+
+      local walk(current, remaining, buildFn) =
+        if std.length(remaining) == 0 then
+          if std.type(current) == 'array' then
+            std.foldl(function(acc, item) acc + buildFn(item), current, {})
+          else buildFn(current)
+        else
+          local next =
+            if std.type(current) == 'object' then std.get(current, remaining[0], null)
+            else null;
+          if next == null then {}
+          else if std.type(next) == 'array' then
+            std.foldl(function(acc, item) acc + walk(item, remaining[1:], buildFn), next, {})
+          else
+            walk(next, remaining[1:], buildFn);
+
+      local itemPath(item, path) =
+        std.foldl(
+          function(acc, seg) if std.type(acc) == 'object' then std.get(acc, seg, null) else null,
+          path,
+          item
+        );
+
+      local nestValue(labels, index, value) =
+        if index == std.length(labels) - 1 then { [labels[index]]: value }
+        else { [labels[index]]+: nestValue(labels, index + 1, value) };
+
+      local nestKeys(keySegs, item, value) =
+        local labels = [
+          if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
+          for seg in keySegs
+        ];
+        nestValue(labels, 0, value);
+
+      local splitPrefix(valueSegs) =
+        if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
+        else if std.objectHas(valueSegs[0], 'param') || std.objectHas(valueSegs[0], 'path') then { prefix: [], suffix: valueSegs }
+        else
+          local rest = splitPrefix(valueSegs[1:]);
+          { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
+
+      local resolveBase(root, node, prefixSegs) =
+        std.foldl(
+          function(acc, seg)
+            if std.objectHas(seg, 'const') then acc[seg.const]
+            else acc[seg.origin](std.toString(node[seg.origin])),
+          prefixSegs,
+          root
+        );
+
+      local resolveKey(spec, item) =
+        if std.type(spec) == 'string' then spec
+        else
+          local raw = itemPath(item, spec.path);
+          if std.objectHas(spec, 'transform') then spec.transform(raw) else raw;
+
+      local resolveFromBase(base, item, suffixSegs) =
+        std.foldl(
+          function(acc, seg)
+            if std.objectHas(seg, 'param') then
+              acc[resolveKey(seg.param, item)](std.toString(itemPath(item, seg.path)))
+            else if std.objectHas(seg, 'const') then
+              acc[seg.const]
+            else
+              acc[resolveKey(seg, item)],
+          suffixSegs,
+          base
+        );
+
+      local resolvable(item, valueSegs) =
+        std.all(
+          [itemPath(item, seg.path) != null for seg in valueSegs if std.objectHas(seg, 'path')] +
+          [
+            itemPath(item, seg.param.path) != null
+            for seg in valueSegs
+            if std.objectHas(seg, 'param') && std.type(seg.param) == 'object'
+          ]
+        );
+
+      local resolveLiteralSegment(node, item, seg) =
+        if std.objectHas(seg, 'const') then seg.const
+        else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
+        else resolveKey(seg, item);
+
+      local resolveLiteralSegments(node, item, segs) =
+        std.foldl(function(acc, seg) acc + resolveLiteralSegment(node, item, seg), segs, '');
+
+      local resolveUrl(node, item, literal) =
+        local query = std.get(literal, 'query', {});
+        url({
+          scheme: std.get(literal, 'scheme', null),
+          host: resolveLiteralSegments(node, item, std.get(literal, 'host', [])),
+          path: [resolveLiteralSegment(node, item, seg) for seg in std.get(literal, 'path', [])],
+          params: { [k]: resolveLiteralSegments(node, item, query[k]) for k in std.objectFields(query) },
+        });
+
+      local urlSegments(literal) =
+        std.get(literal, 'host', []) + std.get(literal, 'path', [])
+        + std.flattenArrays([literal.query[k] for k in std.objectFields(std.get(literal, 'query', {}))]);
+
+      local buildLinks(node, specs, root=import 'root') =
+        std.foldl(
+          function(acc, spec)
+            acc + (
+              if std.type(spec.value) == 'object' then
+                walk(
+                  node.data,
+                  spec.at,
+                  function(item)
+                    if resolvable(item, urlSegments(spec.value))
+                    then nestKeys(spec.keys, item, resolveUrl(node, item, spec.value))
+                    else {}
+                )
+              else
+                local split = splitPrefix(spec.value);
+                local base = resolveBase(root, node, split.prefix);
+                walk(
+                  node.data,
+                  spec.at,
+                  function(item)
+                    if resolvable(item, spec.value)
+                    then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
+                    else {}
+                )
+            ),
+          specs,
+          {}
+        );
+
+      local rowLinkSpec(specs, at) =
+        local matches = [spec for spec in specs if spec.at == at];
+        if std.length(matches) == 0 then null else matches[0];
+
+      local rowLinkFor(node, specs, at, root=import 'root') =
+        local spec = rowLinkSpec(specs, at);
+        if spec == null then null
+        else
+          local split = splitPrefix(spec.value);
+          local base = resolveBase(root, node, split.prefix);
+          function(item)
+            if resolvable(item, spec.value) then resolveFromBase(base, item, split.suffix) else null;
+
+      {
+        buildLinks: buildLinks,
+        rowLinkFor: rowLinkFor,
+        withLinkSpecs: {
+          linkSpecs:: [],
+          links: buildLinks(self, self.linkSpecs, import 'root'),
+        },
+      };
     local c = {
       list:
         local style = |||
@@ -5042,46 +5433,76 @@ local nodesLabelsLib =
             else if std.type(v) == 'array' then '[]'
             else '%s' % v,
 
-          key(k)::
-            { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+          at(links, k)::
+            if std.isObject(links) && std.isString(k) then std.get(links, k, null)
+            else if std.isArray(links) && std.isNumber(k) && k < std.length(links) then links[k]
+            else null,
 
-          row(key, value, depth, bullet)::
-            local hasChildren =
-              (std.type(value) == 'object' || std.type(value) == 'array')
-              && std.length(value) > 0;
-            if hasChildren then
+          href(target)::
+            if std.isString(target) then target
+            else if std.isObject(target) && std.objectHasAll(target, '_queryPath') then target._queryPath
+            else null,
+
+          link(target, children, style)::
+            local href = c.href(target);
+            if href == null then { element: 'span', attributes: { style: style }, children: children }
+            else { element: 'a', attributes: { href: href, style: style }, children: children },
+
+          key(k, target)::
+            c.link(target, [k], 'color: var(--primary-color); font-weight: bold'),
+
+          value(v, target)::
+            if c.href(target) == null then c.scalar(v)
+            else c.link(target, [c.scalar(v)], 'color: inherit'),
+
+          isLeaf(value)::
+            !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
+
+          mapLeaves(value, fn, path=[])::
+            if c.isLeaf(value) then fn(path, value)
+            else if std.isObject(value) then { [k]: c.mapLeaves(value[k], fn, path + [k]) for k in std.objectFields(value) }
+            else [c.mapLeaves(value[i], fn, path + [i]) for i in std.range(0, std.length(value) - 1)],
+
+          row(key, value, links, depth, bullet)::
+            if !c.isLeaf(value) then
               [{ element: 'div', children: [
                 c.indent(depth),
                 bullet,
-                c.key(key),
+                c.key(key, null),
                 ':',
-              ] }] + c.children(value, depth + 1)
+              ] }] + c.children(value, links, depth + 1)
             else
               [{ element: 'div', children: [
                 c.indent(depth),
                 bullet,
-                c.key(key),
-                ': ' + c.scalar(value),
+                c.key(key, c.at(links, 'key')),
+                ': ',
+                c.value(value, c.at(links, 'value')),
               ] }],
 
-          children(value, depth)::
+          children(value, links, depth)::
             if std.type(value) == 'object' then
               std.flatMap(
-                function(kv) c.row(kv.key, kv.value, depth, ''),
+                function(kv) c.row(kv.key, kv.value, c.at(links, kv.key), depth, ''),
                 std.objectKeysValues(value)
               )
             else
-              std.flatMap(function(item)
-                if std.type(item) == 'object' then
-                  local kvs = std.objectKeysValues(item);
-                  c.row(kvs[0].key, kvs[0].value, depth, '- ') +
-                  std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
-                else
-                  [{ element: 'div', children: [
-                    c.indent(depth),
-                    '- ' + c.scalar(item),
-                  ] }]
-                          , value),
+              std.flatMap(
+                function(i)
+                  local item = value[i];
+                  local itemLinks = c.at(links, i);
+                  if std.type(item) == 'object' then
+                    local kvs = std.objectKeysValues(item);
+                    c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
+                    std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
+                  else
+                    [{ element: 'div', children: [
+                      c.indent(depth),
+                      '- ',
+                      c.value(item, c.at(itemLinks, 'value')),
+                    ] }],
+                std.range(0, std.length(value) - 1)
+              ),
         };
 
         local style = |||
@@ -5089,14 +5510,22 @@ local nodesLabelsLib =
             white-space: pre-wrap;
             word-break: break-all;
           }
+          .yaml a {
+            text-decoration: none;
+          }
+          .yaml a:hover {
+            text-decoration: underline;
+          }
         |||;
 
         {
           local c = self,
           data:: error 'Yaml requires data',
+          embeddedLinks:: null,
+          mapLeaves(value, fn):: yaml.mapLeaves(value, fn),
           html: [
             { element: 'style', children: [style] },
-            { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+            { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, c.embeddedLinks, 0) },
           ],
         },
       page:
@@ -5579,46 +6008,76 @@ local nodesLabelsLib =
               else if std.type(v) == 'array' then '[]'
               else '%s' % v,
 
-            key(k)::
-              { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+            at(links, k)::
+              if std.isObject(links) && std.isString(k) then std.get(links, k, null)
+              else if std.isArray(links) && std.isNumber(k) && k < std.length(links) then links[k]
+              else null,
 
-            row(key, value, depth, bullet)::
-              local hasChildren =
-                (std.type(value) == 'object' || std.type(value) == 'array')
-                && std.length(value) > 0;
-              if hasChildren then
+            href(target)::
+              if std.isString(target) then target
+              else if std.isObject(target) && std.objectHasAll(target, '_queryPath') then target._queryPath
+              else null,
+
+            link(target, children, style)::
+              local href = c.href(target);
+              if href == null then { element: 'span', attributes: { style: style }, children: children }
+              else { element: 'a', attributes: { href: href, style: style }, children: children },
+
+            key(k, target)::
+              c.link(target, [k], 'color: var(--primary-color); font-weight: bold'),
+
+            value(v, target)::
+              if c.href(target) == null then c.scalar(v)
+              else c.link(target, [c.scalar(v)], 'color: inherit'),
+
+            isLeaf(value)::
+              !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
+
+            mapLeaves(value, fn, path=[])::
+              if c.isLeaf(value) then fn(path, value)
+              else if std.isObject(value) then { [k]: c.mapLeaves(value[k], fn, path + [k]) for k in std.objectFields(value) }
+              else [c.mapLeaves(value[i], fn, path + [i]) for i in std.range(0, std.length(value) - 1)],
+
+            row(key, value, links, depth, bullet)::
+              if !c.isLeaf(value) then
                 [{ element: 'div', children: [
                   c.indent(depth),
                   bullet,
-                  c.key(key),
+                  c.key(key, null),
                   ':',
-                ] }] + c.children(value, depth + 1)
+                ] }] + c.children(value, links, depth + 1)
               else
                 [{ element: 'div', children: [
                   c.indent(depth),
                   bullet,
-                  c.key(key),
-                  ': ' + c.scalar(value),
+                  c.key(key, c.at(links, 'key')),
+                  ': ',
+                  c.value(value, c.at(links, 'value')),
                 ] }],
 
-            children(value, depth)::
+            children(value, links, depth)::
               if std.type(value) == 'object' then
                 std.flatMap(
-                  function(kv) c.row(kv.key, kv.value, depth, ''),
+                  function(kv) c.row(kv.key, kv.value, c.at(links, kv.key), depth, ''),
                   std.objectKeysValues(value)
                 )
               else
-                std.flatMap(function(item)
-                  if std.type(item) == 'object' then
-                    local kvs = std.objectKeysValues(item);
-                    c.row(kvs[0].key, kvs[0].value, depth, '- ') +
-                    std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
-                  else
-                    [{ element: 'div', children: [
-                      c.indent(depth),
-                      '- ' + c.scalar(item),
-                    ] }]
-                            , value),
+                std.flatMap(
+                  function(i)
+                    local item = value[i];
+                    local itemLinks = c.at(links, i);
+                    if std.type(item) == 'object' then
+                      local kvs = std.objectKeysValues(item);
+                      c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
+                      std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
+                    else
+                      [{ element: 'div', children: [
+                        c.indent(depth),
+                        '- ',
+                        c.value(item, c.at(itemLinks, 'value')),
+                      ] }],
+                  std.range(0, std.length(value) - 1)
+                ),
           };
 
           local style = |||
@@ -5626,14 +6085,22 @@ local nodesLabelsLib =
               white-space: pre-wrap;
               word-break: break-all;
             }
+            .yaml a {
+              text-decoration: none;
+            }
+            .yaml a:hover {
+              text-decoration: underline;
+            }
           |||;
 
           {
             local c = self,
             data:: error 'Yaml requires data',
+            embeddedLinks:: null,
+            mapLeaves(value, fn):: yaml.mapLeaves(value, fn),
             html: [
               { element: 'style', children: [style] },
-              { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+              { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, c.embeddedLinks, 0) },
             ],
           };
 
@@ -5827,182 +6294,6 @@ local nodesLabelsLib =
     local html = {
       manifestHtml(tree): std.native('invoke:html')('manifestHtml', [tree]),
     };
-    local linkspecs =
-      local walk(current, remaining, buildFn) =
-        if std.length(remaining) == 0 then
-          if std.type(current) == 'array' then
-            std.foldl(function(acc, item) acc + buildFn(item), current, {})
-          else buildFn(current)
-        else
-          local next =
-            if std.type(current) == 'object' then std.get(current, remaining[0], null)
-            else null;
-          if next == null then {}
-          else if std.type(next) == 'array' then
-            std.foldl(function(acc, item) acc + walk(item, remaining[1:], buildFn), next, {})
-          else
-            walk(next, remaining[1:], buildFn);
-
-      local itemPath(item, path) =
-        std.foldl(
-          function(acc, seg) if std.type(acc) == 'object' then std.get(acc, seg, null) else null,
-          path,
-          item
-        );
-
-      local nestValue(labels, index, value) =
-        if index == std.length(labels) - 1 then { [labels[index]]: value }
-        else { [labels[index]]+: nestValue(labels, index + 1, value) };
-
-      local nestKeys(keySegs, item, value) =
-        local labels = [
-          if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
-          for seg in keySegs
-        ];
-        nestValue(labels, 0, value);
-
-      local splitPrefix(valueSegs) =
-        if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
-        else if std.objectHas(valueSegs[0], 'param') || std.objectHas(valueSegs[0], 'path') then { prefix: [], suffix: valueSegs }
-        else
-          local rest = splitPrefix(valueSegs[1:]);
-          { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
-
-      local resolveBase(root, node, prefixSegs) =
-        std.foldl(
-          function(acc, seg)
-            if std.objectHas(seg, 'const') then acc[seg.const]
-            else acc[seg.origin](std.toString(node[seg.origin])),
-          prefixSegs,
-          root
-        );
-
-      local resolveKey(spec, item) =
-        if std.type(spec) == 'string' then spec
-        else
-          local raw = itemPath(item, spec.path);
-          if std.objectHas(spec, 'transform') then spec.transform(raw) else raw;
-
-      local resolveFromBase(base, item, suffixSegs) =
-        std.foldl(
-          function(acc, seg)
-            if std.objectHas(seg, 'param') then
-              acc[resolveKey(seg.param, item)](std.toString(itemPath(item, seg.path)))
-            else if std.objectHas(seg, 'const') then
-              acc[seg.const]
-            else
-              acc[resolveKey(seg, item)],
-          suffixSegs,
-          base
-        );
-
-      local resolvable(item, valueSegs) =
-        std.all(
-          [itemPath(item, seg.path) != null for seg in valueSegs if std.objectHas(seg, 'path')] +
-          [
-            itemPath(item, seg.param.path) != null
-            for seg in valueSegs
-            if std.objectHas(seg, 'param') && std.type(seg.param) == 'object'
-          ]
-        );
-
-      local hexDigits = '0123456789ABCDEF';
-
-      local percentEncode(s) =
-        std.join('', [
-          local c = s[i];
-          local cp = std.codepoint(c);
-          if (cp >= 65 && cp <= 90) || (cp >= 97 && cp <= 122) || (cp >= 48 && cp <= 57)
-             || c == '-' || c == '_' || c == '.' || c == '~'
-          then c
-          else '%' + hexDigits[std.floor(cp / 16)] + hexDigits[cp % 16]
-          for i in std.range(0, std.length(s) - 1)
-        ]);
-
-      local resolveLiteralSegment(node, item, seg) =
-        if std.objectHas(seg, 'const') then seg.const
-        else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
-        else resolveKey(seg, item);
-
-      local resolveLiteralSegments(node, item, segs) =
-        std.foldl(function(acc, seg) acc + resolveLiteralSegment(node, item, seg), segs, '');
-
-      local resolveQuery(node, item, queryObj) =
-        local keys = std.objectFields(queryObj);
-        if std.length(keys) == 0 then ''
-        else '?' + std.join('&', [
-          percentEncode(k) + '=' + percentEncode(resolveLiteralSegments(node, item, queryObj[k]))
-          for k in keys
-        ]);
-
-      local resolveUrl(node, item, url) =
-        local scheme = std.get(url, 'scheme', null);
-        local host = std.get(url, 'host', []);
-        local path = std.get(url, 'path', []);
-        local query = std.get(url, 'query', {});
-        (if scheme != null then scheme + '://' else '')
-        + resolveLiteralSegments(node, item, host)
-        + (
-          if std.length(path) > 0 then
-            '/' + std.join('/', [percentEncode(resolveLiteralSegment(node, item, seg)) for seg in path])
-          else ''
-        )
-        + resolveQuery(node, item, query);
-
-      local urlSegments(url) =
-        std.get(url, 'host', []) + std.get(url, 'path', [])
-        + std.flattenArrays([url.query[k] for k in std.objectFields(std.get(url, 'query', {}))]);
-
-      local buildLinks(node, specs, root=import 'root') =
-        std.foldl(
-          function(acc, spec)
-            acc + (
-              if std.type(spec.value) == 'object' then
-                walk(
-                  node.data,
-                  spec.at,
-                  function(item)
-                    if resolvable(item, urlSegments(spec.value))
-                    then nestKeys(spec.keys, item, resolveUrl(node, item, spec.value))
-                    else {}
-                )
-              else
-                local split = splitPrefix(spec.value);
-                local base = resolveBase(root, node, split.prefix);
-                walk(
-                  node.data,
-                  spec.at,
-                  function(item)
-                    if resolvable(item, spec.value)
-                    then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
-                    else {}
-                )
-            ),
-          specs,
-          {}
-        );
-
-      local rowLinkSpec(specs, at) =
-        local matches = [spec for spec in specs if spec.at == at];
-        if std.length(matches) == 0 then null else matches[0];
-
-      local rowLinkFor(node, specs, at, root=import 'root') =
-        local spec = rowLinkSpec(specs, at);
-        if spec == null then null
-        else
-          local split = splitPrefix(spec.value);
-          local base = resolveBase(root, node, split.prefix);
-          function(item)
-            if resolvable(item, spec.value) then resolveFromBase(base, item, split.suffix) else null;
-
-      {
-        buildLinks: buildLinks,
-        rowLinkFor: rowLinkFor,
-        withLinkSpecs: {
-          linkSpecs:: [],
-          links: buildLinks(self, self.linkSpecs, import 'root'),
-        },
-      };
 
     local isNode(value) =
       std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');
@@ -6166,6 +6457,191 @@ local nodesLabelsLib =
     };
 local nodesValuesLib =
   local a =
+    local linkspecs =
+      local url =
+        local hexDigits = '0123456789ABCDEF';
+
+        local unreserved(b) =
+          (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
+          || b == 45 || b == 95 || b == 46 || b == 126;
+
+        local percentEncode(s) =
+          std.join('', [
+            if unreserved(b) then std.char(b)
+            else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
+            for b in std.encodeUTF8(s)
+          ]);
+
+        local queryValue(value) =
+          if std.isString(value) then value
+          else if std.isArray(value) then std.manifestJsonMinified(value)
+          else std.toString(value);
+
+        local query(params) =
+          local keys = std.objectFields(params);
+          if std.length(keys) == 0 then ''
+          else '?' + std.join('&', [
+            percentEncode(k) + '=' + percentEncode(queryValue(params[k]))
+            for k in keys
+          ]);
+
+        function(u)
+          local scheme = std.get(u, 'scheme', null);
+          local path = std.get(u, 'path', []);
+          (if scheme != null then scheme + '://' else '')
+          + std.get(u, 'host', '')
+          + (if std.length(path) > 0 then '/' + std.join('/', [percentEncode(seg) for seg in path]) else '')
+          + query(std.get(u, 'params', {}));
+
+      local walk(current, remaining, buildFn) =
+        if std.length(remaining) == 0 then
+          if std.type(current) == 'array' then
+            std.foldl(function(acc, item) acc + buildFn(item), current, {})
+          else buildFn(current)
+        else
+          local next =
+            if std.type(current) == 'object' then std.get(current, remaining[0], null)
+            else null;
+          if next == null then {}
+          else if std.type(next) == 'array' then
+            std.foldl(function(acc, item) acc + walk(item, remaining[1:], buildFn), next, {})
+          else
+            walk(next, remaining[1:], buildFn);
+
+      local itemPath(item, path) =
+        std.foldl(
+          function(acc, seg) if std.type(acc) == 'object' then std.get(acc, seg, null) else null,
+          path,
+          item
+        );
+
+      local nestValue(labels, index, value) =
+        if index == std.length(labels) - 1 then { [labels[index]]: value }
+        else { [labels[index]]+: nestValue(labels, index + 1, value) };
+
+      local nestKeys(keySegs, item, value) =
+        local labels = [
+          if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
+          for seg in keySegs
+        ];
+        nestValue(labels, 0, value);
+
+      local splitPrefix(valueSegs) =
+        if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
+        else if std.objectHas(valueSegs[0], 'param') || std.objectHas(valueSegs[0], 'path') then { prefix: [], suffix: valueSegs }
+        else
+          local rest = splitPrefix(valueSegs[1:]);
+          { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
+
+      local resolveBase(root, node, prefixSegs) =
+        std.foldl(
+          function(acc, seg)
+            if std.objectHas(seg, 'const') then acc[seg.const]
+            else acc[seg.origin](std.toString(node[seg.origin])),
+          prefixSegs,
+          root
+        );
+
+      local resolveKey(spec, item) =
+        if std.type(spec) == 'string' then spec
+        else
+          local raw = itemPath(item, spec.path);
+          if std.objectHas(spec, 'transform') then spec.transform(raw) else raw;
+
+      local resolveFromBase(base, item, suffixSegs) =
+        std.foldl(
+          function(acc, seg)
+            if std.objectHas(seg, 'param') then
+              acc[resolveKey(seg.param, item)](std.toString(itemPath(item, seg.path)))
+            else if std.objectHas(seg, 'const') then
+              acc[seg.const]
+            else
+              acc[resolveKey(seg, item)],
+          suffixSegs,
+          base
+        );
+
+      local resolvable(item, valueSegs) =
+        std.all(
+          [itemPath(item, seg.path) != null for seg in valueSegs if std.objectHas(seg, 'path')] +
+          [
+            itemPath(item, seg.param.path) != null
+            for seg in valueSegs
+            if std.objectHas(seg, 'param') && std.type(seg.param) == 'object'
+          ]
+        );
+
+      local resolveLiteralSegment(node, item, seg) =
+        if std.objectHas(seg, 'const') then seg.const
+        else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
+        else resolveKey(seg, item);
+
+      local resolveLiteralSegments(node, item, segs) =
+        std.foldl(function(acc, seg) acc + resolveLiteralSegment(node, item, seg), segs, '');
+
+      local resolveUrl(node, item, literal) =
+        local query = std.get(literal, 'query', {});
+        url({
+          scheme: std.get(literal, 'scheme', null),
+          host: resolveLiteralSegments(node, item, std.get(literal, 'host', [])),
+          path: [resolveLiteralSegment(node, item, seg) for seg in std.get(literal, 'path', [])],
+          params: { [k]: resolveLiteralSegments(node, item, query[k]) for k in std.objectFields(query) },
+        });
+
+      local urlSegments(literal) =
+        std.get(literal, 'host', []) + std.get(literal, 'path', [])
+        + std.flattenArrays([literal.query[k] for k in std.objectFields(std.get(literal, 'query', {}))]);
+
+      local buildLinks(node, specs, root=import 'root') =
+        std.foldl(
+          function(acc, spec)
+            acc + (
+              if std.type(spec.value) == 'object' then
+                walk(
+                  node.data,
+                  spec.at,
+                  function(item)
+                    if resolvable(item, urlSegments(spec.value))
+                    then nestKeys(spec.keys, item, resolveUrl(node, item, spec.value))
+                    else {}
+                )
+              else
+                local split = splitPrefix(spec.value);
+                local base = resolveBase(root, node, split.prefix);
+                walk(
+                  node.data,
+                  spec.at,
+                  function(item)
+                    if resolvable(item, spec.value)
+                    then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
+                    else {}
+                )
+            ),
+          specs,
+          {}
+        );
+
+      local rowLinkSpec(specs, at) =
+        local matches = [spec for spec in specs if spec.at == at];
+        if std.length(matches) == 0 then null else matches[0];
+
+      local rowLinkFor(node, specs, at, root=import 'root') =
+        local spec = rowLinkSpec(specs, at);
+        if spec == null then null
+        else
+          local split = splitPrefix(spec.value);
+          local base = resolveBase(root, node, split.prefix);
+          function(item)
+            if resolvable(item, spec.value) then resolveFromBase(base, item, split.suffix) else null;
+
+      {
+        buildLinks: buildLinks,
+        rowLinkFor: rowLinkFor,
+        withLinkSpecs: {
+          linkSpecs:: [],
+          links: buildLinks(self, self.linkSpecs, import 'root'),
+        },
+      };
     local c = {
       list:
         local style = |||
@@ -6716,46 +7192,76 @@ local nodesValuesLib =
             else if std.type(v) == 'array' then '[]'
             else '%s' % v,
 
-          key(k)::
-            { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+          at(links, k)::
+            if std.isObject(links) && std.isString(k) then std.get(links, k, null)
+            else if std.isArray(links) && std.isNumber(k) && k < std.length(links) then links[k]
+            else null,
 
-          row(key, value, depth, bullet)::
-            local hasChildren =
-              (std.type(value) == 'object' || std.type(value) == 'array')
-              && std.length(value) > 0;
-            if hasChildren then
+          href(target)::
+            if std.isString(target) then target
+            else if std.isObject(target) && std.objectHasAll(target, '_queryPath') then target._queryPath
+            else null,
+
+          link(target, children, style)::
+            local href = c.href(target);
+            if href == null then { element: 'span', attributes: { style: style }, children: children }
+            else { element: 'a', attributes: { href: href, style: style }, children: children },
+
+          key(k, target)::
+            c.link(target, [k], 'color: var(--primary-color); font-weight: bold'),
+
+          value(v, target)::
+            if c.href(target) == null then c.scalar(v)
+            else c.link(target, [c.scalar(v)], 'color: inherit'),
+
+          isLeaf(value)::
+            !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
+
+          mapLeaves(value, fn, path=[])::
+            if c.isLeaf(value) then fn(path, value)
+            else if std.isObject(value) then { [k]: c.mapLeaves(value[k], fn, path + [k]) for k in std.objectFields(value) }
+            else [c.mapLeaves(value[i], fn, path + [i]) for i in std.range(0, std.length(value) - 1)],
+
+          row(key, value, links, depth, bullet)::
+            if !c.isLeaf(value) then
               [{ element: 'div', children: [
                 c.indent(depth),
                 bullet,
-                c.key(key),
+                c.key(key, null),
                 ':',
-              ] }] + c.children(value, depth + 1)
+              ] }] + c.children(value, links, depth + 1)
             else
               [{ element: 'div', children: [
                 c.indent(depth),
                 bullet,
-                c.key(key),
-                ': ' + c.scalar(value),
+                c.key(key, c.at(links, 'key')),
+                ': ',
+                c.value(value, c.at(links, 'value')),
               ] }],
 
-          children(value, depth)::
+          children(value, links, depth)::
             if std.type(value) == 'object' then
               std.flatMap(
-                function(kv) c.row(kv.key, kv.value, depth, ''),
+                function(kv) c.row(kv.key, kv.value, c.at(links, kv.key), depth, ''),
                 std.objectKeysValues(value)
               )
             else
-              std.flatMap(function(item)
-                if std.type(item) == 'object' then
-                  local kvs = std.objectKeysValues(item);
-                  c.row(kvs[0].key, kvs[0].value, depth, '- ') +
-                  std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
-                else
-                  [{ element: 'div', children: [
-                    c.indent(depth),
-                    '- ' + c.scalar(item),
-                  ] }]
-                          , value),
+              std.flatMap(
+                function(i)
+                  local item = value[i];
+                  local itemLinks = c.at(links, i);
+                  if std.type(item) == 'object' then
+                    local kvs = std.objectKeysValues(item);
+                    c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
+                    std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
+                  else
+                    [{ element: 'div', children: [
+                      c.indent(depth),
+                      '- ',
+                      c.value(item, c.at(itemLinks, 'value')),
+                    ] }],
+                std.range(0, std.length(value) - 1)
+              ),
         };
 
         local style = |||
@@ -6763,14 +7269,22 @@ local nodesValuesLib =
             white-space: pre-wrap;
             word-break: break-all;
           }
+          .yaml a {
+            text-decoration: none;
+          }
+          .yaml a:hover {
+            text-decoration: underline;
+          }
         |||;
 
         {
           local c = self,
           data:: error 'Yaml requires data',
+          embeddedLinks:: null,
+          mapLeaves(value, fn):: yaml.mapLeaves(value, fn),
           html: [
             { element: 'style', children: [style] },
-            { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+            { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, c.embeddedLinks, 0) },
           ],
         },
       page:
@@ -7253,46 +7767,76 @@ local nodesValuesLib =
               else if std.type(v) == 'array' then '[]'
               else '%s' % v,
 
-            key(k)::
-              { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+            at(links, k)::
+              if std.isObject(links) && std.isString(k) then std.get(links, k, null)
+              else if std.isArray(links) && std.isNumber(k) && k < std.length(links) then links[k]
+              else null,
 
-            row(key, value, depth, bullet)::
-              local hasChildren =
-                (std.type(value) == 'object' || std.type(value) == 'array')
-                && std.length(value) > 0;
-              if hasChildren then
+            href(target)::
+              if std.isString(target) then target
+              else if std.isObject(target) && std.objectHasAll(target, '_queryPath') then target._queryPath
+              else null,
+
+            link(target, children, style)::
+              local href = c.href(target);
+              if href == null then { element: 'span', attributes: { style: style }, children: children }
+              else { element: 'a', attributes: { href: href, style: style }, children: children },
+
+            key(k, target)::
+              c.link(target, [k], 'color: var(--primary-color); font-weight: bold'),
+
+            value(v, target)::
+              if c.href(target) == null then c.scalar(v)
+              else c.link(target, [c.scalar(v)], 'color: inherit'),
+
+            isLeaf(value)::
+              !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
+
+            mapLeaves(value, fn, path=[])::
+              if c.isLeaf(value) then fn(path, value)
+              else if std.isObject(value) then { [k]: c.mapLeaves(value[k], fn, path + [k]) for k in std.objectFields(value) }
+              else [c.mapLeaves(value[i], fn, path + [i]) for i in std.range(0, std.length(value) - 1)],
+
+            row(key, value, links, depth, bullet)::
+              if !c.isLeaf(value) then
                 [{ element: 'div', children: [
                   c.indent(depth),
                   bullet,
-                  c.key(key),
+                  c.key(key, null),
                   ':',
-                ] }] + c.children(value, depth + 1)
+                ] }] + c.children(value, links, depth + 1)
               else
                 [{ element: 'div', children: [
                   c.indent(depth),
                   bullet,
-                  c.key(key),
-                  ': ' + c.scalar(value),
+                  c.key(key, c.at(links, 'key')),
+                  ': ',
+                  c.value(value, c.at(links, 'value')),
                 ] }],
 
-            children(value, depth)::
+            children(value, links, depth)::
               if std.type(value) == 'object' then
                 std.flatMap(
-                  function(kv) c.row(kv.key, kv.value, depth, ''),
+                  function(kv) c.row(kv.key, kv.value, c.at(links, kv.key), depth, ''),
                   std.objectKeysValues(value)
                 )
               else
-                std.flatMap(function(item)
-                  if std.type(item) == 'object' then
-                    local kvs = std.objectKeysValues(item);
-                    c.row(kvs[0].key, kvs[0].value, depth, '- ') +
-                    std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
-                  else
-                    [{ element: 'div', children: [
-                      c.indent(depth),
-                      '- ' + c.scalar(item),
-                    ] }]
-                            , value),
+                std.flatMap(
+                  function(i)
+                    local item = value[i];
+                    local itemLinks = c.at(links, i);
+                    if std.type(item) == 'object' then
+                      local kvs = std.objectKeysValues(item);
+                      c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
+                      std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
+                    else
+                      [{ element: 'div', children: [
+                        c.indent(depth),
+                        '- ',
+                        c.value(item, c.at(itemLinks, 'value')),
+                      ] }],
+                  std.range(0, std.length(value) - 1)
+                ),
           };
 
           local style = |||
@@ -7300,14 +7844,22 @@ local nodesValuesLib =
               white-space: pre-wrap;
               word-break: break-all;
             }
+            .yaml a {
+              text-decoration: none;
+            }
+            .yaml a:hover {
+              text-decoration: underline;
+            }
           |||;
 
           {
             local c = self,
             data:: error 'Yaml requires data',
+            embeddedLinks:: null,
+            mapLeaves(value, fn):: yaml.mapLeaves(value, fn),
             html: [
               { element: 'style', children: [style] },
-              { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+              { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, c.embeddedLinks, 0) },
             ],
           };
 
@@ -7501,182 +8053,6 @@ local nodesValuesLib =
     local html = {
       manifestHtml(tree): std.native('invoke:html')('manifestHtml', [tree]),
     };
-    local linkspecs =
-      local walk(current, remaining, buildFn) =
-        if std.length(remaining) == 0 then
-          if std.type(current) == 'array' then
-            std.foldl(function(acc, item) acc + buildFn(item), current, {})
-          else buildFn(current)
-        else
-          local next =
-            if std.type(current) == 'object' then std.get(current, remaining[0], null)
-            else null;
-          if next == null then {}
-          else if std.type(next) == 'array' then
-            std.foldl(function(acc, item) acc + walk(item, remaining[1:], buildFn), next, {})
-          else
-            walk(next, remaining[1:], buildFn);
-
-      local itemPath(item, path) =
-        std.foldl(
-          function(acc, seg) if std.type(acc) == 'object' then std.get(acc, seg, null) else null,
-          path,
-          item
-        );
-
-      local nestValue(labels, index, value) =
-        if index == std.length(labels) - 1 then { [labels[index]]: value }
-        else { [labels[index]]+: nestValue(labels, index + 1, value) };
-
-      local nestKeys(keySegs, item, value) =
-        local labels = [
-          if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
-          for seg in keySegs
-        ];
-        nestValue(labels, 0, value);
-
-      local splitPrefix(valueSegs) =
-        if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
-        else if std.objectHas(valueSegs[0], 'param') || std.objectHas(valueSegs[0], 'path') then { prefix: [], suffix: valueSegs }
-        else
-          local rest = splitPrefix(valueSegs[1:]);
-          { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
-
-      local resolveBase(root, node, prefixSegs) =
-        std.foldl(
-          function(acc, seg)
-            if std.objectHas(seg, 'const') then acc[seg.const]
-            else acc[seg.origin](std.toString(node[seg.origin])),
-          prefixSegs,
-          root
-        );
-
-      local resolveKey(spec, item) =
-        if std.type(spec) == 'string' then spec
-        else
-          local raw = itemPath(item, spec.path);
-          if std.objectHas(spec, 'transform') then spec.transform(raw) else raw;
-
-      local resolveFromBase(base, item, suffixSegs) =
-        std.foldl(
-          function(acc, seg)
-            if std.objectHas(seg, 'param') then
-              acc[resolveKey(seg.param, item)](std.toString(itemPath(item, seg.path)))
-            else if std.objectHas(seg, 'const') then
-              acc[seg.const]
-            else
-              acc[resolveKey(seg, item)],
-          suffixSegs,
-          base
-        );
-
-      local resolvable(item, valueSegs) =
-        std.all(
-          [itemPath(item, seg.path) != null for seg in valueSegs if std.objectHas(seg, 'path')] +
-          [
-            itemPath(item, seg.param.path) != null
-            for seg in valueSegs
-            if std.objectHas(seg, 'param') && std.type(seg.param) == 'object'
-          ]
-        );
-
-      local hexDigits = '0123456789ABCDEF';
-
-      local percentEncode(s) =
-        std.join('', [
-          local c = s[i];
-          local cp = std.codepoint(c);
-          if (cp >= 65 && cp <= 90) || (cp >= 97 && cp <= 122) || (cp >= 48 && cp <= 57)
-             || c == '-' || c == '_' || c == '.' || c == '~'
-          then c
-          else '%' + hexDigits[std.floor(cp / 16)] + hexDigits[cp % 16]
-          for i in std.range(0, std.length(s) - 1)
-        ]);
-
-      local resolveLiteralSegment(node, item, seg) =
-        if std.objectHas(seg, 'const') then seg.const
-        else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
-        else resolveKey(seg, item);
-
-      local resolveLiteralSegments(node, item, segs) =
-        std.foldl(function(acc, seg) acc + resolveLiteralSegment(node, item, seg), segs, '');
-
-      local resolveQuery(node, item, queryObj) =
-        local keys = std.objectFields(queryObj);
-        if std.length(keys) == 0 then ''
-        else '?' + std.join('&', [
-          percentEncode(k) + '=' + percentEncode(resolveLiteralSegments(node, item, queryObj[k]))
-          for k in keys
-        ]);
-
-      local resolveUrl(node, item, url) =
-        local scheme = std.get(url, 'scheme', null);
-        local host = std.get(url, 'host', []);
-        local path = std.get(url, 'path', []);
-        local query = std.get(url, 'query', {});
-        (if scheme != null then scheme + '://' else '')
-        + resolveLiteralSegments(node, item, host)
-        + (
-          if std.length(path) > 0 then
-            '/' + std.join('/', [percentEncode(resolveLiteralSegment(node, item, seg)) for seg in path])
-          else ''
-        )
-        + resolveQuery(node, item, query);
-
-      local urlSegments(url) =
-        std.get(url, 'host', []) + std.get(url, 'path', [])
-        + std.flattenArrays([url.query[k] for k in std.objectFields(std.get(url, 'query', {}))]);
-
-      local buildLinks(node, specs, root=import 'root') =
-        std.foldl(
-          function(acc, spec)
-            acc + (
-              if std.type(spec.value) == 'object' then
-                walk(
-                  node.data,
-                  spec.at,
-                  function(item)
-                    if resolvable(item, urlSegments(spec.value))
-                    then nestKeys(spec.keys, item, resolveUrl(node, item, spec.value))
-                    else {}
-                )
-              else
-                local split = splitPrefix(spec.value);
-                local base = resolveBase(root, node, split.prefix);
-                walk(
-                  node.data,
-                  spec.at,
-                  function(item)
-                    if resolvable(item, spec.value)
-                    then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
-                    else {}
-                )
-            ),
-          specs,
-          {}
-        );
-
-      local rowLinkSpec(specs, at) =
-        local matches = [spec for spec in specs if spec.at == at];
-        if std.length(matches) == 0 then null else matches[0];
-
-      local rowLinkFor(node, specs, at, root=import 'root') =
-        local spec = rowLinkSpec(specs, at);
-        if spec == null then null
-        else
-          local split = splitPrefix(spec.value);
-          local base = resolveBase(root, node, split.prefix);
-          function(item)
-            if resolvable(item, spec.value) then resolveFromBase(base, item, split.suffix) else null;
-
-      {
-        buildLinks: buildLinks,
-        rowLinkFor: rowLinkFor,
-        withLinkSpecs: {
-          linkSpecs:: [],
-          links: buildLinks(self, self.linkSpecs, import 'root'),
-        },
-      };
 
     local isNode(value) =
       std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');
@@ -8387,46 +8763,76 @@ local nodesLogsLib =
           else if std.type(v) == 'array' then '[]'
           else '%s' % v,
 
-        key(k)::
-          { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+        at(links, k)::
+          if std.isObject(links) && std.isString(k) then std.get(links, k, null)
+          else if std.isArray(links) && std.isNumber(k) && k < std.length(links) then links[k]
+          else null,
 
-        row(key, value, depth, bullet)::
-          local hasChildren =
-            (std.type(value) == 'object' || std.type(value) == 'array')
-            && std.length(value) > 0;
-          if hasChildren then
+        href(target)::
+          if std.isString(target) then target
+          else if std.isObject(target) && std.objectHasAll(target, '_queryPath') then target._queryPath
+          else null,
+
+        link(target, children, style)::
+          local href = c.href(target);
+          if href == null then { element: 'span', attributes: { style: style }, children: children }
+          else { element: 'a', attributes: { href: href, style: style }, children: children },
+
+        key(k, target)::
+          c.link(target, [k], 'color: var(--primary-color); font-weight: bold'),
+
+        value(v, target)::
+          if c.href(target) == null then c.scalar(v)
+          else c.link(target, [c.scalar(v)], 'color: inherit'),
+
+        isLeaf(value)::
+          !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
+
+        mapLeaves(value, fn, path=[])::
+          if c.isLeaf(value) then fn(path, value)
+          else if std.isObject(value) then { [k]: c.mapLeaves(value[k], fn, path + [k]) for k in std.objectFields(value) }
+          else [c.mapLeaves(value[i], fn, path + [i]) for i in std.range(0, std.length(value) - 1)],
+
+        row(key, value, links, depth, bullet)::
+          if !c.isLeaf(value) then
             [{ element: 'div', children: [
               c.indent(depth),
               bullet,
-              c.key(key),
+              c.key(key, null),
               ':',
-            ] }] + c.children(value, depth + 1)
+            ] }] + c.children(value, links, depth + 1)
           else
             [{ element: 'div', children: [
               c.indent(depth),
               bullet,
-              c.key(key),
-              ': ' + c.scalar(value),
+              c.key(key, c.at(links, 'key')),
+              ': ',
+              c.value(value, c.at(links, 'value')),
             ] }],
 
-        children(value, depth)::
+        children(value, links, depth)::
           if std.type(value) == 'object' then
             std.flatMap(
-              function(kv) c.row(kv.key, kv.value, depth, ''),
+              function(kv) c.row(kv.key, kv.value, c.at(links, kv.key), depth, ''),
               std.objectKeysValues(value)
             )
           else
-            std.flatMap(function(item)
-              if std.type(item) == 'object' then
-                local kvs = std.objectKeysValues(item);
-                c.row(kvs[0].key, kvs[0].value, depth, '- ') +
-                std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
-              else
-                [{ element: 'div', children: [
-                  c.indent(depth),
-                  '- ' + c.scalar(item),
-                ] }]
-                        , value),
+            std.flatMap(
+              function(i)
+                local item = value[i];
+                local itemLinks = c.at(links, i);
+                if std.type(item) == 'object' then
+                  local kvs = std.objectKeysValues(item);
+                  c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
+                  std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
+                else
+                  [{ element: 'div', children: [
+                    c.indent(depth),
+                    '- ',
+                    c.value(item, c.at(itemLinks, 'value')),
+                  ] }],
+              std.range(0, std.length(value) - 1)
+            ),
       };
 
       local style = |||
@@ -8434,14 +8840,22 @@ local nodesLogsLib =
           white-space: pre-wrap;
           word-break: break-all;
         }
+        .yaml a {
+          text-decoration: none;
+        }
+        .yaml a:hover {
+          text-decoration: underline;
+        }
       |||;
 
       {
         local c = self,
         data:: error 'Yaml requires data',
+        embeddedLinks:: null,
+        mapLeaves(value, fn):: yaml.mapLeaves(value, fn),
         html: [
           { element: 'style', children: [style] },
-          { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+          { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, c.embeddedLinks, 0) },
         ],
       },
     page:
@@ -8924,46 +9338,76 @@ local nodesLogsLib =
             else if std.type(v) == 'array' then '[]'
             else '%s' % v,
 
-          key(k)::
-            { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+          at(links, k)::
+            if std.isObject(links) && std.isString(k) then std.get(links, k, null)
+            else if std.isArray(links) && std.isNumber(k) && k < std.length(links) then links[k]
+            else null,
 
-          row(key, value, depth, bullet)::
-            local hasChildren =
-              (std.type(value) == 'object' || std.type(value) == 'array')
-              && std.length(value) > 0;
-            if hasChildren then
+          href(target)::
+            if std.isString(target) then target
+            else if std.isObject(target) && std.objectHasAll(target, '_queryPath') then target._queryPath
+            else null,
+
+          link(target, children, style)::
+            local href = c.href(target);
+            if href == null then { element: 'span', attributes: { style: style }, children: children }
+            else { element: 'a', attributes: { href: href, style: style }, children: children },
+
+          key(k, target)::
+            c.link(target, [k], 'color: var(--primary-color); font-weight: bold'),
+
+          value(v, target)::
+            if c.href(target) == null then c.scalar(v)
+            else c.link(target, [c.scalar(v)], 'color: inherit'),
+
+          isLeaf(value)::
+            !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
+
+          mapLeaves(value, fn, path=[])::
+            if c.isLeaf(value) then fn(path, value)
+            else if std.isObject(value) then { [k]: c.mapLeaves(value[k], fn, path + [k]) for k in std.objectFields(value) }
+            else [c.mapLeaves(value[i], fn, path + [i]) for i in std.range(0, std.length(value) - 1)],
+
+          row(key, value, links, depth, bullet)::
+            if !c.isLeaf(value) then
               [{ element: 'div', children: [
                 c.indent(depth),
                 bullet,
-                c.key(key),
+                c.key(key, null),
                 ':',
-              ] }] + c.children(value, depth + 1)
+              ] }] + c.children(value, links, depth + 1)
             else
               [{ element: 'div', children: [
                 c.indent(depth),
                 bullet,
-                c.key(key),
-                ': ' + c.scalar(value),
+                c.key(key, c.at(links, 'key')),
+                ': ',
+                c.value(value, c.at(links, 'value')),
               ] }],
 
-          children(value, depth)::
+          children(value, links, depth)::
             if std.type(value) == 'object' then
               std.flatMap(
-                function(kv) c.row(kv.key, kv.value, depth, ''),
+                function(kv) c.row(kv.key, kv.value, c.at(links, kv.key), depth, ''),
                 std.objectKeysValues(value)
               )
             else
-              std.flatMap(function(item)
-                if std.type(item) == 'object' then
-                  local kvs = std.objectKeysValues(item);
-                  c.row(kvs[0].key, kvs[0].value, depth, '- ') +
-                  std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
-                else
-                  [{ element: 'div', children: [
-                    c.indent(depth),
-                    '- ' + c.scalar(item),
-                  ] }]
-                          , value),
+              std.flatMap(
+                function(i)
+                  local item = value[i];
+                  local itemLinks = c.at(links, i);
+                  if std.type(item) == 'object' then
+                    local kvs = std.objectKeysValues(item);
+                    c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
+                    std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
+                  else
+                    [{ element: 'div', children: [
+                      c.indent(depth),
+                      '- ',
+                      c.value(item, c.at(itemLinks, 'value')),
+                    ] }],
+                std.range(0, std.length(value) - 1)
+              ),
         };
 
         local style = |||
@@ -8971,14 +9415,22 @@ local nodesLogsLib =
             white-space: pre-wrap;
             word-break: break-all;
           }
+          .yaml a {
+            text-decoration: none;
+          }
+          .yaml a:hover {
+            text-decoration: underline;
+          }
         |||;
 
         {
           local c = self,
           data:: error 'Yaml requires data',
+          embeddedLinks:: null,
+          mapLeaves(value, fn):: yaml.mapLeaves(value, fn),
           html: [
             { element: 'style', children: [style] },
-            { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+            { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, c.embeddedLinks, 0) },
           ],
         };
 
@@ -9187,46 +9639,76 @@ local nodesLogsLib =
           else if std.type(v) == 'array' then '[]'
           else '%s' % v,
 
-        key(k)::
-          { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+        at(links, k)::
+          if std.isObject(links) && std.isString(k) then std.get(links, k, null)
+          else if std.isArray(links) && std.isNumber(k) && k < std.length(links) then links[k]
+          else null,
 
-        row(key, value, depth, bullet)::
-          local hasChildren =
-            (std.type(value) == 'object' || std.type(value) == 'array')
-            && std.length(value) > 0;
-          if hasChildren then
+        href(target)::
+          if std.isString(target) then target
+          else if std.isObject(target) && std.objectHasAll(target, '_queryPath') then target._queryPath
+          else null,
+
+        link(target, children, style)::
+          local href = c.href(target);
+          if href == null then { element: 'span', attributes: { style: style }, children: children }
+          else { element: 'a', attributes: { href: href, style: style }, children: children },
+
+        key(k, target)::
+          c.link(target, [k], 'color: var(--primary-color); font-weight: bold'),
+
+        value(v, target)::
+          if c.href(target) == null then c.scalar(v)
+          else c.link(target, [c.scalar(v)], 'color: inherit'),
+
+        isLeaf(value)::
+          !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
+
+        mapLeaves(value, fn, path=[])::
+          if c.isLeaf(value) then fn(path, value)
+          else if std.isObject(value) then { [k]: c.mapLeaves(value[k], fn, path + [k]) for k in std.objectFields(value) }
+          else [c.mapLeaves(value[i], fn, path + [i]) for i in std.range(0, std.length(value) - 1)],
+
+        row(key, value, links, depth, bullet)::
+          if !c.isLeaf(value) then
             [{ element: 'div', children: [
               c.indent(depth),
               bullet,
-              c.key(key),
+              c.key(key, null),
               ':',
-            ] }] + c.children(value, depth + 1)
+            ] }] + c.children(value, links, depth + 1)
           else
             [{ element: 'div', children: [
               c.indent(depth),
               bullet,
-              c.key(key),
-              ': ' + c.scalar(value),
+              c.key(key, c.at(links, 'key')),
+              ': ',
+              c.value(value, c.at(links, 'value')),
             ] }],
 
-        children(value, depth)::
+        children(value, links, depth)::
           if std.type(value) == 'object' then
             std.flatMap(
-              function(kv) c.row(kv.key, kv.value, depth, ''),
+              function(kv) c.row(kv.key, kv.value, c.at(links, kv.key), depth, ''),
               std.objectKeysValues(value)
             )
           else
-            std.flatMap(function(item)
-              if std.type(item) == 'object' then
-                local kvs = std.objectKeysValues(item);
-                c.row(kvs[0].key, kvs[0].value, depth, '- ') +
-                std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
-              else
-                [{ element: 'div', children: [
-                  c.indent(depth),
-                  '- ' + c.scalar(item),
-                ] }]
-                        , value),
+            std.flatMap(
+              function(i)
+                local item = value[i];
+                local itemLinks = c.at(links, i);
+                if std.type(item) == 'object' then
+                  local kvs = std.objectKeysValues(item);
+                  c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
+                  std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
+                else
+                  [{ element: 'div', children: [
+                    c.indent(depth),
+                    '- ',
+                    c.value(item, c.at(itemLinks, 'value')),
+                  ] }],
+              std.range(0, std.length(value) - 1)
+            ),
       };
 
       local style = |||
@@ -9234,14 +9716,22 @@ local nodesLogsLib =
           white-space: pre-wrap;
           word-break: break-all;
         }
+        .yaml a {
+          text-decoration: none;
+        }
+        .yaml a:hover {
+          text-decoration: underline;
+        }
       |||;
 
       {
         local c = self,
         data:: error 'Yaml requires data',
+        embeddedLinks:: null,
+        mapLeaves(value, fn):: yaml.mapLeaves(value, fn),
         html: [
           { element: 'style', children: [style] },
-          { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+          { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, c.embeddedLinks, 0) },
         ],
       };
     local time = {
@@ -9331,6 +9821,13 @@ local nodesLogsLib =
       }
     |||;
 
+    local valueAt(fields, path) =
+      std.foldl(function(acc, seg) if std.isObject(acc) then std.get(acc, seg, null) else null, path, fields);
+
+    local cellText(fields, path) =
+      local value = valueAt(fields, path);
+      if value == null then '' else std.toString(value);
+
     local logRow = {
       local r = self,
       record:: error 'LogRow requires record',
@@ -9339,6 +9836,7 @@ local nodesLogsLib =
       link:: null,
       columns:: [],
       template:: null,
+      embeddedLinks:: null,
       local rec = r.record,
       local fields = std.get(rec, 'fields', {}),
       local expandable = std.length(fields) > 0,
@@ -9351,7 +9849,7 @@ local nodesLogsLib =
       local cells =
         if tabular then
           [timeEl] + [
-            { element: 'span', attributes: { class: 'log-cell' }, children: [std.toString(std.get(fields, col, ''))] }
+            { element: 'span', attributes: { class: 'log-cell' }, children: [cellText(fields, col)] }
             for col in r.columns
           ]
         else
@@ -9364,7 +9862,16 @@ local nodesLogsLib =
           attributes: entryAttrs,
           children: [
             { element: 'summary', attributes: rowAttrs, children: cells },
-            { element: 'div', attributes: { class: 'log-detail' }, children: [yaml { data:: fields }] },
+            {
+              element: 'div',
+              attributes: { class: 'log-detail' },
+              children: [
+                yaml {
+                  data:: fields,
+                  embeddedLinks:: if r.embeddedLinks == null then null else std.get(r.embeddedLinks, 'fields', null),
+                },
+              ],
+            },
           ],
         } else {
           element: 'div',
@@ -9382,11 +9889,12 @@ local nodesLogsLib =
       timeFormat:: '2006-01-02 15:04:05.000',
       links:: {},
       columns:: [],
+      embeddedLinks:: [],
       local tabular = std.length(c.columns) > 0,
       local fieldWidth(col) = std.foldl(
-        function(m, rec) std.max(m, std.length(std.toString(std.get(std.get(rec, 'fields', {}), col, '')))),
+        function(m, rec) std.max(m, std.length(cellText(std.get(rec, 'fields', {}), col))),
         c.records,
-        std.length(col),
+        std.length(std.join('.', col)),
       ),
       local template =
         if tabular then std.join(' ', ['%dch' % std.length(c.timeFormat)] + ['%dch' % fieldWidth(col) for col in c.columns])
@@ -9400,22 +9908,23 @@ local nodesLogsLib =
             (if tabular then [{
                element: 'div',
                attributes: { class: 'log-header', style: 'grid-template-columns: %s' % template },
-               children: [{ element: 'span', children: ['time'] }] + [{ element: 'span', children: [col] } for col in c.columns],
+               children: [{ element: 'span', children: ['time'] }] + [{ element: 'span', children: [std.join('.', col)] } for col in c.columns],
              }] else [])
             + (
               if std.length(c.records) == 0 then
                 [{ element: 'div', attributes: { class: 'logs-empty' }, children: ['No logs'] }]
               else
                 [
-                  (logRow {
-                     record:: rec,
-                     colors:: c.colors,
-                     timeFormat:: c.timeFormat,
-                     link:: std.get(c.links, std.get(rec, 'id', ''), null),
-                     columns:: c.columns,
-                     template:: template,
-                   }).html
-                  for rec in c.records
+                  logRow {
+                    record:: c.records[i],
+                    colors:: c.colors,
+                    timeFormat:: c.timeFormat,
+                    link:: std.get(c.links, std.get(c.records[i], 'id', ''), null),
+                    columns:: c.columns,
+                    template:: template,
+                    embeddedLinks:: if i < std.length(c.embeddedLinks) then c.embeddedLinks[i] else null,
+                  }
+                  for i in std.range(0, std.length(c.records) - 1)
                 ]
             ),
         },
@@ -9429,7 +9938,12 @@ local nodesLogsLib =
       type:: 'logql',
       expr:: error 'Logs requires expr',
       columns:: [],
-      _paramSpecs: timeRange.paramSpecs,
+      _paramSpecs: timeRange.paramSpecs + [{
+        name: 'columns',
+        type: 'array',
+        items: { type: 'array', items: 'string' },
+        default: [if std.isString(col) then [col] else col for col in n.columns],
+      }],
       _telemetryItems:: [{ type: n.type, expr: n.expr }],
       data: query(n.datasource, n._telemetryItems, n._params.from, n._params.to),
       local records = std.reverse(std.sort(
@@ -9444,6 +9958,14 @@ local nodesLogsLib =
           if std.get(rec, 'id', '') != ''
         },
       _view:: {
+        local columnLink(path, value) =
+          if std.isObject(value) || std.isArray(value) then null
+          else if std.any([std.isNumber(seg) for seg in path]) || std.member(n._params.columns, path) then null
+          else { key: n { _params+: { columns: n._params.columns + [path] } } },
+        local embeddedLinks = [
+          { fields: ui.yaml.mapLeaves(std.get(rec, 'fields', {}), columnLink) }
+          for rec in records
+        ],
         local hasRecords = std.length(records) > 0,
         local nav = timeRange.element {
           from:: n._params.from,
@@ -9457,7 +9979,8 @@ local nodesLogsLib =
           logs {
             records:: records,
             links:: { [id]: n.links[id]._queryPath for id in std.objectFields(n.links) },
-            columns:: n.columns,
+            columns:: n._params.columns,
+            embeddedLinks:: embeddedLinks,
           },
           nav.html,
         ],
@@ -9470,6 +9993,191 @@ local nodesLogsLib =
     };
 local nodesLogrecordLib =
   local ui =
+    local linkspecs =
+      local url =
+        local hexDigits = '0123456789ABCDEF';
+
+        local unreserved(b) =
+          (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
+          || b == 45 || b == 95 || b == 46 || b == 126;
+
+        local percentEncode(s) =
+          std.join('', [
+            if unreserved(b) then std.char(b)
+            else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
+            for b in std.encodeUTF8(s)
+          ]);
+
+        local queryValue(value) =
+          if std.isString(value) then value
+          else if std.isArray(value) then std.manifestJsonMinified(value)
+          else std.toString(value);
+
+        local query(params) =
+          local keys = std.objectFields(params);
+          if std.length(keys) == 0 then ''
+          else '?' + std.join('&', [
+            percentEncode(k) + '=' + percentEncode(queryValue(params[k]))
+            for k in keys
+          ]);
+
+        function(u)
+          local scheme = std.get(u, 'scheme', null);
+          local path = std.get(u, 'path', []);
+          (if scheme != null then scheme + '://' else '')
+          + std.get(u, 'host', '')
+          + (if std.length(path) > 0 then '/' + std.join('/', [percentEncode(seg) for seg in path]) else '')
+          + query(std.get(u, 'params', {}));
+
+      local walk(current, remaining, buildFn) =
+        if std.length(remaining) == 0 then
+          if std.type(current) == 'array' then
+            std.foldl(function(acc, item) acc + buildFn(item), current, {})
+          else buildFn(current)
+        else
+          local next =
+            if std.type(current) == 'object' then std.get(current, remaining[0], null)
+            else null;
+          if next == null then {}
+          else if std.type(next) == 'array' then
+            std.foldl(function(acc, item) acc + walk(item, remaining[1:], buildFn), next, {})
+          else
+            walk(next, remaining[1:], buildFn);
+
+      local itemPath(item, path) =
+        std.foldl(
+          function(acc, seg) if std.type(acc) == 'object' then std.get(acc, seg, null) else null,
+          path,
+          item
+        );
+
+      local nestValue(labels, index, value) =
+        if index == std.length(labels) - 1 then { [labels[index]]: value }
+        else { [labels[index]]+: nestValue(labels, index + 1, value) };
+
+      local nestKeys(keySegs, item, value) =
+        local labels = [
+          if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
+          for seg in keySegs
+        ];
+        nestValue(labels, 0, value);
+
+      local splitPrefix(valueSegs) =
+        if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
+        else if std.objectHas(valueSegs[0], 'param') || std.objectHas(valueSegs[0], 'path') then { prefix: [], suffix: valueSegs }
+        else
+          local rest = splitPrefix(valueSegs[1:]);
+          { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
+
+      local resolveBase(root, node, prefixSegs) =
+        std.foldl(
+          function(acc, seg)
+            if std.objectHas(seg, 'const') then acc[seg.const]
+            else acc[seg.origin](std.toString(node[seg.origin])),
+          prefixSegs,
+          root
+        );
+
+      local resolveKey(spec, item) =
+        if std.type(spec) == 'string' then spec
+        else
+          local raw = itemPath(item, spec.path);
+          if std.objectHas(spec, 'transform') then spec.transform(raw) else raw;
+
+      local resolveFromBase(base, item, suffixSegs) =
+        std.foldl(
+          function(acc, seg)
+            if std.objectHas(seg, 'param') then
+              acc[resolveKey(seg.param, item)](std.toString(itemPath(item, seg.path)))
+            else if std.objectHas(seg, 'const') then
+              acc[seg.const]
+            else
+              acc[resolveKey(seg, item)],
+          suffixSegs,
+          base
+        );
+
+      local resolvable(item, valueSegs) =
+        std.all(
+          [itemPath(item, seg.path) != null for seg in valueSegs if std.objectHas(seg, 'path')] +
+          [
+            itemPath(item, seg.param.path) != null
+            for seg in valueSegs
+            if std.objectHas(seg, 'param') && std.type(seg.param) == 'object'
+          ]
+        );
+
+      local resolveLiteralSegment(node, item, seg) =
+        if std.objectHas(seg, 'const') then seg.const
+        else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
+        else resolveKey(seg, item);
+
+      local resolveLiteralSegments(node, item, segs) =
+        std.foldl(function(acc, seg) acc + resolveLiteralSegment(node, item, seg), segs, '');
+
+      local resolveUrl(node, item, literal) =
+        local query = std.get(literal, 'query', {});
+        url({
+          scheme: std.get(literal, 'scheme', null),
+          host: resolveLiteralSegments(node, item, std.get(literal, 'host', [])),
+          path: [resolveLiteralSegment(node, item, seg) for seg in std.get(literal, 'path', [])],
+          params: { [k]: resolveLiteralSegments(node, item, query[k]) for k in std.objectFields(query) },
+        });
+
+      local urlSegments(literal) =
+        std.get(literal, 'host', []) + std.get(literal, 'path', [])
+        + std.flattenArrays([literal.query[k] for k in std.objectFields(std.get(literal, 'query', {}))]);
+
+      local buildLinks(node, specs, root=import 'root') =
+        std.foldl(
+          function(acc, spec)
+            acc + (
+              if std.type(spec.value) == 'object' then
+                walk(
+                  node.data,
+                  spec.at,
+                  function(item)
+                    if resolvable(item, urlSegments(spec.value))
+                    then nestKeys(spec.keys, item, resolveUrl(node, item, spec.value))
+                    else {}
+                )
+              else
+                local split = splitPrefix(spec.value);
+                local base = resolveBase(root, node, split.prefix);
+                walk(
+                  node.data,
+                  spec.at,
+                  function(item)
+                    if resolvable(item, spec.value)
+                    then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
+                    else {}
+                )
+            ),
+          specs,
+          {}
+        );
+
+      local rowLinkSpec(specs, at) =
+        local matches = [spec for spec in specs if spec.at == at];
+        if std.length(matches) == 0 then null else matches[0];
+
+      local rowLinkFor(node, specs, at, root=import 'root') =
+        local spec = rowLinkSpec(specs, at);
+        if spec == null then null
+        else
+          local split = splitPrefix(spec.value);
+          local base = resolveBase(root, node, split.prefix);
+          function(item)
+            if resolvable(item, spec.value) then resolveFromBase(base, item, split.suffix) else null;
+
+      {
+        buildLinks: buildLinks,
+        rowLinkFor: rowLinkFor,
+        withLinkSpecs: {
+          linkSpecs:: [],
+          links: buildLinks(self, self.linkSpecs, import 'root'),
+        },
+      };
     local c = {
       list:
         local style = |||
@@ -10020,46 +10728,76 @@ local nodesLogrecordLib =
             else if std.type(v) == 'array' then '[]'
             else '%s' % v,
 
-          key(k)::
-            { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+          at(links, k)::
+            if std.isObject(links) && std.isString(k) then std.get(links, k, null)
+            else if std.isArray(links) && std.isNumber(k) && k < std.length(links) then links[k]
+            else null,
 
-          row(key, value, depth, bullet)::
-            local hasChildren =
-              (std.type(value) == 'object' || std.type(value) == 'array')
-              && std.length(value) > 0;
-            if hasChildren then
+          href(target)::
+            if std.isString(target) then target
+            else if std.isObject(target) && std.objectHasAll(target, '_queryPath') then target._queryPath
+            else null,
+
+          link(target, children, style)::
+            local href = c.href(target);
+            if href == null then { element: 'span', attributes: { style: style }, children: children }
+            else { element: 'a', attributes: { href: href, style: style }, children: children },
+
+          key(k, target)::
+            c.link(target, [k], 'color: var(--primary-color); font-weight: bold'),
+
+          value(v, target)::
+            if c.href(target) == null then c.scalar(v)
+            else c.link(target, [c.scalar(v)], 'color: inherit'),
+
+          isLeaf(value)::
+            !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
+
+          mapLeaves(value, fn, path=[])::
+            if c.isLeaf(value) then fn(path, value)
+            else if std.isObject(value) then { [k]: c.mapLeaves(value[k], fn, path + [k]) for k in std.objectFields(value) }
+            else [c.mapLeaves(value[i], fn, path + [i]) for i in std.range(0, std.length(value) - 1)],
+
+          row(key, value, links, depth, bullet)::
+            if !c.isLeaf(value) then
               [{ element: 'div', children: [
                 c.indent(depth),
                 bullet,
-                c.key(key),
+                c.key(key, null),
                 ':',
-              ] }] + c.children(value, depth + 1)
+              ] }] + c.children(value, links, depth + 1)
             else
               [{ element: 'div', children: [
                 c.indent(depth),
                 bullet,
-                c.key(key),
-                ': ' + c.scalar(value),
+                c.key(key, c.at(links, 'key')),
+                ': ',
+                c.value(value, c.at(links, 'value')),
               ] }],
 
-          children(value, depth)::
+          children(value, links, depth)::
             if std.type(value) == 'object' then
               std.flatMap(
-                function(kv) c.row(kv.key, kv.value, depth, ''),
+                function(kv) c.row(kv.key, kv.value, c.at(links, kv.key), depth, ''),
                 std.objectKeysValues(value)
               )
             else
-              std.flatMap(function(item)
-                if std.type(item) == 'object' then
-                  local kvs = std.objectKeysValues(item);
-                  c.row(kvs[0].key, kvs[0].value, depth, '- ') +
-                  std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
-                else
-                  [{ element: 'div', children: [
-                    c.indent(depth),
-                    '- ' + c.scalar(item),
-                  ] }]
-                          , value),
+              std.flatMap(
+                function(i)
+                  local item = value[i];
+                  local itemLinks = c.at(links, i);
+                  if std.type(item) == 'object' then
+                    local kvs = std.objectKeysValues(item);
+                    c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
+                    std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
+                  else
+                    [{ element: 'div', children: [
+                      c.indent(depth),
+                      '- ',
+                      c.value(item, c.at(itemLinks, 'value')),
+                    ] }],
+                std.range(0, std.length(value) - 1)
+              ),
         };
 
         local style = |||
@@ -10067,14 +10805,22 @@ local nodesLogrecordLib =
             white-space: pre-wrap;
             word-break: break-all;
           }
+          .yaml a {
+            text-decoration: none;
+          }
+          .yaml a:hover {
+            text-decoration: underline;
+          }
         |||;
 
         {
           local c = self,
           data:: error 'Yaml requires data',
+          embeddedLinks:: null,
+          mapLeaves(value, fn):: yaml.mapLeaves(value, fn),
           html: [
             { element: 'style', children: [style] },
-            { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+            { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, c.embeddedLinks, 0) },
           ],
         },
       page:
@@ -10557,46 +11303,76 @@ local nodesLogrecordLib =
               else if std.type(v) == 'array' then '[]'
               else '%s' % v,
 
-            key(k)::
-              { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+            at(links, k)::
+              if std.isObject(links) && std.isString(k) then std.get(links, k, null)
+              else if std.isArray(links) && std.isNumber(k) && k < std.length(links) then links[k]
+              else null,
 
-            row(key, value, depth, bullet)::
-              local hasChildren =
-                (std.type(value) == 'object' || std.type(value) == 'array')
-                && std.length(value) > 0;
-              if hasChildren then
+            href(target)::
+              if std.isString(target) then target
+              else if std.isObject(target) && std.objectHasAll(target, '_queryPath') then target._queryPath
+              else null,
+
+            link(target, children, style)::
+              local href = c.href(target);
+              if href == null then { element: 'span', attributes: { style: style }, children: children }
+              else { element: 'a', attributes: { href: href, style: style }, children: children },
+
+            key(k, target)::
+              c.link(target, [k], 'color: var(--primary-color); font-weight: bold'),
+
+            value(v, target)::
+              if c.href(target) == null then c.scalar(v)
+              else c.link(target, [c.scalar(v)], 'color: inherit'),
+
+            isLeaf(value)::
+              !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
+
+            mapLeaves(value, fn, path=[])::
+              if c.isLeaf(value) then fn(path, value)
+              else if std.isObject(value) then { [k]: c.mapLeaves(value[k], fn, path + [k]) for k in std.objectFields(value) }
+              else [c.mapLeaves(value[i], fn, path + [i]) for i in std.range(0, std.length(value) - 1)],
+
+            row(key, value, links, depth, bullet)::
+              if !c.isLeaf(value) then
                 [{ element: 'div', children: [
                   c.indent(depth),
                   bullet,
-                  c.key(key),
+                  c.key(key, null),
                   ':',
-                ] }] + c.children(value, depth + 1)
+                ] }] + c.children(value, links, depth + 1)
               else
                 [{ element: 'div', children: [
                   c.indent(depth),
                   bullet,
-                  c.key(key),
-                  ': ' + c.scalar(value),
+                  c.key(key, c.at(links, 'key')),
+                  ': ',
+                  c.value(value, c.at(links, 'value')),
                 ] }],
 
-            children(value, depth)::
+            children(value, links, depth)::
               if std.type(value) == 'object' then
                 std.flatMap(
-                  function(kv) c.row(kv.key, kv.value, depth, ''),
+                  function(kv) c.row(kv.key, kv.value, c.at(links, kv.key), depth, ''),
                   std.objectKeysValues(value)
                 )
               else
-                std.flatMap(function(item)
-                  if std.type(item) == 'object' then
-                    local kvs = std.objectKeysValues(item);
-                    c.row(kvs[0].key, kvs[0].value, depth, '- ') +
-                    std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
-                  else
-                    [{ element: 'div', children: [
-                      c.indent(depth),
-                      '- ' + c.scalar(item),
-                    ] }]
-                            , value),
+                std.flatMap(
+                  function(i)
+                    local item = value[i];
+                    local itemLinks = c.at(links, i);
+                    if std.type(item) == 'object' then
+                      local kvs = std.objectKeysValues(item);
+                      c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
+                      std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
+                    else
+                      [{ element: 'div', children: [
+                        c.indent(depth),
+                        '- ',
+                        c.value(item, c.at(itemLinks, 'value')),
+                      ] }],
+                  std.range(0, std.length(value) - 1)
+                ),
           };
 
           local style = |||
@@ -10604,14 +11380,22 @@ local nodesLogrecordLib =
               white-space: pre-wrap;
               word-break: break-all;
             }
+            .yaml a {
+              text-decoration: none;
+            }
+            .yaml a:hover {
+              text-decoration: underline;
+            }
           |||;
 
           {
             local c = self,
             data:: error 'Yaml requires data',
+            embeddedLinks:: null,
+            mapLeaves(value, fn):: yaml.mapLeaves(value, fn),
             html: [
               { element: 'style', children: [style] },
-              { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+              { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, c.embeddedLinks, 0) },
             ],
           };
 
@@ -10805,182 +11589,6 @@ local nodesLogrecordLib =
     local html = {
       manifestHtml(tree): std.native('invoke:html')('manifestHtml', [tree]),
     };
-    local linkspecs =
-      local walk(current, remaining, buildFn) =
-        if std.length(remaining) == 0 then
-          if std.type(current) == 'array' then
-            std.foldl(function(acc, item) acc + buildFn(item), current, {})
-          else buildFn(current)
-        else
-          local next =
-            if std.type(current) == 'object' then std.get(current, remaining[0], null)
-            else null;
-          if next == null then {}
-          else if std.type(next) == 'array' then
-            std.foldl(function(acc, item) acc + walk(item, remaining[1:], buildFn), next, {})
-          else
-            walk(next, remaining[1:], buildFn);
-
-      local itemPath(item, path) =
-        std.foldl(
-          function(acc, seg) if std.type(acc) == 'object' then std.get(acc, seg, null) else null,
-          path,
-          item
-        );
-
-      local nestValue(labels, index, value) =
-        if index == std.length(labels) - 1 then { [labels[index]]: value }
-        else { [labels[index]]+: nestValue(labels, index + 1, value) };
-
-      local nestKeys(keySegs, item, value) =
-        local labels = [
-          if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
-          for seg in keySegs
-        ];
-        nestValue(labels, 0, value);
-
-      local splitPrefix(valueSegs) =
-        if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
-        else if std.objectHas(valueSegs[0], 'param') || std.objectHas(valueSegs[0], 'path') then { prefix: [], suffix: valueSegs }
-        else
-          local rest = splitPrefix(valueSegs[1:]);
-          { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
-
-      local resolveBase(root, node, prefixSegs) =
-        std.foldl(
-          function(acc, seg)
-            if std.objectHas(seg, 'const') then acc[seg.const]
-            else acc[seg.origin](std.toString(node[seg.origin])),
-          prefixSegs,
-          root
-        );
-
-      local resolveKey(spec, item) =
-        if std.type(spec) == 'string' then spec
-        else
-          local raw = itemPath(item, spec.path);
-          if std.objectHas(spec, 'transform') then spec.transform(raw) else raw;
-
-      local resolveFromBase(base, item, suffixSegs) =
-        std.foldl(
-          function(acc, seg)
-            if std.objectHas(seg, 'param') then
-              acc[resolveKey(seg.param, item)](std.toString(itemPath(item, seg.path)))
-            else if std.objectHas(seg, 'const') then
-              acc[seg.const]
-            else
-              acc[resolveKey(seg, item)],
-          suffixSegs,
-          base
-        );
-
-      local resolvable(item, valueSegs) =
-        std.all(
-          [itemPath(item, seg.path) != null for seg in valueSegs if std.objectHas(seg, 'path')] +
-          [
-            itemPath(item, seg.param.path) != null
-            for seg in valueSegs
-            if std.objectHas(seg, 'param') && std.type(seg.param) == 'object'
-          ]
-        );
-
-      local hexDigits = '0123456789ABCDEF';
-
-      local percentEncode(s) =
-        std.join('', [
-          local c = s[i];
-          local cp = std.codepoint(c);
-          if (cp >= 65 && cp <= 90) || (cp >= 97 && cp <= 122) || (cp >= 48 && cp <= 57)
-             || c == '-' || c == '_' || c == '.' || c == '~'
-          then c
-          else '%' + hexDigits[std.floor(cp / 16)] + hexDigits[cp % 16]
-          for i in std.range(0, std.length(s) - 1)
-        ]);
-
-      local resolveLiteralSegment(node, item, seg) =
-        if std.objectHas(seg, 'const') then seg.const
-        else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
-        else resolveKey(seg, item);
-
-      local resolveLiteralSegments(node, item, segs) =
-        std.foldl(function(acc, seg) acc + resolveLiteralSegment(node, item, seg), segs, '');
-
-      local resolveQuery(node, item, queryObj) =
-        local keys = std.objectFields(queryObj);
-        if std.length(keys) == 0 then ''
-        else '?' + std.join('&', [
-          percentEncode(k) + '=' + percentEncode(resolveLiteralSegments(node, item, queryObj[k]))
-          for k in keys
-        ]);
-
-      local resolveUrl(node, item, url) =
-        local scheme = std.get(url, 'scheme', null);
-        local host = std.get(url, 'host', []);
-        local path = std.get(url, 'path', []);
-        local query = std.get(url, 'query', {});
-        (if scheme != null then scheme + '://' else '')
-        + resolveLiteralSegments(node, item, host)
-        + (
-          if std.length(path) > 0 then
-            '/' + std.join('/', [percentEncode(resolveLiteralSegment(node, item, seg)) for seg in path])
-          else ''
-        )
-        + resolveQuery(node, item, query);
-
-      local urlSegments(url) =
-        std.get(url, 'host', []) + std.get(url, 'path', [])
-        + std.flattenArrays([url.query[k] for k in std.objectFields(std.get(url, 'query', {}))]);
-
-      local buildLinks(node, specs, root=import 'root') =
-        std.foldl(
-          function(acc, spec)
-            acc + (
-              if std.type(spec.value) == 'object' then
-                walk(
-                  node.data,
-                  spec.at,
-                  function(item)
-                    if resolvable(item, urlSegments(spec.value))
-                    then nestKeys(spec.keys, item, resolveUrl(node, item, spec.value))
-                    else {}
-                )
-              else
-                local split = splitPrefix(spec.value);
-                local base = resolveBase(root, node, split.prefix);
-                walk(
-                  node.data,
-                  spec.at,
-                  function(item)
-                    if resolvable(item, spec.value)
-                    then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
-                    else {}
-                )
-            ),
-          specs,
-          {}
-        );
-
-      local rowLinkSpec(specs, at) =
-        local matches = [spec for spec in specs if spec.at == at];
-        if std.length(matches) == 0 then null else matches[0];
-
-      local rowLinkFor(node, specs, at, root=import 'root') =
-        local spec = rowLinkSpec(specs, at);
-        if spec == null then null
-        else
-          local split = splitPrefix(spec.value);
-          local base = resolveBase(root, node, split.prefix);
-          function(item)
-            if resolvable(item, spec.value) then resolveFromBase(base, item, split.suffix) else null;
-
-      {
-        buildLinks: buildLinks,
-        rowLinkFor: rowLinkFor,
-        withLinkSpecs: {
-          linkSpecs:: [],
-          links: buildLinks(self, self.linkSpecs, import 'root'),
-        },
-      };
 
     local isNode(value) =
       std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');
@@ -11893,46 +12501,76 @@ local nodesDashboardLib =
             else if std.type(v) == 'array' then '[]'
             else '%s' % v,
 
-          key(k)::
-            { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+          at(links, k)::
+            if std.isObject(links) && std.isString(k) then std.get(links, k, null)
+            else if std.isArray(links) && std.isNumber(k) && k < std.length(links) then links[k]
+            else null,
 
-          row(key, value, depth, bullet)::
-            local hasChildren =
-              (std.type(value) == 'object' || std.type(value) == 'array')
-              && std.length(value) > 0;
-            if hasChildren then
+          href(target)::
+            if std.isString(target) then target
+            else if std.isObject(target) && std.objectHasAll(target, '_queryPath') then target._queryPath
+            else null,
+
+          link(target, children, style)::
+            local href = c.href(target);
+            if href == null then { element: 'span', attributes: { style: style }, children: children }
+            else { element: 'a', attributes: { href: href, style: style }, children: children },
+
+          key(k, target)::
+            c.link(target, [k], 'color: var(--primary-color); font-weight: bold'),
+
+          value(v, target)::
+            if c.href(target) == null then c.scalar(v)
+            else c.link(target, [c.scalar(v)], 'color: inherit'),
+
+          isLeaf(value)::
+            !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
+
+          mapLeaves(value, fn, path=[])::
+            if c.isLeaf(value) then fn(path, value)
+            else if std.isObject(value) then { [k]: c.mapLeaves(value[k], fn, path + [k]) for k in std.objectFields(value) }
+            else [c.mapLeaves(value[i], fn, path + [i]) for i in std.range(0, std.length(value) - 1)],
+
+          row(key, value, links, depth, bullet)::
+            if !c.isLeaf(value) then
               [{ element: 'div', children: [
                 c.indent(depth),
                 bullet,
-                c.key(key),
+                c.key(key, null),
                 ':',
-              ] }] + c.children(value, depth + 1)
+              ] }] + c.children(value, links, depth + 1)
             else
               [{ element: 'div', children: [
                 c.indent(depth),
                 bullet,
-                c.key(key),
-                ': ' + c.scalar(value),
+                c.key(key, c.at(links, 'key')),
+                ': ',
+                c.value(value, c.at(links, 'value')),
               ] }],
 
-          children(value, depth)::
+          children(value, links, depth)::
             if std.type(value) == 'object' then
               std.flatMap(
-                function(kv) c.row(kv.key, kv.value, depth, ''),
+                function(kv) c.row(kv.key, kv.value, c.at(links, kv.key), depth, ''),
                 std.objectKeysValues(value)
               )
             else
-              std.flatMap(function(item)
-                if std.type(item) == 'object' then
-                  local kvs = std.objectKeysValues(item);
-                  c.row(kvs[0].key, kvs[0].value, depth, '- ') +
-                  std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
-                else
-                  [{ element: 'div', children: [
-                    c.indent(depth),
-                    '- ' + c.scalar(item),
-                  ] }]
-                          , value),
+              std.flatMap(
+                function(i)
+                  local item = value[i];
+                  local itemLinks = c.at(links, i);
+                  if std.type(item) == 'object' then
+                    local kvs = std.objectKeysValues(item);
+                    c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
+                    std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
+                  else
+                    [{ element: 'div', children: [
+                      c.indent(depth),
+                      '- ',
+                      c.value(item, c.at(itemLinks, 'value')),
+                    ] }],
+                std.range(0, std.length(value) - 1)
+              ),
         };
 
         local style = |||
@@ -11940,14 +12578,22 @@ local nodesDashboardLib =
             white-space: pre-wrap;
             word-break: break-all;
           }
+          .yaml a {
+            text-decoration: none;
+          }
+          .yaml a:hover {
+            text-decoration: underline;
+          }
         |||;
 
         {
           local c = self,
           data:: error 'Yaml requires data',
+          embeddedLinks:: null,
+          mapLeaves(value, fn):: yaml.mapLeaves(value, fn),
           html: [
             { element: 'style', children: [style] },
-            { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+            { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, c.embeddedLinks, 0) },
           ],
         },
       page:
@@ -12430,46 +13076,76 @@ local nodesDashboardLib =
               else if std.type(v) == 'array' then '[]'
               else '%s' % v,
 
-            key(k)::
-              { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
+            at(links, k)::
+              if std.isObject(links) && std.isString(k) then std.get(links, k, null)
+              else if std.isArray(links) && std.isNumber(k) && k < std.length(links) then links[k]
+              else null,
 
-            row(key, value, depth, bullet)::
-              local hasChildren =
-                (std.type(value) == 'object' || std.type(value) == 'array')
-                && std.length(value) > 0;
-              if hasChildren then
+            href(target)::
+              if std.isString(target) then target
+              else if std.isObject(target) && std.objectHasAll(target, '_queryPath') then target._queryPath
+              else null,
+
+            link(target, children, style)::
+              local href = c.href(target);
+              if href == null then { element: 'span', attributes: { style: style }, children: children }
+              else { element: 'a', attributes: { href: href, style: style }, children: children },
+
+            key(k, target)::
+              c.link(target, [k], 'color: var(--primary-color); font-weight: bold'),
+
+            value(v, target)::
+              if c.href(target) == null then c.scalar(v)
+              else c.link(target, [c.scalar(v)], 'color: inherit'),
+
+            isLeaf(value)::
+              !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
+
+            mapLeaves(value, fn, path=[])::
+              if c.isLeaf(value) then fn(path, value)
+              else if std.isObject(value) then { [k]: c.mapLeaves(value[k], fn, path + [k]) for k in std.objectFields(value) }
+              else [c.mapLeaves(value[i], fn, path + [i]) for i in std.range(0, std.length(value) - 1)],
+
+            row(key, value, links, depth, bullet)::
+              if !c.isLeaf(value) then
                 [{ element: 'div', children: [
                   c.indent(depth),
                   bullet,
-                  c.key(key),
+                  c.key(key, null),
                   ':',
-                ] }] + c.children(value, depth + 1)
+                ] }] + c.children(value, links, depth + 1)
               else
                 [{ element: 'div', children: [
                   c.indent(depth),
                   bullet,
-                  c.key(key),
-                  ': ' + c.scalar(value),
+                  c.key(key, c.at(links, 'key')),
+                  ': ',
+                  c.value(value, c.at(links, 'value')),
                 ] }],
 
-            children(value, depth)::
+            children(value, links, depth)::
               if std.type(value) == 'object' then
                 std.flatMap(
-                  function(kv) c.row(kv.key, kv.value, depth, ''),
+                  function(kv) c.row(kv.key, kv.value, c.at(links, kv.key), depth, ''),
                   std.objectKeysValues(value)
                 )
               else
-                std.flatMap(function(item)
-                  if std.type(item) == 'object' then
-                    local kvs = std.objectKeysValues(item);
-                    c.row(kvs[0].key, kvs[0].value, depth, '- ') +
-                    std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
-                  else
-                    [{ element: 'div', children: [
-                      c.indent(depth),
-                      '- ' + c.scalar(item),
-                    ] }]
-                            , value),
+                std.flatMap(
+                  function(i)
+                    local item = value[i];
+                    local itemLinks = c.at(links, i);
+                    if std.type(item) == 'object' then
+                      local kvs = std.objectKeysValues(item);
+                      c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
+                      std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
+                    else
+                      [{ element: 'div', children: [
+                        c.indent(depth),
+                        '- ',
+                        c.value(item, c.at(itemLinks, 'value')),
+                      ] }],
+                  std.range(0, std.length(value) - 1)
+                ),
           };
 
           local style = |||
@@ -12477,14 +13153,22 @@ local nodesDashboardLib =
               white-space: pre-wrap;
               word-break: break-all;
             }
+            .yaml a {
+              text-decoration: none;
+            }
+            .yaml a:hover {
+              text-decoration: underline;
+            }
           |||;
 
           {
             local c = self,
             data:: error 'Yaml requires data',
+            embeddedLinks:: null,
+            mapLeaves(value, fn):: yaml.mapLeaves(value, fn),
             html: [
               { element: 'style', children: [style] },
-              { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+              { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, c.embeddedLinks, 0) },
             ],
           };
 
