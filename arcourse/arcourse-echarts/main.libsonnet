@@ -502,25 +502,14 @@ local ui = {
 
     local slug(label) = std.asciiLower(std.strReplace(std.toString(label), ' ', '-'));
 
-    local cellValue(item, col) =
-      if std.objectHas(col, 'value') then col.value(item)
-      else std.foldl(
-        function(acc, k) if std.type(acc) == 'object' then std.get(acc, k, null) else null,
-        col.path,
-        item
-      );
-
     local cellText(item, col) =
-      local val = cellValue(item, col);
+      local val = std.get(item, col.key, null);
       if val == null then '' else std.toString(val);
 
-    local rowHref(rowLink, item) =
-      if rowLink == null then null
-      else
-        local target = rowLink(item);
-        if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
-        then target._queryPath
-        else null;
+    local rowHref(target) =
+      if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
+      then target._queryPath
+      else null;
 
     local cell = {
       local c = self,
@@ -592,7 +581,7 @@ local ui = {
       local c = self,
       items:: error 'Table requires items',
       columns:: [],
-      rowLink:: null,
+      rowLinks:: [],
       pagination:: null,
       local rows = if std.isArray(c.items) then c.items else [],
       local nav = paginationNav { pagination:: c.pagination },
@@ -621,7 +610,8 @@ local ui = {
                   children:
                     if std.length(rows) == 0 then [emptyRow { columnCount:: std.length(c.columns) }]
                     else [
-                      local href = rowHref(c.rowLink, item);
+                      local item = rows[r];
+                      local href = rowHref(if r < std.length(c.rowLinks) then c.rowLinks[r] else null);
                       {
                         element: 'tr',
                         children: [
@@ -629,7 +619,7 @@ local ui = {
                           for i in std.range(0, std.length(c.columns) - 1)
                         ],
                       }
-                      for item in rows
+                      for r in std.range(0, std.length(rows) - 1)
                     ],
                 },
               ],
