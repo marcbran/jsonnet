@@ -29,6 +29,25 @@ and links, either explicit or derived from an OpenAPI discovery document.
 
 ## Fields
 
+### apps
+
+`nodeList` adds pod tables for deployments, statefulsets and daemonsets (selected
+
+```jsonnet
+arcourse-kubernetes.apps
+```
+
+
+### core
+
+Hand-written core layers on top of the generated graph. `nodeList` adds the pod
+
+```jsonnet
+arcourse-kubernetes.core
+```
+
+pod columns including computed Ready and Restarts.
+
 ### graph
 
 Root package. `contexts` are the configured kubeconfig context(s), `columns` and
@@ -39,3 +58,12 @@ arcourse-kubernetes.graph
 
 `manifest` (default `true`) controls whether `_view.jsonnet` is rendered as a
 string or returned as an AST.
+
+### networking.k8s.io
+
+`nodeList` adds an external https link per ingress rule host.
+
+```jsonnet
+arcourse-kubernetes.networking.k8s.io
+```
+
