@@ -1156,25 +1156,14 @@ local telemetry =
 
           local slug(label) = std.asciiLower(std.strReplace(std.toString(label), ' ', '-'));
 
-          local cellValue(item, col) =
-            if std.objectHas(col, 'value') then col.value(item)
-            else std.foldl(
-              function(acc, k) if std.type(acc) == 'object' then std.get(acc, k, null) else null,
-              col.path,
-              item
-            );
-
           local cellText(item, col) =
-            local val = cellValue(item, col);
+            local val = std.get(item, col.key, null);
             if val == null then '' else std.toString(val);
 
-          local rowHref(rowLink, item) =
-            if rowLink == null then null
-            else
-              local target = rowLink(item);
-              if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
-              then target._queryPath
-              else null;
+          local rowHref(target) =
+            if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
+            then target._queryPath
+            else null;
 
           local cell = {
             local c = self,
@@ -1246,7 +1235,7 @@ local telemetry =
             local c = self,
             items:: error 'Table requires items',
             columns:: [],
-            rowLink:: null,
+            rowLinks:: [],
             pagination:: null,
             local rows = if std.isArray(c.items) then c.items else [],
             local nav = paginationNav { pagination:: c.pagination },
@@ -1275,7 +1264,8 @@ local telemetry =
                         children:
                           if std.length(rows) == 0 then [emptyRow { columnCount:: std.length(c.columns) }]
                           else [
-                            local href = rowHref(c.rowLink, item);
+                            local item = rows[r];
+                            local href = rowHref(if r < std.length(c.rowLinks) then c.rowLinks[r] else null);
                             {
                               element: 'tr',
                               children: [
@@ -1283,7 +1273,7 @@ local telemetry =
                                 for i in std.range(0, std.length(c.columns) - 1)
                               ],
                             }
-                            for item in rows
+                            for r in std.range(0, std.length(rows) - 1)
                           ],
                       },
                     ],
@@ -3424,25 +3414,14 @@ local telemetry =
 
           local slug(label) = std.asciiLower(std.strReplace(std.toString(label), ' ', '-'));
 
-          local cellValue(item, col) =
-            if std.objectHas(col, 'value') then col.value(item)
-            else std.foldl(
-              function(acc, k) if std.type(acc) == 'object' then std.get(acc, k, null) else null,
-              col.path,
-              item
-            );
-
           local cellText(item, col) =
-            local val = cellValue(item, col);
+            local val = std.get(item, col.key, null);
             if val == null then '' else std.toString(val);
 
-          local rowHref(rowLink, item) =
-            if rowLink == null then null
-            else
-              local target = rowLink(item);
-              if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
-              then target._queryPath
-              else null;
+          local rowHref(target) =
+            if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
+            then target._queryPath
+            else null;
 
           local cell = {
             local c = self,
@@ -3514,7 +3493,7 @@ local telemetry =
             local c = self,
             items:: error 'Table requires items',
             columns:: [],
-            rowLink:: null,
+            rowLinks:: [],
             pagination:: null,
             local rows = if std.isArray(c.items) then c.items else [],
             local nav = paginationNav { pagination:: c.pagination },
@@ -3543,7 +3522,8 @@ local telemetry =
                         children:
                           if std.length(rows) == 0 then [emptyRow { columnCount:: std.length(c.columns) }]
                           else [
-                            local href = rowHref(c.rowLink, item);
+                            local item = rows[r];
+                            local href = rowHref(if r < std.length(c.rowLinks) then c.rowLinks[r] else null);
                             {
                               element: 'tr',
                               children: [
@@ -3551,7 +3531,7 @@ local telemetry =
                                 for i in std.range(0, std.length(c.columns) - 1)
                               ],
                             }
-                            for item in rows
+                            for r in std.range(0, std.length(rows) - 1)
                           ],
                       },
                     ],
@@ -4625,16 +4605,47 @@ local telemetry =
         },
       };
 
+      local columnValue(item, col) =
+        if std.objectHasAll(col, 'value') then col.value(item) else safeGet(item, col.path);
+
+      local isAlphanumeric(ch) =
+        (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9');
+
+      local labelWords(label) = [
+        word
+        for word in std.split(std.join('', [if isAlphanumeric(ch) then ch else ' ' for ch in std.stringChars(label)]), ' ')
+        if word != ''
+      ];
+
+      local lowerCamelCase(label) =
+        local parts = labelWords(std.toString(label));
+        if std.length(parts) == 0 then ''
+        else std.asciiLower(parts[0]) + std.join('', [std.asciiUpper(part[0]) + part[1:] for part in parts[1:]]);
+
+      local columnKey(col) = std.get(col, 'key', lowerCamelCase(col.label));
+
+      local projectItem(item, columns) = {
+        [col.key]: value
+        for col in columns
+        for value in [columnValue(item, col)]
+        if value != null
+      };
+
       local tableView = baseView {
+        data:: error 'table requires data',
+        local table = std.get($, 'table', {}),
+        local at = std.get(table, 'at', ['items']),
+        local columns = [col { key: columnKey(col) } for col in std.get(table, 'columns', [])],
+        local found = safeGet($.data, at),
+        local dataItems = if std.isArray(found) then found else [],
+        items: [projectItem(item, columns) for item in dataItems],
         _view+:: {
           fragment:
-            local table = std.get($, 'table', {});
-            local at = std.get(table, 'at', ['items']);
-            local items = safeGet($.data, at);
+            local rowLink = linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at);
             c.table {
-              items:: items,
-              columns:: std.get(table, 'columns', []),
-              rowLink:: linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at),
+              items:: $.items,
+              columns:: columns,
+              rowLinks:: if rowLink == null then [] else [rowLink(item) for item in dataItems],
               pagination:: std.get(std.get($, 'links', {}), 'pagination', null),
             },
         },
@@ -5184,25 +5195,14 @@ local telemetry =
 
           local slug(label) = std.asciiLower(std.strReplace(std.toString(label), ' ', '-'));
 
-          local cellValue(item, col) =
-            if std.objectHas(col, 'value') then col.value(item)
-            else std.foldl(
-              function(acc, k) if std.type(acc) == 'object' then std.get(acc, k, null) else null,
-              col.path,
-              item
-            );
-
           local cellText(item, col) =
-            local val = cellValue(item, col);
+            local val = std.get(item, col.key, null);
             if val == null then '' else std.toString(val);
 
-          local rowHref(rowLink, item) =
-            if rowLink == null then null
-            else
-              local target = rowLink(item);
-              if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
-              then target._queryPath
-              else null;
+          local rowHref(target) =
+            if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
+            then target._queryPath
+            else null;
 
           local cell = {
             local c = self,
@@ -5274,7 +5274,7 @@ local telemetry =
             local c = self,
             items:: error 'Table requires items',
             columns:: [],
-            rowLink:: null,
+            rowLinks:: [],
             pagination:: null,
             local rows = if std.isArray(c.items) then c.items else [],
             local nav = paginationNav { pagination:: c.pagination },
@@ -5303,7 +5303,8 @@ local telemetry =
                         children:
                           if std.length(rows) == 0 then [emptyRow { columnCount:: std.length(c.columns) }]
                           else [
-                            local href = rowHref(c.rowLink, item);
+                            local item = rows[r];
+                            local href = rowHref(if r < std.length(c.rowLinks) then c.rowLinks[r] else null);
                             {
                               element: 'tr',
                               children: [
@@ -5311,7 +5312,7 @@ local telemetry =
                                 for i in std.range(0, std.length(c.columns) - 1)
                               ],
                             }
-                            for item in rows
+                            for r in std.range(0, std.length(rows) - 1)
                           ],
                       },
                     ],
@@ -6385,16 +6386,47 @@ local telemetry =
         },
       };
 
+      local columnValue(item, col) =
+        if std.objectHasAll(col, 'value') then col.value(item) else safeGet(item, col.path);
+
+      local isAlphanumeric(ch) =
+        (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9');
+
+      local labelWords(label) = [
+        word
+        for word in std.split(std.join('', [if isAlphanumeric(ch) then ch else ' ' for ch in std.stringChars(label)]), ' ')
+        if word != ''
+      ];
+
+      local lowerCamelCase(label) =
+        local parts = labelWords(std.toString(label));
+        if std.length(parts) == 0 then ''
+        else std.asciiLower(parts[0]) + std.join('', [std.asciiUpper(part[0]) + part[1:] for part in parts[1:]]);
+
+      local columnKey(col) = std.get(col, 'key', lowerCamelCase(col.label));
+
+      local projectItem(item, columns) = {
+        [col.key]: value
+        for col in columns
+        for value in [columnValue(item, col)]
+        if value != null
+      };
+
       local tableView = baseView {
+        data:: error 'table requires data',
+        local table = std.get($, 'table', {}),
+        local at = std.get(table, 'at', ['items']),
+        local columns = [col { key: columnKey(col) } for col in std.get(table, 'columns', [])],
+        local found = safeGet($.data, at),
+        local dataItems = if std.isArray(found) then found else [],
+        items: [projectItem(item, columns) for item in dataItems],
         _view+:: {
           fragment:
-            local table = std.get($, 'table', {});
-            local at = std.get(table, 'at', ['items']);
-            local items = safeGet($.data, at);
+            local rowLink = linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at);
             c.table {
-              items:: items,
-              columns:: std.get(table, 'columns', []),
-              rowLink:: linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at),
+              items:: $.items,
+              columns:: columns,
+              rowLinks:: if rowLink == null then [] else [rowLink(item) for item in dataItems],
               pagination:: std.get(std.get($, 'links', {}), 'pagination', null),
             },
         },
@@ -6943,25 +6975,14 @@ local telemetry =
 
           local slug(label) = std.asciiLower(std.strReplace(std.toString(label), ' ', '-'));
 
-          local cellValue(item, col) =
-            if std.objectHas(col, 'value') then col.value(item)
-            else std.foldl(
-              function(acc, k) if std.type(acc) == 'object' then std.get(acc, k, null) else null,
-              col.path,
-              item
-            );
-
           local cellText(item, col) =
-            local val = cellValue(item, col);
+            local val = std.get(item, col.key, null);
             if val == null then '' else std.toString(val);
 
-          local rowHref(rowLink, item) =
-            if rowLink == null then null
-            else
-              local target = rowLink(item);
-              if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
-              then target._queryPath
-              else null;
+          local rowHref(target) =
+            if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
+            then target._queryPath
+            else null;
 
           local cell = {
             local c = self,
@@ -7033,7 +7054,7 @@ local telemetry =
             local c = self,
             items:: error 'Table requires items',
             columns:: [],
-            rowLink:: null,
+            rowLinks:: [],
             pagination:: null,
             local rows = if std.isArray(c.items) then c.items else [],
             local nav = paginationNav { pagination:: c.pagination },
@@ -7062,7 +7083,8 @@ local telemetry =
                         children:
                           if std.length(rows) == 0 then [emptyRow { columnCount:: std.length(c.columns) }]
                           else [
-                            local href = rowHref(c.rowLink, item);
+                            local item = rows[r];
+                            local href = rowHref(if r < std.length(c.rowLinks) then c.rowLinks[r] else null);
                             {
                               element: 'tr',
                               children: [
@@ -7070,7 +7092,7 @@ local telemetry =
                                 for i in std.range(0, std.length(c.columns) - 1)
                               ],
                             }
-                            for item in rows
+                            for r in std.range(0, std.length(rows) - 1)
                           ],
                       },
                     ],
@@ -8144,16 +8166,47 @@ local telemetry =
         },
       };
 
+      local columnValue(item, col) =
+        if std.objectHasAll(col, 'value') then col.value(item) else safeGet(item, col.path);
+
+      local isAlphanumeric(ch) =
+        (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9');
+
+      local labelWords(label) = [
+        word
+        for word in std.split(std.join('', [if isAlphanumeric(ch) then ch else ' ' for ch in std.stringChars(label)]), ' ')
+        if word != ''
+      ];
+
+      local lowerCamelCase(label) =
+        local parts = labelWords(std.toString(label));
+        if std.length(parts) == 0 then ''
+        else std.asciiLower(parts[0]) + std.join('', [std.asciiUpper(part[0]) + part[1:] for part in parts[1:]]);
+
+      local columnKey(col) = std.get(col, 'key', lowerCamelCase(col.label));
+
+      local projectItem(item, columns) = {
+        [col.key]: value
+        for col in columns
+        for value in [columnValue(item, col)]
+        if value != null
+      };
+
       local tableView = baseView {
+        data:: error 'table requires data',
+        local table = std.get($, 'table', {}),
+        local at = std.get(table, 'at', ['items']),
+        local columns = [col { key: columnKey(col) } for col in std.get(table, 'columns', [])],
+        local found = safeGet($.data, at),
+        local dataItems = if std.isArray(found) then found else [],
+        items: [projectItem(item, columns) for item in dataItems],
         _view+:: {
           fragment:
-            local table = std.get($, 'table', {});
-            local at = std.get(table, 'at', ['items']);
-            local items = safeGet($.data, at);
+            local rowLink = linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at);
             c.table {
-              items:: items,
-              columns:: std.get(table, 'columns', []),
-              rowLink:: linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at),
+              items:: $.items,
+              columns:: columns,
+              rowLinks:: if rowLink == null then [] else [rowLink(item) for item in dataItems],
               pagination:: std.get(std.get($, 'links', {}), 'pagination', null),
             },
         },
@@ -8514,25 +8567,14 @@ local telemetry =
 
         local slug(label) = std.asciiLower(std.strReplace(std.toString(label), ' ', '-'));
 
-        local cellValue(item, col) =
-          if std.objectHas(col, 'value') then col.value(item)
-          else std.foldl(
-            function(acc, k) if std.type(acc) == 'object' then std.get(acc, k, null) else null,
-            col.path,
-            item
-          );
-
         local cellText(item, col) =
-          local val = cellValue(item, col);
+          local val = std.get(item, col.key, null);
           if val == null then '' else std.toString(val);
 
-        local rowHref(rowLink, item) =
-          if rowLink == null then null
-          else
-            local target = rowLink(item);
-            if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
-            then target._queryPath
-            else null;
+        local rowHref(target) =
+          if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
+          then target._queryPath
+          else null;
 
         local cell = {
           local c = self,
@@ -8604,7 +8646,7 @@ local telemetry =
           local c = self,
           items:: error 'Table requires items',
           columns:: [],
-          rowLink:: null,
+          rowLinks:: [],
           pagination:: null,
           local rows = if std.isArray(c.items) then c.items else [],
           local nav = paginationNav { pagination:: c.pagination },
@@ -8633,7 +8675,8 @@ local telemetry =
                       children:
                         if std.length(rows) == 0 then [emptyRow { columnCount:: std.length(c.columns) }]
                         else [
-                          local href = rowHref(c.rowLink, item);
+                          local item = rows[r];
+                          local href = rowHref(if r < std.length(c.rowLinks) then c.rowLinks[r] else null);
                           {
                             element: 'tr',
                             children: [
@@ -8641,7 +8684,7 @@ local telemetry =
                               for i in std.range(0, std.length(c.columns) - 1)
                             ],
                           }
-                          for item in rows
+                          for r in std.range(0, std.length(rows) - 1)
                         ],
                     },
                   ],
@@ -10481,25 +10524,14 @@ local telemetry =
 
           local slug(label) = std.asciiLower(std.strReplace(std.toString(label), ' ', '-'));
 
-          local cellValue(item, col) =
-            if std.objectHas(col, 'value') then col.value(item)
-            else std.foldl(
-              function(acc, k) if std.type(acc) == 'object' then std.get(acc, k, null) else null,
-              col.path,
-              item
-            );
-
           local cellText(item, col) =
-            local val = cellValue(item, col);
+            local val = std.get(item, col.key, null);
             if val == null then '' else std.toString(val);
 
-          local rowHref(rowLink, item) =
-            if rowLink == null then null
-            else
-              local target = rowLink(item);
-              if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
-              then target._queryPath
-              else null;
+          local rowHref(target) =
+            if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
+            then target._queryPath
+            else null;
 
           local cell = {
             local c = self,
@@ -10571,7 +10603,7 @@ local telemetry =
             local c = self,
             items:: error 'Table requires items',
             columns:: [],
-            rowLink:: null,
+            rowLinks:: [],
             pagination:: null,
             local rows = if std.isArray(c.items) then c.items else [],
             local nav = paginationNav { pagination:: c.pagination },
@@ -10600,7 +10632,8 @@ local telemetry =
                         children:
                           if std.length(rows) == 0 then [emptyRow { columnCount:: std.length(c.columns) }]
                           else [
-                            local href = rowHref(c.rowLink, item);
+                            local item = rows[r];
+                            local href = rowHref(if r < std.length(c.rowLinks) then c.rowLinks[r] else null);
                             {
                               element: 'tr',
                               children: [
@@ -10608,7 +10641,7 @@ local telemetry =
                                 for i in std.range(0, std.length(c.columns) - 1)
                               ],
                             }
-                            for item in rows
+                            for r in std.range(0, std.length(rows) - 1)
                           ],
                       },
                     ],
@@ -11682,16 +11715,47 @@ local telemetry =
         },
       };
 
+      local columnValue(item, col) =
+        if std.objectHasAll(col, 'value') then col.value(item) else safeGet(item, col.path);
+
+      local isAlphanumeric(ch) =
+        (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9');
+
+      local labelWords(label) = [
+        word
+        for word in std.split(std.join('', [if isAlphanumeric(ch) then ch else ' ' for ch in std.stringChars(label)]), ' ')
+        if word != ''
+      ];
+
+      local lowerCamelCase(label) =
+        local parts = labelWords(std.toString(label));
+        if std.length(parts) == 0 then ''
+        else std.asciiLower(parts[0]) + std.join('', [std.asciiUpper(part[0]) + part[1:] for part in parts[1:]]);
+
+      local columnKey(col) = std.get(col, 'key', lowerCamelCase(col.label));
+
+      local projectItem(item, columns) = {
+        [col.key]: value
+        for col in columns
+        for value in [columnValue(item, col)]
+        if value != null
+      };
+
       local tableView = baseView {
+        data:: error 'table requires data',
+        local table = std.get($, 'table', {}),
+        local at = std.get(table, 'at', ['items']),
+        local columns = [col { key: columnKey(col) } for col in std.get(table, 'columns', [])],
+        local found = safeGet($.data, at),
+        local dataItems = if std.isArray(found) then found else [],
+        items: [projectItem(item, columns) for item in dataItems],
         _view+:: {
           fragment:
-            local table = std.get($, 'table', {});
-            local at = std.get(table, 'at', ['items']);
-            local items = safeGet($.data, at);
+            local rowLink = linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at);
             c.table {
-              items:: items,
-              columns:: std.get(table, 'columns', []),
-              rowLink:: linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at),
+              items:: $.items,
+              columns:: columns,
+              rowLinks:: if rowLink == null then [] else [rowLink(item) for item in dataItems],
               pagination:: std.get(std.get($, 'links', {}), 'pagination', null),
             },
         },
@@ -12254,25 +12318,14 @@ local telemetry =
 
           local slug(label) = std.asciiLower(std.strReplace(std.toString(label), ' ', '-'));
 
-          local cellValue(item, col) =
-            if std.objectHas(col, 'value') then col.value(item)
-            else std.foldl(
-              function(acc, k) if std.type(acc) == 'object' then std.get(acc, k, null) else null,
-              col.path,
-              item
-            );
-
           local cellText(item, col) =
-            local val = cellValue(item, col);
+            local val = std.get(item, col.key, null);
             if val == null then '' else std.toString(val);
 
-          local rowHref(rowLink, item) =
-            if rowLink == null then null
-            else
-              local target = rowLink(item);
-              if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
-              then target._queryPath
-              else null;
+          local rowHref(target) =
+            if std.type(target) == 'object' && std.objectHasAll(target, '_queryPath')
+            then target._queryPath
+            else null;
 
           local cell = {
             local c = self,
@@ -12344,7 +12397,7 @@ local telemetry =
             local c = self,
             items:: error 'Table requires items',
             columns:: [],
-            rowLink:: null,
+            rowLinks:: [],
             pagination:: null,
             local rows = if std.isArray(c.items) then c.items else [],
             local nav = paginationNav { pagination:: c.pagination },
@@ -12373,7 +12426,8 @@ local telemetry =
                         children:
                           if std.length(rows) == 0 then [emptyRow { columnCount:: std.length(c.columns) }]
                           else [
-                            local href = rowHref(c.rowLink, item);
+                            local item = rows[r];
+                            local href = rowHref(if r < std.length(c.rowLinks) then c.rowLinks[r] else null);
                             {
                               element: 'tr',
                               children: [
@@ -12381,7 +12435,7 @@ local telemetry =
                                 for i in std.range(0, std.length(c.columns) - 1)
                               ],
                             }
-                            for item in rows
+                            for r in std.range(0, std.length(rows) - 1)
                           ],
                       },
                     ],
