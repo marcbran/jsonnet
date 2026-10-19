@@ -19,6 +19,13 @@ local chain =
 
   local chain(node, calls) = std.foldl(function(n, call) n[call[0]](call[1]), calls, node);
   local chainFields(node, fields) = std.foldl(function(n, f) n[f], fields, node);
+  local walkPath(node, path, values) = std.foldl(
+    function(acc, seg)
+      if std.startsWith(seg, '$') then { node: acc.node[seg[1:]](values[acc.i]), i: acc.i + 1 }
+      else { node: acc.node[seg], i: acc.i },
+    path,
+    { node: node, i: 0 }
+  ).node;
 
   local accs(labels, vars) =
     local n = std.length(labels);
@@ -46,6 +53,7 @@ local chain =
     promote: promote,
     chain: chain,
     chainFields: chainFields,
+    walkPath: walkPath,
     accs: accs,
   };
 local timeRange =
@@ -473,8 +481,11 @@ local g =
       (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
       || b == 45 || b == 95 || b == 46 || b == 126;
 
+    local unreservedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~';
+
     local percentEncode(s) =
-      std.join('', [
+      if std.length(std.stripChars(s, unreservedChars)) == 0 then s
+      else std.join('', [
         if unreserved(b) then std.char(b)
         else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
         for b in std.encodeUTF8(s)
@@ -881,6 +892,16 @@ local nodesChartLib =
               margin: 0;
               padding: 0;
             }
+            :scope.columns {
+              flex-direction: row;
+              flex-wrap: wrap;
+              align-items: flex-start;
+            }
+            .list-column {
+              display: flex;
+              flex-direction: column;
+              gap: 0.25em;
+            }
           }
         |||;
 
@@ -907,32 +928,61 @@ local nodesChartLib =
           },
         };
 
+        local card = {
+          local c = self,
+          title:: null,
+          items:: error 'Card requires items',
+          lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+          html: {
+            element: 'nav',
+            attributes: { class: 'card' },
+            children:
+              (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+              + [itemList { items:: c.items }],
+          },
+        };
+
+        local column = {
+          local c = self,
+          cards:: error 'Column requires cards',
+          html: {
+            element: 'div',
+            attributes: { class: 'list-column' },
+            children: [card.html for card in c.cards],
+          },
+        };
+
+        local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+        local distribute(cards, count) =
+          local target = lineCount(cards) / count;
+          std.foldl(
+            function(columns, card)
+              local last = columns[std.length(columns) - 1];
+              if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+              then columns + [[card]]
+              else columns[:std.length(columns) - 1] + [last + [card]],
+            cards,
+            [[]]
+          );
+
         {
           local c = self,
           items:: error 'List requires items',
           groups:: [],
+          columns:: 1,
           style:: '',
+          local cards =
+            (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+            + [card { title:: group.title, items:: group.items } for group in c.groups],
           html: [
             { element: 'style', children: [style] },
             {
               element: 'aside',
-              attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+              attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
               children:
-                (if std.length(c.items) > 0 then [{
-                   element: 'nav',
-                   attributes: { class: 'card' },
-                   children: [itemList { items:: c.items }],
-                 }] else []) + [
-                  {
-                    element: 'nav',
-                    attributes: { class: 'card' },
-                    children: [
-                      { element: 'strong', children: [group.title] },
-                      itemList { items:: group.items },
-                    ],
-                  }
-                  for group in c.groups
-                ],
+                if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+                else [card.html for card in cards],
             },
           ],
         },
@@ -1901,6 +1951,16 @@ local nodesChartLib =
                 margin: 0;
                 padding: 0;
               }
+              :scope.columns {
+                flex-direction: row;
+                flex-wrap: wrap;
+                align-items: flex-start;
+              }
+              .list-column {
+                display: flex;
+                flex-direction: column;
+                gap: 0.25em;
+              }
             }
           |||;
 
@@ -1927,32 +1987,61 @@ local nodesChartLib =
             },
           };
 
+          local card = {
+            local c = self,
+            title:: null,
+            items:: error 'Card requires items',
+            lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+            html: {
+              element: 'nav',
+              attributes: { class: 'card' },
+              children:
+                (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+                + [itemList { items:: c.items }],
+            },
+          };
+
+          local column = {
+            local c = self,
+            cards:: error 'Column requires cards',
+            html: {
+              element: 'div',
+              attributes: { class: 'list-column' },
+              children: [card.html for card in c.cards],
+            },
+          };
+
+          local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+          local distribute(cards, count) =
+            local target = lineCount(cards) / count;
+            std.foldl(
+              function(columns, card)
+                local last = columns[std.length(columns) - 1];
+                if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+                then columns + [[card]]
+                else columns[:std.length(columns) - 1] + [last + [card]],
+              cards,
+              [[]]
+            );
+
           {
             local c = self,
             items:: error 'List requires items',
             groups:: [],
+            columns:: 1,
             style:: '',
+            local cards =
+              (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+              + [card { title:: group.title, items:: group.items } for group in c.groups],
             html: [
               { element: 'style', children: [style] },
               {
                 element: 'aside',
-                attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+                attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
                 children:
-                  (if std.length(c.items) > 0 then [{
-                     element: 'nav',
-                     attributes: { class: 'card' },
-                     children: [itemList { items:: c.items }],
-                   }] else []) + [
-                    {
-                      element: 'nav',
-                      attributes: { class: 'card' },
-                      children: [
-                        { element: 'strong', children: [group.title] },
-                        itemList { items:: group.items },
-                      ],
-                    }
-                    for group in c.groups
-                  ],
+                  if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+                  else [card.html for card in cards],
               },
             ],
           };
@@ -2078,6 +2167,14 @@ local nodesChartLib =
             flex: 1 1 0;
             min-width: 0;
           }
+          .resource.stacked {
+            flex-direction: column;
+            flex-wrap: nowrap;
+          }
+          .resource.stacked > .yaml,
+          .resource.stacked > .tree {
+            flex: none;
+          }
         |||;
 
         {
@@ -2086,15 +2183,18 @@ local nodesChartLib =
           content:: yaml { data:: c.data },
           items:: [],
           groups:: [],
+          columns:: 1,
+          stacked:: false,
+          local links =
+            if std.length(c.items) > 0 || std.length(c.groups) > 0 then
+              [list { items:: c.items, groups:: c.groups, columns:: c.columns, style:: ' min-width: 8em;' }]
+            else [],
           html: [
             { element: 'style', children: [style] },
             {
               element: 'div',
-              attributes: { class: 'resource' },
-              children:
-                (if std.length(c.items) > 0 || std.length(c.groups) > 0 then
-                   [list { items:: c.items, groups:: c.groups, style:: ' min-width: 8em;' }]
-                 else []) + [c.content],
+              attributes: { class: if c.stacked then 'resource stacked' else 'resource' },
+              children: if c.stacked then [c.content] + links else links + [c.content],
             },
           ],
         },
@@ -2640,6 +2740,10 @@ local nodesChartLib =
       if std.isObject(links[k]) && std.objectHasAll(links[k], '_queryPath')
     };
 
+    local panelLinkPaths(node) =
+      if node.type == 'panel' then node { chart: node.chart { links: linkPaths(node.chart.links) } }
+      else node { children: [panelLinkPaths(child) for child in node.children] };
+
     local chartView = baseView {
       _view+:: {
         fragment:
@@ -2659,7 +2763,7 @@ local nodesChartLib =
         fragment:
           c.panel {
             child:: c.dashboard {
-              layout:: $.tree,
+              layout:: panelLinkPaths($.tree),
               height:: std.get($, 'height', '600px'),
             },
           },
@@ -2840,8 +2944,8 @@ local nodeListsDrilldownLib = function(c)
         title: titles[idx],
         ancestorVars: accs[i].ancestorVars,
         matchers: c.matcherClause(accs[i].matchers),
-        path: base + ['$' + v for v in accs[i].ancestorVars] + pathSuffixes[i],
-        nextPathSuffix: if i < n then pathSuffixes[i + 1] else null,
+        path: base + ['$' + v for v in accs[i].ancestorVars] + ['metrics'] + pathSuffixes[i],
+        nextPathSuffix: if i < n then ['metrics'] + pathSuffixes[i + 1] else null,
       }
       for i in std.range(0, n)
     ];
@@ -2888,12 +2992,14 @@ local nodeListsEntityLib = function(c, listNode, drilldown, logsNode)
     local ctx = params { groupBy:: labels[last], matchers:: matchers };
 
     local entityEntries =
-      if std.objectHasAll(params, 'entityBase') then
-        local entityNode = c.chainFields(c.root, params.entityBase);
-        local entityPath = params.entityBase + ['$' + v for v in vars];
+      if std.objectHasAll(params, 'entityPath') then
+        local entityPath = params.entityPath;
         [
-          [placeholderPath, { links+: { entity: c.chain(entityNode, [[v, $[v]] for v in vars]) } }],
-          [entityPath, { links+: { telemetry: c.chain(rootNode, [[v, $[v]] for v in vars]) } }],
+          [placeholderPath, { links+: { entity: c.walkPath(c.root, entityPath, [$[v] for v in vars]) } }],
+          [entityPath, {
+            local telemetry = c.chain(rootNode, [[v, $[v]] for v in vars]),
+            links+: { telemetry: telemetry } + (if std.objectHas(telemetry, 'metrics') then { metrics: telemetry.metrics } else {}),
+          }],
         ]
       else [[placeholderPath]];
 
@@ -2914,10 +3020,12 @@ local nodeListsEntityLib = function(c, listNode, drilldown, logsNode)
 
     local logsEntries =
       if std.objectHasAll(params, 'logs') then
-        [[placeholderPath + ['logs'], logsNode + params.logs]] + (
-          if std.objectHasAll(params, 'entityBase') then
-            local entityPath = params.entityBase + ['$' + v for v in vars];
-            [[entityPath, { links+: { logs: c.chain(rootNode, [[v, $[v]] for v in vars]).logs } }]]
+        [
+          [placeholderPath + ['logs', view], logsNode + params.logs[view]]
+          for view in std.objectFields(params.logs)
+        ] + (
+          if std.objectHasAll(params, 'entityPath') then
+            [[params.entityPath, { links+: { logs: c.chain(rootNode, [[v, $[v]] for v in vars]).logs } }]]
           else []
         )
       else [];
@@ -2936,8 +3044,11 @@ local nodesListLib =
           (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
           || b == 45 || b == 95 || b == 46 || b == 126;
 
+        local unreservedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~';
+
         local percentEncode(s) =
-          std.join('', [
+          if std.length(std.stripChars(s, unreservedChars)) == 0 then s
+          else std.join('', [
             if unreserved(b) then std.char(b)
             else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
             for b in std.encodeUTF8(s)
@@ -3139,6 +3250,16 @@ local nodesListLib =
               margin: 0;
               padding: 0;
             }
+            :scope.columns {
+              flex-direction: row;
+              flex-wrap: wrap;
+              align-items: flex-start;
+            }
+            .list-column {
+              display: flex;
+              flex-direction: column;
+              gap: 0.25em;
+            }
           }
         |||;
 
@@ -3165,32 +3286,61 @@ local nodesListLib =
           },
         };
 
+        local card = {
+          local c = self,
+          title:: null,
+          items:: error 'Card requires items',
+          lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+          html: {
+            element: 'nav',
+            attributes: { class: 'card' },
+            children:
+              (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+              + [itemList { items:: c.items }],
+          },
+        };
+
+        local column = {
+          local c = self,
+          cards:: error 'Column requires cards',
+          html: {
+            element: 'div',
+            attributes: { class: 'list-column' },
+            children: [card.html for card in c.cards],
+          },
+        };
+
+        local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+        local distribute(cards, count) =
+          local target = lineCount(cards) / count;
+          std.foldl(
+            function(columns, card)
+              local last = columns[std.length(columns) - 1];
+              if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+              then columns + [[card]]
+              else columns[:std.length(columns) - 1] + [last + [card]],
+            cards,
+            [[]]
+          );
+
         {
           local c = self,
           items:: error 'List requires items',
           groups:: [],
+          columns:: 1,
           style:: '',
+          local cards =
+            (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+            + [card { title:: group.title, items:: group.items } for group in c.groups],
           html: [
             { element: 'style', children: [style] },
             {
               element: 'aside',
-              attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+              attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
               children:
-                (if std.length(c.items) > 0 then [{
-                   element: 'nav',
-                   attributes: { class: 'card' },
-                   children: [itemList { items:: c.items }],
-                 }] else []) + [
-                  {
-                    element: 'nav',
-                    attributes: { class: 'card' },
-                    children: [
-                      { element: 'strong', children: [group.title] },
-                      itemList { items:: group.items },
-                    ],
-                  }
-                  for group in c.groups
-                ],
+                if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+                else [card.html for card in cards],
             },
           ],
         },
@@ -4159,6 +4309,16 @@ local nodesListLib =
                 margin: 0;
                 padding: 0;
               }
+              :scope.columns {
+                flex-direction: row;
+                flex-wrap: wrap;
+                align-items: flex-start;
+              }
+              .list-column {
+                display: flex;
+                flex-direction: column;
+                gap: 0.25em;
+              }
             }
           |||;
 
@@ -4185,32 +4345,61 @@ local nodesListLib =
             },
           };
 
+          local card = {
+            local c = self,
+            title:: null,
+            items:: error 'Card requires items',
+            lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+            html: {
+              element: 'nav',
+              attributes: { class: 'card' },
+              children:
+                (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+                + [itemList { items:: c.items }],
+            },
+          };
+
+          local column = {
+            local c = self,
+            cards:: error 'Column requires cards',
+            html: {
+              element: 'div',
+              attributes: { class: 'list-column' },
+              children: [card.html for card in c.cards],
+            },
+          };
+
+          local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+          local distribute(cards, count) =
+            local target = lineCount(cards) / count;
+            std.foldl(
+              function(columns, card)
+                local last = columns[std.length(columns) - 1];
+                if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+                then columns + [[card]]
+                else columns[:std.length(columns) - 1] + [last + [card]],
+              cards,
+              [[]]
+            );
+
           {
             local c = self,
             items:: error 'List requires items',
             groups:: [],
+            columns:: 1,
             style:: '',
+            local cards =
+              (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+              + [card { title:: group.title, items:: group.items } for group in c.groups],
             html: [
               { element: 'style', children: [style] },
               {
                 element: 'aside',
-                attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+                attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
                 children:
-                  (if std.length(c.items) > 0 then [{
-                     element: 'nav',
-                     attributes: { class: 'card' },
-                     children: [itemList { items:: c.items }],
-                   }] else []) + [
-                    {
-                      element: 'nav',
-                      attributes: { class: 'card' },
-                      children: [
-                        { element: 'strong', children: [group.title] },
-                        itemList { items:: group.items },
-                      ],
-                    }
-                    for group in c.groups
-                  ],
+                  if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+                  else [card.html for card in cards],
               },
             ],
           };
@@ -4336,6 +4525,14 @@ local nodesListLib =
             flex: 1 1 0;
             min-width: 0;
           }
+          .resource.stacked {
+            flex-direction: column;
+            flex-wrap: nowrap;
+          }
+          .resource.stacked > .yaml,
+          .resource.stacked > .tree {
+            flex: none;
+          }
         |||;
 
         {
@@ -4344,15 +4541,18 @@ local nodesListLib =
           content:: yaml { data:: c.data },
           items:: [],
           groups:: [],
+          columns:: 1,
+          stacked:: false,
+          local links =
+            if std.length(c.items) > 0 || std.length(c.groups) > 0 then
+              [list { items:: c.items, groups:: c.groups, columns:: c.columns, style:: ' min-width: 8em;' }]
+            else [],
           html: [
             { element: 'style', children: [style] },
             {
               element: 'div',
-              attributes: { class: 'resource' },
-              children:
-                (if std.length(c.items) > 0 || std.length(c.groups) > 0 then
-                   [list { items:: c.items, groups:: c.groups, style:: ' min-width: 8em;' }]
-                 else []) + [c.content],
+              attributes: { class: if c.stacked then 'resource stacked' else 'resource' },
+              children: if c.stacked then [c.content] + links else links + [c.content],
             },
           ],
         },
@@ -4561,13 +4761,40 @@ local nodesListLib =
         for item in linksItems(obj) + std.flatMap(function(group) group.items, linksGroups(obj))
       ]);
 
+    local neighborKeys(obj) = [
+      k
+      for k in std.objectFields(obj)
+      if !std.member(['data', '_view', 'links'], k) && std.substr(k, 0, 1) != '_' && std.type(obj[k]) == 'object'
+    ];
+
     local neighborItems(obj) =
       local curated = curatedLinks(obj);
       [
-        item
-        for item in collectNeighbors(obj, '', ['data', '_view', 'links'])
-        if !std.setMember(item.link, curated)
+        { link: obj[k]._queryPath, text: k }
+        for k in neighborKeys(obj)
+        if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
       ] + linksItems(obj);
+
+    local childGroups(obj) =
+      local curated = curatedLinks(obj);
+      [
+        group
+        for k in neighborKeys(obj)
+        if !isNode(obj[k])
+        for group in [{ title: k, items: [item for item in collectNeighbors(obj[k]) if !std.setMember(item.link, curated)] }]
+        if std.length(group.items) > 0
+      ];
+
+    local orderGroups(groups, order) =
+      local rank = { [order[i]]: i for i in std.range(0, std.length(order) - 1) };
+      local keyed = [
+        { group: groups[i], key: std.get(rank, groups[i].title, std.length(order) + i) }
+        for i in std.range(0, std.length(groups) - 1)
+      ];
+      [entry.group for entry in std.sort(keyed, function(entry) entry.key)];
+
+    local neighborGroups(obj) =
+      linksGroups(obj) + orderGroups(childGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
 
     local safeGet(obj, path) =
       std.foldl(
@@ -4593,7 +4820,8 @@ local nodesListLib =
       _view+:: {
         fragment: c.list {
           items:: neighborItems($),
-          groups:: linksGroups($),
+          groups:: neighborGroups($),
+          columns:: std.get(std.get($, 'list', {}), 'columns', 1),
         },
       },
     };
@@ -4656,7 +4884,8 @@ local nodesListLib =
           local tree = std.get($, 'tree', {});
           c.resource {
             items:: neighborItems($),
-            groups:: linksGroups($),
+            groups:: neighborGroups($),
+            columns:: std.get(std.get($, 'list', {}), 'columns', 1),
             content:: c.tree {
               nodes:: std.get(tree, 'nodes', []),
               item:: std.get(tree, 'item', super.item),
@@ -4670,7 +4899,9 @@ local nodesListLib =
         fragment: c.resource {
           data:: $.data,
           items:: neighborItems($),
-          groups:: linksGroups($),
+          groups:: neighborGroups($),
+          columns:: std.get(std.get($, 'list', {}), 'columns', 1),
+          stacked:: std.get(std.get($, 'resource', {}), 'stacked', false),
         },
       },
     };
@@ -4717,8 +4948,11 @@ local nodesLabelsLib =
           (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
           || b == 45 || b == 95 || b == 46 || b == 126;
 
+        local unreservedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~';
+
         local percentEncode(s) =
-          std.join('', [
+          if std.length(std.stripChars(s, unreservedChars)) == 0 then s
+          else std.join('', [
             if unreserved(b) then std.char(b)
             else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
             for b in std.encodeUTF8(s)
@@ -4920,6 +5154,16 @@ local nodesLabelsLib =
               margin: 0;
               padding: 0;
             }
+            :scope.columns {
+              flex-direction: row;
+              flex-wrap: wrap;
+              align-items: flex-start;
+            }
+            .list-column {
+              display: flex;
+              flex-direction: column;
+              gap: 0.25em;
+            }
           }
         |||;
 
@@ -4946,32 +5190,61 @@ local nodesLabelsLib =
           },
         };
 
+        local card = {
+          local c = self,
+          title:: null,
+          items:: error 'Card requires items',
+          lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+          html: {
+            element: 'nav',
+            attributes: { class: 'card' },
+            children:
+              (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+              + [itemList { items:: c.items }],
+          },
+        };
+
+        local column = {
+          local c = self,
+          cards:: error 'Column requires cards',
+          html: {
+            element: 'div',
+            attributes: { class: 'list-column' },
+            children: [card.html for card in c.cards],
+          },
+        };
+
+        local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+        local distribute(cards, count) =
+          local target = lineCount(cards) / count;
+          std.foldl(
+            function(columns, card)
+              local last = columns[std.length(columns) - 1];
+              if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+              then columns + [[card]]
+              else columns[:std.length(columns) - 1] + [last + [card]],
+            cards,
+            [[]]
+          );
+
         {
           local c = self,
           items:: error 'List requires items',
           groups:: [],
+          columns:: 1,
           style:: '',
+          local cards =
+            (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+            + [card { title:: group.title, items:: group.items } for group in c.groups],
           html: [
             { element: 'style', children: [style] },
             {
               element: 'aside',
-              attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+              attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
               children:
-                (if std.length(c.items) > 0 then [{
-                   element: 'nav',
-                   attributes: { class: 'card' },
-                   children: [itemList { items:: c.items }],
-                 }] else []) + [
-                  {
-                    element: 'nav',
-                    attributes: { class: 'card' },
-                    children: [
-                      { element: 'strong', children: [group.title] },
-                      itemList { items:: group.items },
-                    ],
-                  }
-                  for group in c.groups
-                ],
+                if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+                else [card.html for card in cards],
             },
           ],
         },
@@ -5940,6 +6213,16 @@ local nodesLabelsLib =
                 margin: 0;
                 padding: 0;
               }
+              :scope.columns {
+                flex-direction: row;
+                flex-wrap: wrap;
+                align-items: flex-start;
+              }
+              .list-column {
+                display: flex;
+                flex-direction: column;
+                gap: 0.25em;
+              }
             }
           |||;
 
@@ -5966,32 +6249,61 @@ local nodesLabelsLib =
             },
           };
 
+          local card = {
+            local c = self,
+            title:: null,
+            items:: error 'Card requires items',
+            lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+            html: {
+              element: 'nav',
+              attributes: { class: 'card' },
+              children:
+                (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+                + [itemList { items:: c.items }],
+            },
+          };
+
+          local column = {
+            local c = self,
+            cards:: error 'Column requires cards',
+            html: {
+              element: 'div',
+              attributes: { class: 'list-column' },
+              children: [card.html for card in c.cards],
+            },
+          };
+
+          local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+          local distribute(cards, count) =
+            local target = lineCount(cards) / count;
+            std.foldl(
+              function(columns, card)
+                local last = columns[std.length(columns) - 1];
+                if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+                then columns + [[card]]
+                else columns[:std.length(columns) - 1] + [last + [card]],
+              cards,
+              [[]]
+            );
+
           {
             local c = self,
             items:: error 'List requires items',
             groups:: [],
+            columns:: 1,
             style:: '',
+            local cards =
+              (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+              + [card { title:: group.title, items:: group.items } for group in c.groups],
             html: [
               { element: 'style', children: [style] },
               {
                 element: 'aside',
-                attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+                attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
                 children:
-                  (if std.length(c.items) > 0 then [{
-                     element: 'nav',
-                     attributes: { class: 'card' },
-                     children: [itemList { items:: c.items }],
-                   }] else []) + [
-                    {
-                      element: 'nav',
-                      attributes: { class: 'card' },
-                      children: [
-                        { element: 'strong', children: [group.title] },
-                        itemList { items:: group.items },
-                      ],
-                    }
-                    for group in c.groups
-                  ],
+                  if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+                  else [card.html for card in cards],
               },
             ],
           };
@@ -6117,6 +6429,14 @@ local nodesLabelsLib =
             flex: 1 1 0;
             min-width: 0;
           }
+          .resource.stacked {
+            flex-direction: column;
+            flex-wrap: nowrap;
+          }
+          .resource.stacked > .yaml,
+          .resource.stacked > .tree {
+            flex: none;
+          }
         |||;
 
         {
@@ -6125,15 +6445,18 @@ local nodesLabelsLib =
           content:: yaml { data:: c.data },
           items:: [],
           groups:: [],
+          columns:: 1,
+          stacked:: false,
+          local links =
+            if std.length(c.items) > 0 || std.length(c.groups) > 0 then
+              [list { items:: c.items, groups:: c.groups, columns:: c.columns, style:: ' min-width: 8em;' }]
+            else [],
           html: [
             { element: 'style', children: [style] },
             {
               element: 'div',
-              attributes: { class: 'resource' },
-              children:
-                (if std.length(c.items) > 0 || std.length(c.groups) > 0 then
-                   [list { items:: c.items, groups:: c.groups, style:: ' min-width: 8em;' }]
-                 else []) + [c.content],
+              attributes: { class: if c.stacked then 'resource stacked' else 'resource' },
+              children: if c.stacked then [c.content] + links else links + [c.content],
             },
           ],
         },
@@ -6342,13 +6665,40 @@ local nodesLabelsLib =
         for item in linksItems(obj) + std.flatMap(function(group) group.items, linksGroups(obj))
       ]);
 
+    local neighborKeys(obj) = [
+      k
+      for k in std.objectFields(obj)
+      if !std.member(['data', '_view', 'links'], k) && std.substr(k, 0, 1) != '_' && std.type(obj[k]) == 'object'
+    ];
+
     local neighborItems(obj) =
       local curated = curatedLinks(obj);
       [
-        item
-        for item in collectNeighbors(obj, '', ['data', '_view', 'links'])
-        if !std.setMember(item.link, curated)
+        { link: obj[k]._queryPath, text: k }
+        for k in neighborKeys(obj)
+        if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
       ] + linksItems(obj);
+
+    local childGroups(obj) =
+      local curated = curatedLinks(obj);
+      [
+        group
+        for k in neighborKeys(obj)
+        if !isNode(obj[k])
+        for group in [{ title: k, items: [item for item in collectNeighbors(obj[k]) if !std.setMember(item.link, curated)] }]
+        if std.length(group.items) > 0
+      ];
+
+    local orderGroups(groups, order) =
+      local rank = { [order[i]]: i for i in std.range(0, std.length(order) - 1) };
+      local keyed = [
+        { group: groups[i], key: std.get(rank, groups[i].title, std.length(order) + i) }
+        for i in std.range(0, std.length(groups) - 1)
+      ];
+      [entry.group for entry in std.sort(keyed, function(entry) entry.key)];
+
+    local neighborGroups(obj) =
+      linksGroups(obj) + orderGroups(childGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
 
     local safeGet(obj, path) =
       std.foldl(
@@ -6374,7 +6724,8 @@ local nodesLabelsLib =
       _view+:: {
         fragment: c.list {
           items:: neighborItems($),
-          groups:: linksGroups($),
+          groups:: neighborGroups($),
+          columns:: std.get(std.get($, 'list', {}), 'columns', 1),
         },
       },
     };
@@ -6437,7 +6788,8 @@ local nodesLabelsLib =
           local tree = std.get($, 'tree', {});
           c.resource {
             items:: neighborItems($),
-            groups:: linksGroups($),
+            groups:: neighborGroups($),
+            columns:: std.get(std.get($, 'list', {}), 'columns', 1),
             content:: c.tree {
               nodes:: std.get(tree, 'nodes', []),
               item:: std.get(tree, 'item', super.item),
@@ -6451,7 +6803,9 @@ local nodesLabelsLib =
         fragment: c.resource {
           data:: $.data,
           items:: neighborItems($),
-          groups:: linksGroups($),
+          groups:: neighborGroups($),
+          columns:: std.get(std.get($, 'list', {}), 'columns', 1),
+          stacked:: std.get(std.get($, 'resource', {}), 'stacked', false),
         },
       },
     };
@@ -6497,8 +6851,11 @@ local nodesValuesLib =
           (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
           || b == 45 || b == 95 || b == 46 || b == 126;
 
+        local unreservedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~';
+
         local percentEncode(s) =
-          std.join('', [
+          if std.length(std.stripChars(s, unreservedChars)) == 0 then s
+          else std.join('', [
             if unreserved(b) then std.char(b)
             else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
             for b in std.encodeUTF8(s)
@@ -6700,6 +7057,16 @@ local nodesValuesLib =
               margin: 0;
               padding: 0;
             }
+            :scope.columns {
+              flex-direction: row;
+              flex-wrap: wrap;
+              align-items: flex-start;
+            }
+            .list-column {
+              display: flex;
+              flex-direction: column;
+              gap: 0.25em;
+            }
           }
         |||;
 
@@ -6726,32 +7093,61 @@ local nodesValuesLib =
           },
         };
 
+        local card = {
+          local c = self,
+          title:: null,
+          items:: error 'Card requires items',
+          lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+          html: {
+            element: 'nav',
+            attributes: { class: 'card' },
+            children:
+              (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+              + [itemList { items:: c.items }],
+          },
+        };
+
+        local column = {
+          local c = self,
+          cards:: error 'Column requires cards',
+          html: {
+            element: 'div',
+            attributes: { class: 'list-column' },
+            children: [card.html for card in c.cards],
+          },
+        };
+
+        local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+        local distribute(cards, count) =
+          local target = lineCount(cards) / count;
+          std.foldl(
+            function(columns, card)
+              local last = columns[std.length(columns) - 1];
+              if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+              then columns + [[card]]
+              else columns[:std.length(columns) - 1] + [last + [card]],
+            cards,
+            [[]]
+          );
+
         {
           local c = self,
           items:: error 'List requires items',
           groups:: [],
+          columns:: 1,
           style:: '',
+          local cards =
+            (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+            + [card { title:: group.title, items:: group.items } for group in c.groups],
           html: [
             { element: 'style', children: [style] },
             {
               element: 'aside',
-              attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+              attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
               children:
-                (if std.length(c.items) > 0 then [{
-                   element: 'nav',
-                   attributes: { class: 'card' },
-                   children: [itemList { items:: c.items }],
-                 }] else []) + [
-                  {
-                    element: 'nav',
-                    attributes: { class: 'card' },
-                    children: [
-                      { element: 'strong', children: [group.title] },
-                      itemList { items:: group.items },
-                    ],
-                  }
-                  for group in c.groups
-                ],
+                if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+                else [card.html for card in cards],
             },
           ],
         },
@@ -7720,6 +8116,16 @@ local nodesValuesLib =
                 margin: 0;
                 padding: 0;
               }
+              :scope.columns {
+                flex-direction: row;
+                flex-wrap: wrap;
+                align-items: flex-start;
+              }
+              .list-column {
+                display: flex;
+                flex-direction: column;
+                gap: 0.25em;
+              }
             }
           |||;
 
@@ -7746,32 +8152,61 @@ local nodesValuesLib =
             },
           };
 
+          local card = {
+            local c = self,
+            title:: null,
+            items:: error 'Card requires items',
+            lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+            html: {
+              element: 'nav',
+              attributes: { class: 'card' },
+              children:
+                (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+                + [itemList { items:: c.items }],
+            },
+          };
+
+          local column = {
+            local c = self,
+            cards:: error 'Column requires cards',
+            html: {
+              element: 'div',
+              attributes: { class: 'list-column' },
+              children: [card.html for card in c.cards],
+            },
+          };
+
+          local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+          local distribute(cards, count) =
+            local target = lineCount(cards) / count;
+            std.foldl(
+              function(columns, card)
+                local last = columns[std.length(columns) - 1];
+                if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+                then columns + [[card]]
+                else columns[:std.length(columns) - 1] + [last + [card]],
+              cards,
+              [[]]
+            );
+
           {
             local c = self,
             items:: error 'List requires items',
             groups:: [],
+            columns:: 1,
             style:: '',
+            local cards =
+              (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+              + [card { title:: group.title, items:: group.items } for group in c.groups],
             html: [
               { element: 'style', children: [style] },
               {
                 element: 'aside',
-                attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+                attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
                 children:
-                  (if std.length(c.items) > 0 then [{
-                     element: 'nav',
-                     attributes: { class: 'card' },
-                     children: [itemList { items:: c.items }],
-                   }] else []) + [
-                    {
-                      element: 'nav',
-                      attributes: { class: 'card' },
-                      children: [
-                        { element: 'strong', children: [group.title] },
-                        itemList { items:: group.items },
-                      ],
-                    }
-                    for group in c.groups
-                  ],
+                  if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+                  else [card.html for card in cards],
               },
             ],
           };
@@ -7897,6 +8332,14 @@ local nodesValuesLib =
             flex: 1 1 0;
             min-width: 0;
           }
+          .resource.stacked {
+            flex-direction: column;
+            flex-wrap: nowrap;
+          }
+          .resource.stacked > .yaml,
+          .resource.stacked > .tree {
+            flex: none;
+          }
         |||;
 
         {
@@ -7905,15 +8348,18 @@ local nodesValuesLib =
           content:: yaml { data:: c.data },
           items:: [],
           groups:: [],
+          columns:: 1,
+          stacked:: false,
+          local links =
+            if std.length(c.items) > 0 || std.length(c.groups) > 0 then
+              [list { items:: c.items, groups:: c.groups, columns:: c.columns, style:: ' min-width: 8em;' }]
+            else [],
           html: [
             { element: 'style', children: [style] },
             {
               element: 'div',
-              attributes: { class: 'resource' },
-              children:
-                (if std.length(c.items) > 0 || std.length(c.groups) > 0 then
-                   [list { items:: c.items, groups:: c.groups, style:: ' min-width: 8em;' }]
-                 else []) + [c.content],
+              attributes: { class: if c.stacked then 'resource stacked' else 'resource' },
+              children: if c.stacked then [c.content] + links else links + [c.content],
             },
           ],
         },
@@ -8122,13 +8568,40 @@ local nodesValuesLib =
         for item in linksItems(obj) + std.flatMap(function(group) group.items, linksGroups(obj))
       ]);
 
+    local neighborKeys(obj) = [
+      k
+      for k in std.objectFields(obj)
+      if !std.member(['data', '_view', 'links'], k) && std.substr(k, 0, 1) != '_' && std.type(obj[k]) == 'object'
+    ];
+
     local neighborItems(obj) =
       local curated = curatedLinks(obj);
       [
-        item
-        for item in collectNeighbors(obj, '', ['data', '_view', 'links'])
-        if !std.setMember(item.link, curated)
+        { link: obj[k]._queryPath, text: k }
+        for k in neighborKeys(obj)
+        if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
       ] + linksItems(obj);
+
+    local childGroups(obj) =
+      local curated = curatedLinks(obj);
+      [
+        group
+        for k in neighborKeys(obj)
+        if !isNode(obj[k])
+        for group in [{ title: k, items: [item for item in collectNeighbors(obj[k]) if !std.setMember(item.link, curated)] }]
+        if std.length(group.items) > 0
+      ];
+
+    local orderGroups(groups, order) =
+      local rank = { [order[i]]: i for i in std.range(0, std.length(order) - 1) };
+      local keyed = [
+        { group: groups[i], key: std.get(rank, groups[i].title, std.length(order) + i) }
+        for i in std.range(0, std.length(groups) - 1)
+      ];
+      [entry.group for entry in std.sort(keyed, function(entry) entry.key)];
+
+    local neighborGroups(obj) =
+      linksGroups(obj) + orderGroups(childGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
 
     local safeGet(obj, path) =
       std.foldl(
@@ -8154,7 +8627,8 @@ local nodesValuesLib =
       _view+:: {
         fragment: c.list {
           items:: neighborItems($),
-          groups:: linksGroups($),
+          groups:: neighborGroups($),
+          columns:: std.get(std.get($, 'list', {}), 'columns', 1),
         },
       },
     };
@@ -8217,7 +8691,8 @@ local nodesValuesLib =
           local tree = std.get($, 'tree', {});
           c.resource {
             items:: neighborItems($),
-            groups:: linksGroups($),
+            groups:: neighborGroups($),
+            columns:: std.get(std.get($, 'list', {}), 'columns', 1),
             content:: c.tree {
               nodes:: std.get(tree, 'nodes', []),
               item:: std.get(tree, 'item', super.item),
@@ -8231,7 +8706,9 @@ local nodesValuesLib =
         fragment: c.resource {
           data:: $.data,
           items:: neighborItems($),
-          groups:: linksGroups($),
+          groups:: neighborGroups($),
+          columns:: std.get(std.get($, 'list', {}), 'columns', 1),
+          stacked:: std.get(std.get($, 'resource', {}), 'stacked', false),
         },
       },
     };
@@ -8292,6 +8769,16 @@ local nodesLogsLib =
             margin: 0;
             padding: 0;
           }
+          :scope.columns {
+            flex-direction: row;
+            flex-wrap: wrap;
+            align-items: flex-start;
+          }
+          .list-column {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25em;
+          }
         }
       |||;
 
@@ -8318,32 +8805,61 @@ local nodesLogsLib =
         },
       };
 
+      local card = {
+        local c = self,
+        title:: null,
+        items:: error 'Card requires items',
+        lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+        html: {
+          element: 'nav',
+          attributes: { class: 'card' },
+          children:
+            (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+            + [itemList { items:: c.items }],
+        },
+      };
+
+      local column = {
+        local c = self,
+        cards:: error 'Column requires cards',
+        html: {
+          element: 'div',
+          attributes: { class: 'list-column' },
+          children: [card.html for card in c.cards],
+        },
+      };
+
+      local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+      local distribute(cards, count) =
+        local target = lineCount(cards) / count;
+        std.foldl(
+          function(columns, card)
+            local last = columns[std.length(columns) - 1];
+            if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+            then columns + [[card]]
+            else columns[:std.length(columns) - 1] + [last + [card]],
+          cards,
+          [[]]
+        );
+
       {
         local c = self,
         items:: error 'List requires items',
         groups:: [],
+        columns:: 1,
         style:: '',
+        local cards =
+          (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+          + [card { title:: group.title, items:: group.items } for group in c.groups],
         html: [
           { element: 'style', children: [style] },
           {
             element: 'aside',
-            attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+            attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
             children:
-              (if std.length(c.items) > 0 then [{
-                 element: 'nav',
-                 attributes: { class: 'card' },
-                 children: [itemList { items:: c.items }],
-               }] else []) + [
-                {
-                  element: 'nav',
-                  attributes: { class: 'card' },
-                  children: [
-                    { element: 'strong', children: [group.title] },
-                    itemList { items:: group.items },
-                  ],
-                }
-                for group in c.groups
-              ],
+              if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+              else [card.html for card in cards],
           },
         ],
       },
@@ -9312,6 +9828,16 @@ local nodesLogsLib =
               margin: 0;
               padding: 0;
             }
+            :scope.columns {
+              flex-direction: row;
+              flex-wrap: wrap;
+              align-items: flex-start;
+            }
+            .list-column {
+              display: flex;
+              flex-direction: column;
+              gap: 0.25em;
+            }
           }
         |||;
 
@@ -9338,32 +9864,61 @@ local nodesLogsLib =
           },
         };
 
+        local card = {
+          local c = self,
+          title:: null,
+          items:: error 'Card requires items',
+          lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+          html: {
+            element: 'nav',
+            attributes: { class: 'card' },
+            children:
+              (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+              + [itemList { items:: c.items }],
+          },
+        };
+
+        local column = {
+          local c = self,
+          cards:: error 'Column requires cards',
+          html: {
+            element: 'div',
+            attributes: { class: 'list-column' },
+            children: [card.html for card in c.cards],
+          },
+        };
+
+        local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+        local distribute(cards, count) =
+          local target = lineCount(cards) / count;
+          std.foldl(
+            function(columns, card)
+              local last = columns[std.length(columns) - 1];
+              if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+              then columns + [[card]]
+              else columns[:std.length(columns) - 1] + [last + [card]],
+            cards,
+            [[]]
+          );
+
         {
           local c = self,
           items:: error 'List requires items',
           groups:: [],
+          columns:: 1,
           style:: '',
+          local cards =
+            (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+            + [card { title:: group.title, items:: group.items } for group in c.groups],
           html: [
             { element: 'style', children: [style] },
             {
               element: 'aside',
-              attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+              attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
               children:
-                (if std.length(c.items) > 0 then [{
-                   element: 'nav',
-                   attributes: { class: 'card' },
-                   children: [itemList { items:: c.items }],
-                 }] else []) + [
-                  {
-                    element: 'nav',
-                    attributes: { class: 'card' },
-                    children: [
-                      { element: 'strong', children: [group.title] },
-                      itemList { items:: group.items },
-                    ],
-                  }
-                  for group in c.groups
-                ],
+                if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+                else [card.html for card in cards],
             },
           ],
         };
@@ -9489,6 +10044,14 @@ local nodesLogsLib =
           flex: 1 1 0;
           min-width: 0;
         }
+        .resource.stacked {
+          flex-direction: column;
+          flex-wrap: nowrap;
+        }
+        .resource.stacked > .yaml,
+        .resource.stacked > .tree {
+          flex: none;
+        }
       |||;
 
       {
@@ -9497,15 +10060,18 @@ local nodesLogsLib =
         content:: yaml { data:: c.data },
         items:: [],
         groups:: [],
+        columns:: 1,
+        stacked:: false,
+        local links =
+          if std.length(c.items) > 0 || std.length(c.groups) > 0 then
+            [list { items:: c.items, groups:: c.groups, columns:: c.columns, style:: ' min-width: 8em;' }]
+          else [],
         html: [
           { element: 'style', children: [style] },
           {
             element: 'div',
-            attributes: { class: 'resource' },
-            children:
-              (if std.length(c.items) > 0 || std.length(c.groups) > 0 then
-                 [list { items:: c.items, groups:: c.groups, style:: ' min-width: 8em;' }]
-               else []) + [c.content],
+            attributes: { class: if c.stacked then 'resource stacked' else 'resource' },
+            children: if c.stacked then [c.content] + links else links + [c.content],
           },
         ],
       },
@@ -10046,8 +10612,11 @@ local nodesLogrecordLib =
           (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
           || b == 45 || b == 95 || b == 46 || b == 126;
 
+        local unreservedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~';
+
         local percentEncode(s) =
-          std.join('', [
+          if std.length(std.stripChars(s, unreservedChars)) == 0 then s
+          else std.join('', [
             if unreserved(b) then std.char(b)
             else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
             for b in std.encodeUTF8(s)
@@ -10249,6 +10818,16 @@ local nodesLogrecordLib =
               margin: 0;
               padding: 0;
             }
+            :scope.columns {
+              flex-direction: row;
+              flex-wrap: wrap;
+              align-items: flex-start;
+            }
+            .list-column {
+              display: flex;
+              flex-direction: column;
+              gap: 0.25em;
+            }
           }
         |||;
 
@@ -10275,32 +10854,61 @@ local nodesLogrecordLib =
           },
         };
 
+        local card = {
+          local c = self,
+          title:: null,
+          items:: error 'Card requires items',
+          lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+          html: {
+            element: 'nav',
+            attributes: { class: 'card' },
+            children:
+              (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+              + [itemList { items:: c.items }],
+          },
+        };
+
+        local column = {
+          local c = self,
+          cards:: error 'Column requires cards',
+          html: {
+            element: 'div',
+            attributes: { class: 'list-column' },
+            children: [card.html for card in c.cards],
+          },
+        };
+
+        local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+        local distribute(cards, count) =
+          local target = lineCount(cards) / count;
+          std.foldl(
+            function(columns, card)
+              local last = columns[std.length(columns) - 1];
+              if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+              then columns + [[card]]
+              else columns[:std.length(columns) - 1] + [last + [card]],
+            cards,
+            [[]]
+          );
+
         {
           local c = self,
           items:: error 'List requires items',
           groups:: [],
+          columns:: 1,
           style:: '',
+          local cards =
+            (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+            + [card { title:: group.title, items:: group.items } for group in c.groups],
           html: [
             { element: 'style', children: [style] },
             {
               element: 'aside',
-              attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+              attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
               children:
-                (if std.length(c.items) > 0 then [{
-                   element: 'nav',
-                   attributes: { class: 'card' },
-                   children: [itemList { items:: c.items }],
-                 }] else []) + [
-                  {
-                    element: 'nav',
-                    attributes: { class: 'card' },
-                    children: [
-                      { element: 'strong', children: [group.title] },
-                      itemList { items:: group.items },
-                    ],
-                  }
-                  for group in c.groups
-                ],
+                if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+                else [card.html for card in cards],
             },
           ],
         },
@@ -11269,6 +11877,16 @@ local nodesLogrecordLib =
                 margin: 0;
                 padding: 0;
               }
+              :scope.columns {
+                flex-direction: row;
+                flex-wrap: wrap;
+                align-items: flex-start;
+              }
+              .list-column {
+                display: flex;
+                flex-direction: column;
+                gap: 0.25em;
+              }
             }
           |||;
 
@@ -11295,32 +11913,61 @@ local nodesLogrecordLib =
             },
           };
 
+          local card = {
+            local c = self,
+            title:: null,
+            items:: error 'Card requires items',
+            lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+            html: {
+              element: 'nav',
+              attributes: { class: 'card' },
+              children:
+                (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+                + [itemList { items:: c.items }],
+            },
+          };
+
+          local column = {
+            local c = self,
+            cards:: error 'Column requires cards',
+            html: {
+              element: 'div',
+              attributes: { class: 'list-column' },
+              children: [card.html for card in c.cards],
+            },
+          };
+
+          local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+          local distribute(cards, count) =
+            local target = lineCount(cards) / count;
+            std.foldl(
+              function(columns, card)
+                local last = columns[std.length(columns) - 1];
+                if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+                then columns + [[card]]
+                else columns[:std.length(columns) - 1] + [last + [card]],
+              cards,
+              [[]]
+            );
+
           {
             local c = self,
             items:: error 'List requires items',
             groups:: [],
+            columns:: 1,
             style:: '',
+            local cards =
+              (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+              + [card { title:: group.title, items:: group.items } for group in c.groups],
             html: [
               { element: 'style', children: [style] },
               {
                 element: 'aside',
-                attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+                attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
                 children:
-                  (if std.length(c.items) > 0 then [{
-                     element: 'nav',
-                     attributes: { class: 'card' },
-                     children: [itemList { items:: c.items }],
-                   }] else []) + [
-                    {
-                      element: 'nav',
-                      attributes: { class: 'card' },
-                      children: [
-                        { element: 'strong', children: [group.title] },
-                        itemList { items:: group.items },
-                      ],
-                    }
-                    for group in c.groups
-                  ],
+                  if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+                  else [card.html for card in cards],
               },
             ],
           };
@@ -11446,6 +12093,14 @@ local nodesLogrecordLib =
             flex: 1 1 0;
             min-width: 0;
           }
+          .resource.stacked {
+            flex-direction: column;
+            flex-wrap: nowrap;
+          }
+          .resource.stacked > .yaml,
+          .resource.stacked > .tree {
+            flex: none;
+          }
         |||;
 
         {
@@ -11454,15 +12109,18 @@ local nodesLogrecordLib =
           content:: yaml { data:: c.data },
           items:: [],
           groups:: [],
+          columns:: 1,
+          stacked:: false,
+          local links =
+            if std.length(c.items) > 0 || std.length(c.groups) > 0 then
+              [list { items:: c.items, groups:: c.groups, columns:: c.columns, style:: ' min-width: 8em;' }]
+            else [],
           html: [
             { element: 'style', children: [style] },
             {
               element: 'div',
-              attributes: { class: 'resource' },
-              children:
-                (if std.length(c.items) > 0 || std.length(c.groups) > 0 then
-                   [list { items:: c.items, groups:: c.groups, style:: ' min-width: 8em;' }]
-                 else []) + [c.content],
+              attributes: { class: if c.stacked then 'resource stacked' else 'resource' },
+              children: if c.stacked then [c.content] + links else links + [c.content],
             },
           ],
         },
@@ -11671,13 +12329,40 @@ local nodesLogrecordLib =
         for item in linksItems(obj) + std.flatMap(function(group) group.items, linksGroups(obj))
       ]);
 
+    local neighborKeys(obj) = [
+      k
+      for k in std.objectFields(obj)
+      if !std.member(['data', '_view', 'links'], k) && std.substr(k, 0, 1) != '_' && std.type(obj[k]) == 'object'
+    ];
+
     local neighborItems(obj) =
       local curated = curatedLinks(obj);
       [
-        item
-        for item in collectNeighbors(obj, '', ['data', '_view', 'links'])
-        if !std.setMember(item.link, curated)
+        { link: obj[k]._queryPath, text: k }
+        for k in neighborKeys(obj)
+        if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
       ] + linksItems(obj);
+
+    local childGroups(obj) =
+      local curated = curatedLinks(obj);
+      [
+        group
+        for k in neighborKeys(obj)
+        if !isNode(obj[k])
+        for group in [{ title: k, items: [item for item in collectNeighbors(obj[k]) if !std.setMember(item.link, curated)] }]
+        if std.length(group.items) > 0
+      ];
+
+    local orderGroups(groups, order) =
+      local rank = { [order[i]]: i for i in std.range(0, std.length(order) - 1) };
+      local keyed = [
+        { group: groups[i], key: std.get(rank, groups[i].title, std.length(order) + i) }
+        for i in std.range(0, std.length(groups) - 1)
+      ];
+      [entry.group for entry in std.sort(keyed, function(entry) entry.key)];
+
+    local neighborGroups(obj) =
+      linksGroups(obj) + orderGroups(childGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
 
     local safeGet(obj, path) =
       std.foldl(
@@ -11703,7 +12388,8 @@ local nodesLogrecordLib =
       _view+:: {
         fragment: c.list {
           items:: neighborItems($),
-          groups:: linksGroups($),
+          groups:: neighborGroups($),
+          columns:: std.get(std.get($, 'list', {}), 'columns', 1),
         },
       },
     };
@@ -11766,7 +12452,8 @@ local nodesLogrecordLib =
           local tree = std.get($, 'tree', {});
           c.resource {
             items:: neighborItems($),
-            groups:: linksGroups($),
+            groups:: neighborGroups($),
+            columns:: std.get(std.get($, 'list', {}), 'columns', 1),
             content:: c.tree {
               nodes:: std.get(tree, 'nodes', []),
               item:: std.get(tree, 'item', super.item),
@@ -11780,7 +12467,9 @@ local nodesLogrecordLib =
         fragment: c.resource {
           data:: $.data,
           items:: neighborItems($),
-          groups:: linksGroups($),
+          groups:: neighborGroups($),
+          columns:: std.get(std.get($, 'list', {}), 'columns', 1),
+          stacked:: std.get(std.get($, 'resource', {}), 'stacked', false),
         },
       },
     };
@@ -12043,6 +12732,16 @@ local nodesDashboardLib =
               margin: 0;
               padding: 0;
             }
+            :scope.columns {
+              flex-direction: row;
+              flex-wrap: wrap;
+              align-items: flex-start;
+            }
+            .list-column {
+              display: flex;
+              flex-direction: column;
+              gap: 0.25em;
+            }
           }
         |||;
 
@@ -12069,32 +12768,61 @@ local nodesDashboardLib =
           },
         };
 
+        local card = {
+          local c = self,
+          title:: null,
+          items:: error 'Card requires items',
+          lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+          html: {
+            element: 'nav',
+            attributes: { class: 'card' },
+            children:
+              (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+              + [itemList { items:: c.items }],
+          },
+        };
+
+        local column = {
+          local c = self,
+          cards:: error 'Column requires cards',
+          html: {
+            element: 'div',
+            attributes: { class: 'list-column' },
+            children: [card.html for card in c.cards],
+          },
+        };
+
+        local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+        local distribute(cards, count) =
+          local target = lineCount(cards) / count;
+          std.foldl(
+            function(columns, card)
+              local last = columns[std.length(columns) - 1];
+              if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+              then columns + [[card]]
+              else columns[:std.length(columns) - 1] + [last + [card]],
+            cards,
+            [[]]
+          );
+
         {
           local c = self,
           items:: error 'List requires items',
           groups:: [],
+          columns:: 1,
           style:: '',
+          local cards =
+            (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+            + [card { title:: group.title, items:: group.items } for group in c.groups],
           html: [
             { element: 'style', children: [style] },
             {
               element: 'aside',
-              attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+              attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
               children:
-                (if std.length(c.items) > 0 then [{
-                   element: 'nav',
-                   attributes: { class: 'card' },
-                   children: [itemList { items:: c.items }],
-                 }] else []) + [
-                  {
-                    element: 'nav',
-                    attributes: { class: 'card' },
-                    children: [
-                      { element: 'strong', children: [group.title] },
-                      itemList { items:: group.items },
-                    ],
-                  }
-                  for group in c.groups
-                ],
+                if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+                else [card.html for card in cards],
             },
           ],
         },
@@ -13063,6 +13791,16 @@ local nodesDashboardLib =
                 margin: 0;
                 padding: 0;
               }
+              :scope.columns {
+                flex-direction: row;
+                flex-wrap: wrap;
+                align-items: flex-start;
+              }
+              .list-column {
+                display: flex;
+                flex-direction: column;
+                gap: 0.25em;
+              }
             }
           |||;
 
@@ -13089,32 +13827,61 @@ local nodesDashboardLib =
             },
           };
 
+          local card = {
+            local c = self,
+            title:: null,
+            items:: error 'Card requires items',
+            lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+            html: {
+              element: 'nav',
+              attributes: { class: 'card' },
+              children:
+                (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+                + [itemList { items:: c.items }],
+            },
+          };
+
+          local column = {
+            local c = self,
+            cards:: error 'Column requires cards',
+            html: {
+              element: 'div',
+              attributes: { class: 'list-column' },
+              children: [card.html for card in c.cards],
+            },
+          };
+
+          local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+          local distribute(cards, count) =
+            local target = lineCount(cards) / count;
+            std.foldl(
+              function(columns, card)
+                local last = columns[std.length(columns) - 1];
+                if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+                then columns + [[card]]
+                else columns[:std.length(columns) - 1] + [last + [card]],
+              cards,
+              [[]]
+            );
+
           {
             local c = self,
             items:: error 'List requires items',
             groups:: [],
+            columns:: 1,
             style:: '',
+            local cards =
+              (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+              + [card { title:: group.title, items:: group.items } for group in c.groups],
             html: [
               { element: 'style', children: [style] },
               {
                 element: 'aside',
-                attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+                attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
                 children:
-                  (if std.length(c.items) > 0 then [{
-                     element: 'nav',
-                     attributes: { class: 'card' },
-                     children: [itemList { items:: c.items }],
-                   }] else []) + [
-                    {
-                      element: 'nav',
-                      attributes: { class: 'card' },
-                      children: [
-                        { element: 'strong', children: [group.title] },
-                        itemList { items:: group.items },
-                      ],
-                    }
-                    for group in c.groups
-                  ],
+                  if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+                  else [card.html for card in cards],
               },
             ],
           };
@@ -13240,6 +14007,14 @@ local nodesDashboardLib =
             flex: 1 1 0;
             min-width: 0;
           }
+          .resource.stacked {
+            flex-direction: column;
+            flex-wrap: nowrap;
+          }
+          .resource.stacked > .yaml,
+          .resource.stacked > .tree {
+            flex: none;
+          }
         |||;
 
         {
@@ -13248,15 +14023,18 @@ local nodesDashboardLib =
           content:: yaml { data:: c.data },
           items:: [],
           groups:: [],
+          columns:: 1,
+          stacked:: false,
+          local links =
+            if std.length(c.items) > 0 || std.length(c.groups) > 0 then
+              [list { items:: c.items, groups:: c.groups, columns:: c.columns, style:: ' min-width: 8em;' }]
+            else [],
           html: [
             { element: 'style', children: [style] },
             {
               element: 'div',
-              attributes: { class: 'resource' },
-              children:
-                (if std.length(c.items) > 0 || std.length(c.groups) > 0 then
-                   [list { items:: c.items, groups:: c.groups, style:: ' min-width: 8em;' }]
-                 else []) + [c.content],
+              attributes: { class: if c.stacked then 'resource stacked' else 'resource' },
+              children: if c.stacked then [c.content] + links else links + [c.content],
             },
           ],
         },
@@ -13802,6 +14580,10 @@ local nodesDashboardLib =
       if std.isObject(links[k]) && std.objectHasAll(links[k], '_queryPath')
     };
 
+    local panelLinkPaths(node) =
+      if node.type == 'panel' then node { chart: node.chart { links: linkPaths(node.chart.links) } }
+      else node { children: [panelLinkPaths(child) for child in node.children] };
+
     local chartView = baseView {
       _view+:: {
         fragment:
@@ -13821,7 +14603,7 @@ local nodesDashboardLib =
         fragment:
           c.panel {
             child:: c.dashboard {
-              layout:: $.tree,
+              layout:: panelLinkPaths($.tree),
               height:: std.get($, 'height', '600px'),
             },
           },
