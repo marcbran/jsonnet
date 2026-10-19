@@ -25,7 +25,9 @@ local arcourse-telemetry-kubernetes = import 'arcourse/arcourse-telemetry-kubern
 `pod`, `container`, `pvc`, `deployment`, `node`) via kube-state-metrics and
 cAdvisor queries, with drilldown charts and cross-links to the matching
 `arcourse-kubernetes` resource nodes (and back). The `context`, `namespace`,
-`pod`, and `container` entities also expose a `logs` view.
+`pod`, and `container` entities also expose `logs` views: each field of an
+entity's `logs` object becomes a logs node at `logs/<field>` (by default `all`
+and `errors`), so more views are added as more fields.
 
 This is an opinionated, backend-coupled convenience layer: metric drilldowns
 assume Prometheus/PromQL (kube-state-metrics + cAdvisor), and the `logs`
@@ -42,7 +44,7 @@ mounted at `root.kubernetes`. Each entity is exposed as an overridable field;
 
 ### container
 
-Entity spec for the container dimension, with restarts/cpu/memory drilldowns and a logs view.
+Entity spec for the container dimension, with restarts/cpu/memory drilldowns and all/errors logs views.
 
 ```jsonnet
 arcourse-telemetry-kubernetes.container
@@ -51,7 +53,7 @@ arcourse-telemetry-kubernetes.container
 
 ### context
 
-Entity spec for the cluster/context dimension, with a logs view.
+Entity spec for the cluster/context dimension, with all/errors logs views.
 
 ```jsonnet
 arcourse-telemetry-kubernetes.context
@@ -69,7 +71,7 @@ arcourse-telemetry-kubernetes.deployment
 
 ### namespace
 
-Entity spec for the namespace dimension, with a logs view.
+Entity spec for the namespace dimension, with all/errors logs views.
 
 ```jsonnet
 arcourse-telemetry-kubernetes.namespace
@@ -96,7 +98,7 @@ arcourse-telemetry-kubernetes.nodeList
 
 ### pod
 
-Entity spec for the pod dimension, with a pod-phase state timeline drilldown and a logs view.
+Entity spec for the pod dimension, with a pod-phase state timeline drilldown and all/errors logs views.
 
 ```jsonnet
 arcourse-telemetry-kubernetes.pod
