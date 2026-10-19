@@ -228,6 +228,16 @@ local ui = {
           margin: 0;
           padding: 0;
         }
+        :scope.columns {
+          flex-direction: row;
+          flex-wrap: wrap;
+          align-items: flex-start;
+        }
+        .list-column {
+          display: flex;
+          flex-direction: column;
+          gap: 0.25em;
+        }
       }
     |||;
 
@@ -254,32 +264,61 @@ local ui = {
       },
     };
 
+    local card = {
+      local c = self,
+      title:: null,
+      items:: error 'Card requires items',
+      lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+      html: {
+        element: 'nav',
+        attributes: { class: 'card' },
+        children:
+          (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+          + [itemList { items:: c.items }],
+      },
+    };
+
+    local column = {
+      local c = self,
+      cards:: error 'Column requires cards',
+      html: {
+        element: 'div',
+        attributes: { class: 'list-column' },
+        children: [card.html for card in c.cards],
+      },
+    };
+
+    local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+    local distribute(cards, count) =
+      local target = lineCount(cards) / count;
+      std.foldl(
+        function(columns, card)
+          local last = columns[std.length(columns) - 1];
+          if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+          then columns + [[card]]
+          else columns[:std.length(columns) - 1] + [last + [card]],
+        cards,
+        [[]]
+      );
+
     {
       local c = self,
       items:: error 'List requires items',
       groups:: [],
+      columns:: 1,
       style:: '',
+      local cards =
+        (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+        + [card { title:: group.title, items:: group.items } for group in c.groups],
       html: [
         { element: 'style', children: [style] },
         {
           element: 'aside',
-          attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+          attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
           children:
-            (if std.length(c.items) > 0 then [{
-               element: 'nav',
-               attributes: { class: 'card' },
-               children: [itemList { items:: c.items }],
-             }] else []) + [
-              {
-                element: 'nav',
-                attributes: { class: 'card' },
-                children: [
-                  { element: 'strong', children: [group.title] },
-                  itemList { items:: group.items },
-                ],
-              }
-              for group in c.groups
-            ],
+            if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+            else [card.html for card in cards],
         },
       ],
     },
@@ -1248,6 +1287,16 @@ local ui = {
             margin: 0;
             padding: 0;
           }
+          :scope.columns {
+            flex-direction: row;
+            flex-wrap: wrap;
+            align-items: flex-start;
+          }
+          .list-column {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25em;
+          }
         }
       |||;
 
@@ -1274,32 +1323,61 @@ local ui = {
         },
       };
 
+      local card = {
+        local c = self,
+        title:: null,
+        items:: error 'Card requires items',
+        lines:: std.length(c.items) + (if c.title == null then 0 else 1),
+        html: {
+          element: 'nav',
+          attributes: { class: 'card' },
+          children:
+            (if c.title == null then [] else [{ element: 'strong', children: [c.title] }])
+            + [itemList { items:: c.items }],
+        },
+      };
+
+      local column = {
+        local c = self,
+        cards:: error 'Column requires cards',
+        html: {
+          element: 'div',
+          attributes: { class: 'list-column' },
+          children: [card.html for card in c.cards],
+        },
+      };
+
+      local lineCount(cards) = std.foldl(function(acc, card) acc + card.lines, cards, 0);
+
+      local distribute(cards, count) =
+        local target = lineCount(cards) / count;
+        std.foldl(
+          function(columns, card)
+            local last = columns[std.length(columns) - 1];
+            if std.length(last) > 0 && std.length(columns) < count && lineCount(last) + card.lines / 2 > target
+            then columns + [[card]]
+            else columns[:std.length(columns) - 1] + [last + [card]],
+          cards,
+          [[]]
+        );
+
       {
         local c = self,
         items:: error 'List requires items',
         groups:: [],
+        columns:: 1,
         style:: '',
+        local cards =
+          (if std.length(c.items) > 0 then [card { items:: c.items }] else [])
+          + [card { title:: group.title, items:: group.items } for group in c.groups],
         html: [
           { element: 'style', children: [style] },
           {
             element: 'aside',
-            attributes: { class: 'list' } + (if c.style != '' then { style: c.style } else {}),
+            attributes: { class: if c.columns > 1 then 'list columns' else 'list' } + (if c.style != '' then { style: c.style } else {}),
             children:
-              (if std.length(c.items) > 0 then [{
-                 element: 'nav',
-                 attributes: { class: 'card' },
-                 children: [itemList { items:: c.items }],
-               }] else []) + [
-                {
-                  element: 'nav',
-                  attributes: { class: 'card' },
-                  children: [
-                    { element: 'strong', children: [group.title] },
-                    itemList { items:: group.items },
-                  ],
-                }
-                for group in c.groups
-              ],
+              if c.columns > 1 then [column { cards:: cards }.html for cards in distribute(cards, c.columns)]
+              else [card.html for card in cards],
           },
         ],
       };
@@ -1425,6 +1503,14 @@ local ui = {
         flex: 1 1 0;
         min-width: 0;
       }
+      .resource.stacked {
+        flex-direction: column;
+        flex-wrap: nowrap;
+      }
+      .resource.stacked > .yaml,
+      .resource.stacked > .tree {
+        flex: none;
+      }
     |||;
 
     {
@@ -1433,15 +1519,18 @@ local ui = {
       content:: yaml { data:: c.data },
       items:: [],
       groups:: [],
+      columns:: 1,
+      stacked:: false,
+      local links =
+        if std.length(c.items) > 0 || std.length(c.groups) > 0 then
+          [list { items:: c.items, groups:: c.groups, columns:: c.columns, style:: ' min-width: 8em;' }]
+        else [],
       html: [
         { element: 'style', children: [style] },
         {
           element: 'div',
-          attributes: { class: 'resource' },
-          children:
-            (if std.length(c.items) > 0 || std.length(c.groups) > 0 then
-               [list { items:: c.items, groups:: c.groups, style:: ' min-width: 8em;' }]
-             else []) + [c.content],
+          attributes: { class: if c.stacked then 'resource stacked' else 'resource' },
+          children: if c.stacked then [c.content] + links else links + [c.content],
         },
       ],
     },
@@ -1987,6 +2076,10 @@ local linkPaths(links) = {
   if std.isObject(links[k]) && std.objectHasAll(links[k], '_queryPath')
 };
 
+local panelLinkPaths(node) =
+  if node.type == 'panel' then node { chart: node.chart { links: linkPaths(node.chart.links) } }
+  else node { children: [panelLinkPaths(child) for child in node.children] };
+
 local chartView = baseView {
   _view+:: {
     fragment:
@@ -2006,7 +2099,7 @@ local dashboardView = baseView {
     fragment:
       c.panel {
         child:: c.dashboard {
-          layout:: $.tree,
+          layout:: panelLinkPaths($.tree),
           height:: std.get($, 'height', '600px'),
         },
       },
