@@ -2981,6 +2981,7 @@ local telemetry =
       local labels = std.get(params, 'labels', vars);
       local titles = std.get(params, 'titles', [c.capitalize(v) for v in vars]);
       local metric = params.metric;
+      local hidden = std.get(params, 'hidden', []);
       local n = std.length(vars);
 
       local pathSuffixes = [
@@ -2990,9 +2991,14 @@ local telemetry =
 
       local accs = c.accs(labels, vars);
 
+      local placement(i) = if i == 0 then 'root' else vars[i - 1];
+
       local levelInputs = [
         local idx = if i == n then n - 1 else i;
         {
+          placement: placement(i),
+          isHidden: std.member(hidden, placement(i)),
+          linksNext: i < n && !std.member(hidden, placement(i + 1)),
           isLeaf: i == n,
           label: labels[idx],
           var: vars[idx],
@@ -3011,14 +3017,13 @@ local telemetry =
           matchers:: li.matchers,
           titleGroupBy:: if li.isLeaf then '' else 'by %s ' % li.title,
         };
-        local override = std.get(std.get(ctx, 'levels', {}), ctx.groupBy, {});
+        local override = std.get(std.get(ctx, 'levels', {}), li.placement, {});
         [li.path, ctx + override {
-          title:: ctx.title,
           queries: [
             {
-              expr: ctx.expr % $,
-              legendFormat: if std.objectHasAll(params, 'legend') then ctx.legend else '{{%s}}' % ctx.groupBy,
-              link:: if li.isLeaf then null else function(series)
+              expr: $.expr % $,
+              legendFormat: if std.objectHasAll($, 'legend') then $.legend else '{{%s}}' % ctx.groupBy,
+              link:: if !li.linksNext then null else function(series)
                 c.chainFields(
                   c.chain(rootNode, [[v, $[v]] for v in li.ancestorVars] + [[li.var, series[li.label]]]),
                   li.nextPathSuffix
@@ -3027,6 +3032,7 @@ local telemetry =
           ],
         }]
         for li in levelInputs
+        if !li.isHidden
       ];
   local nodeListsEntityLib = function(c, listNode, drilldown, logsNode)
     function(params)
@@ -15240,6 +15246,13 @@ local telemetry =
           Unknown: '#7a7a7a',
         },
         levels:: {
+          local notRunning = {
+            expr:: 'sum by (%(groupBy)s, phase) (kube_pod_status_phase{%(matchers)s, phase!="Running"}) > 0' % self,
+            title:: 'Non-running Pod Phase %(titleGroupBy)s' % self,
+          },
+          root: notRunning,
+          context: notRunning,
+          namespace: self.pod,
           pod: { rowBy:: '{{pod}}', labelBy:: '{{phase}}', tooltip:: '{{pod}} · {{phase}} · {{from}} – {{to}}' },
         },
       },
