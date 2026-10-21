@@ -1467,6 +1467,28 @@ local nodesChartLib =
             if c.href(target) == null then c.scalar(v)
             else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+          isMultiline(v)::
+            std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+          leaf:: {
+            local l = self,
+            prefix:: [],
+            data:: error 'leaf requires data',
+            target:: null,
+            depth:: 0,
+            html:
+              if !c.isMultiline(l.data) then
+                [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+              else
+                local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+                local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+                local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+                [{ element: 'div', children: l.prefix + [indicator] }] + [
+                  { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                  for line in lines
+                ],
+          },
+
           isLeaf(value)::
             !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -1484,13 +1506,17 @@ local nodesChartLib =
                 ':',
               ] }] + c.children(value, links, depth + 1)
             else
-              [{ element: 'div', children: [
-                c.indent(depth),
-                bullet,
-                c.key(key, c.at(links, 'key')),
-                ': ',
-                c.value(value, c.at(links, 'value')),
-              ] }],
+              (c.leaf {
+                 prefix:: [
+                   c.indent(depth),
+                   bullet,
+                   c.key(key, c.at(links, 'key')),
+                   ': ',
+                 ],
+                 data:: value,
+                 target:: c.at(links, 'value'),
+                 depth:: depth,
+               }).html,
 
           children(value, links, depth)::
             if std.type(value) == 'object' then
@@ -1508,11 +1534,12 @@ local nodesChartLib =
                     c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                     std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                   else
-                    [{ element: 'div', children: [
-                      c.indent(depth),
-                      '- ',
-                      c.value(item, c.at(itemLinks, 'value')),
-                    ] }],
+                    (c.leaf {
+                       prefix:: [c.indent(depth), '- '],
+                       data:: item,
+                       target:: c.at(itemLinks, 'value'),
+                       depth:: depth,
+                     }).html,
                 std.range(0, std.length(value) - 1)
               ),
         };
@@ -2081,6 +2108,28 @@ local nodesChartLib =
               if c.href(target) == null then c.scalar(v)
               else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+            isMultiline(v)::
+              std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+            leaf:: {
+              local l = self,
+              prefix:: [],
+              data:: error 'leaf requires data',
+              target:: null,
+              depth:: 0,
+              html:
+                if !c.isMultiline(l.data) then
+                  [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+                else
+                  local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+                  local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+                  local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+                  [{ element: 'div', children: l.prefix + [indicator] }] + [
+                    { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                    for line in lines
+                  ],
+            },
+
             isLeaf(value)::
               !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -2098,13 +2147,17 @@ local nodesChartLib =
                   ':',
                 ] }] + c.children(value, links, depth + 1)
               else
-                [{ element: 'div', children: [
-                  c.indent(depth),
-                  bullet,
-                  c.key(key, c.at(links, 'key')),
-                  ': ',
-                  c.value(value, c.at(links, 'value')),
-                ] }],
+                (c.leaf {
+                   prefix:: [
+                     c.indent(depth),
+                     bullet,
+                     c.key(key, c.at(links, 'key')),
+                     ': ',
+                   ],
+                   data:: value,
+                   target:: c.at(links, 'value'),
+                   depth:: depth,
+                 }).html,
 
             children(value, links, depth)::
               if std.type(value) == 'object' then
@@ -2122,11 +2175,12 @@ local nodesChartLib =
                       c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                       std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                     else
-                      [{ element: 'div', children: [
-                        c.indent(depth),
-                        '- ',
-                        c.value(item, c.at(itemLinks, 'value')),
-                      ] }],
+                      (c.leaf {
+                         prefix:: [c.indent(depth), '- '],
+                         data:: item,
+                         target:: c.at(itemLinks, 'value'),
+                         depth:: depth,
+                       }).html,
                   std.range(0, std.length(value) - 1)
                 ),
           };
@@ -3825,6 +3879,28 @@ local nodesListLib =
             if c.href(target) == null then c.scalar(v)
             else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+          isMultiline(v)::
+            std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+          leaf:: {
+            local l = self,
+            prefix:: [],
+            data:: error 'leaf requires data',
+            target:: null,
+            depth:: 0,
+            html:
+              if !c.isMultiline(l.data) then
+                [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+              else
+                local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+                local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+                local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+                [{ element: 'div', children: l.prefix + [indicator] }] + [
+                  { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                  for line in lines
+                ],
+          },
+
           isLeaf(value)::
             !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -3842,13 +3918,17 @@ local nodesListLib =
                 ':',
               ] }] + c.children(value, links, depth + 1)
             else
-              [{ element: 'div', children: [
-                c.indent(depth),
-                bullet,
-                c.key(key, c.at(links, 'key')),
-                ': ',
-                c.value(value, c.at(links, 'value')),
-              ] }],
+              (c.leaf {
+                 prefix:: [
+                   c.indent(depth),
+                   bullet,
+                   c.key(key, c.at(links, 'key')),
+                   ': ',
+                 ],
+                 data:: value,
+                 target:: c.at(links, 'value'),
+                 depth:: depth,
+               }).html,
 
           children(value, links, depth)::
             if std.type(value) == 'object' then
@@ -3866,11 +3946,12 @@ local nodesListLib =
                     c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                     std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                   else
-                    [{ element: 'div', children: [
-                      c.indent(depth),
-                      '- ',
-                      c.value(item, c.at(itemLinks, 'value')),
-                    ] }],
+                    (c.leaf {
+                       prefix:: [c.indent(depth), '- '],
+                       data:: item,
+                       target:: c.at(itemLinks, 'value'),
+                       depth:: depth,
+                     }).html,
                 std.range(0, std.length(value) - 1)
               ),
         };
@@ -4439,6 +4520,28 @@ local nodesListLib =
               if c.href(target) == null then c.scalar(v)
               else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+            isMultiline(v)::
+              std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+            leaf:: {
+              local l = self,
+              prefix:: [],
+              data:: error 'leaf requires data',
+              target:: null,
+              depth:: 0,
+              html:
+                if !c.isMultiline(l.data) then
+                  [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+                else
+                  local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+                  local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+                  local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+                  [{ element: 'div', children: l.prefix + [indicator] }] + [
+                    { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                    for line in lines
+                  ],
+            },
+
             isLeaf(value)::
               !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -4456,13 +4559,17 @@ local nodesListLib =
                   ':',
                 ] }] + c.children(value, links, depth + 1)
               else
-                [{ element: 'div', children: [
-                  c.indent(depth),
-                  bullet,
-                  c.key(key, c.at(links, 'key')),
-                  ': ',
-                  c.value(value, c.at(links, 'value')),
-                ] }],
+                (c.leaf {
+                   prefix:: [
+                     c.indent(depth),
+                     bullet,
+                     c.key(key, c.at(links, 'key')),
+                     ': ',
+                   ],
+                   data:: value,
+                   target:: c.at(links, 'value'),
+                   depth:: depth,
+                 }).html,
 
             children(value, links, depth)::
               if std.type(value) == 'object' then
@@ -4480,11 +4587,12 @@ local nodesListLib =
                       c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                       std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                     else
-                      [{ element: 'div', children: [
-                        c.indent(depth),
-                        '- ',
-                        c.value(item, c.at(itemLinks, 'value')),
-                      ] }],
+                      (c.leaf {
+                         prefix:: [c.indent(depth), '- '],
+                         data:: item,
+                         target:: c.at(itemLinks, 'value'),
+                         depth:: depth,
+                       }).html,
                   std.range(0, std.length(value) - 1)
                 ),
           };
@@ -4767,13 +4875,37 @@ local nodesListLib =
       if !std.member(['data', '_view', 'links'], k) && std.substr(k, 0, 1) != '_' && std.type(obj[k]) == 'object'
     ];
 
+    local nodeGroupsSpec(obj) = std.get(std.get(obj, 'list', {}), 'nodeGroups', {});
+
+    local nodeGroupedKeys(obj) =
+      local spec = nodeGroupsSpec(obj);
+      std.set(std.flattenArrays([spec[title] for title in std.objectFields(spec)]));
+
     local neighborItems(obj) =
       local curated = curatedLinks(obj);
+      local grouped = nodeGroupedKeys(obj);
       [
         { link: obj[k]._queryPath, text: k }
         for k in neighborKeys(obj)
-        if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
+        if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated) && !std.setMember(k, grouped)
       ] + linksItems(obj);
+
+    local nodeGroups(obj) =
+      local spec = nodeGroupsSpec(obj);
+      local curated = curatedLinks(obj);
+      [
+        group
+        for title in std.objectFields(spec)
+        for group in [{
+          title: title,
+          items: [
+            { link: obj[k]._queryPath, text: k }
+            for k in spec[title]
+            if std.objectHas(obj, k) && isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
+          ],
+        }]
+        if std.length(group.items) > 0
+      ];
 
     local childGroups(obj) =
       local curated = curatedLinks(obj);
@@ -4794,7 +4926,7 @@ local nodesListLib =
       [entry.group for entry in std.sort(keyed, function(entry) entry.key)];
 
     local neighborGroups(obj) =
-      linksGroups(obj) + orderGroups(childGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
+      linksGroups(obj) + orderGroups(childGroups(obj) + nodeGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
 
     local safeGet(obj, path) =
       std.foldl(
@@ -5729,6 +5861,28 @@ local nodesLabelsLib =
             if c.href(target) == null then c.scalar(v)
             else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+          isMultiline(v)::
+            std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+          leaf:: {
+            local l = self,
+            prefix:: [],
+            data:: error 'leaf requires data',
+            target:: null,
+            depth:: 0,
+            html:
+              if !c.isMultiline(l.data) then
+                [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+              else
+                local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+                local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+                local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+                [{ element: 'div', children: l.prefix + [indicator] }] + [
+                  { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                  for line in lines
+                ],
+          },
+
           isLeaf(value)::
             !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -5746,13 +5900,17 @@ local nodesLabelsLib =
                 ':',
               ] }] + c.children(value, links, depth + 1)
             else
-              [{ element: 'div', children: [
-                c.indent(depth),
-                bullet,
-                c.key(key, c.at(links, 'key')),
-                ': ',
-                c.value(value, c.at(links, 'value')),
-              ] }],
+              (c.leaf {
+                 prefix:: [
+                   c.indent(depth),
+                   bullet,
+                   c.key(key, c.at(links, 'key')),
+                   ': ',
+                 ],
+                 data:: value,
+                 target:: c.at(links, 'value'),
+                 depth:: depth,
+               }).html,
 
           children(value, links, depth)::
             if std.type(value) == 'object' then
@@ -5770,11 +5928,12 @@ local nodesLabelsLib =
                     c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                     std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                   else
-                    [{ element: 'div', children: [
-                      c.indent(depth),
-                      '- ',
-                      c.value(item, c.at(itemLinks, 'value')),
-                    ] }],
+                    (c.leaf {
+                       prefix:: [c.indent(depth), '- '],
+                       data:: item,
+                       target:: c.at(itemLinks, 'value'),
+                       depth:: depth,
+                     }).html,
                 std.range(0, std.length(value) - 1)
               ),
         };
@@ -6343,6 +6502,28 @@ local nodesLabelsLib =
               if c.href(target) == null then c.scalar(v)
               else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+            isMultiline(v)::
+              std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+            leaf:: {
+              local l = self,
+              prefix:: [],
+              data:: error 'leaf requires data',
+              target:: null,
+              depth:: 0,
+              html:
+                if !c.isMultiline(l.data) then
+                  [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+                else
+                  local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+                  local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+                  local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+                  [{ element: 'div', children: l.prefix + [indicator] }] + [
+                    { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                    for line in lines
+                  ],
+            },
+
             isLeaf(value)::
               !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -6360,13 +6541,17 @@ local nodesLabelsLib =
                   ':',
                 ] }] + c.children(value, links, depth + 1)
               else
-                [{ element: 'div', children: [
-                  c.indent(depth),
-                  bullet,
-                  c.key(key, c.at(links, 'key')),
-                  ': ',
-                  c.value(value, c.at(links, 'value')),
-                ] }],
+                (c.leaf {
+                   prefix:: [
+                     c.indent(depth),
+                     bullet,
+                     c.key(key, c.at(links, 'key')),
+                     ': ',
+                   ],
+                   data:: value,
+                   target:: c.at(links, 'value'),
+                   depth:: depth,
+                 }).html,
 
             children(value, links, depth)::
               if std.type(value) == 'object' then
@@ -6384,11 +6569,12 @@ local nodesLabelsLib =
                       c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                       std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                     else
-                      [{ element: 'div', children: [
-                        c.indent(depth),
-                        '- ',
-                        c.value(item, c.at(itemLinks, 'value')),
-                      ] }],
+                      (c.leaf {
+                         prefix:: [c.indent(depth), '- '],
+                         data:: item,
+                         target:: c.at(itemLinks, 'value'),
+                         depth:: depth,
+                       }).html,
                   std.range(0, std.length(value) - 1)
                 ),
           };
@@ -6671,13 +6857,37 @@ local nodesLabelsLib =
       if !std.member(['data', '_view', 'links'], k) && std.substr(k, 0, 1) != '_' && std.type(obj[k]) == 'object'
     ];
 
+    local nodeGroupsSpec(obj) = std.get(std.get(obj, 'list', {}), 'nodeGroups', {});
+
+    local nodeGroupedKeys(obj) =
+      local spec = nodeGroupsSpec(obj);
+      std.set(std.flattenArrays([spec[title] for title in std.objectFields(spec)]));
+
     local neighborItems(obj) =
       local curated = curatedLinks(obj);
+      local grouped = nodeGroupedKeys(obj);
       [
         { link: obj[k]._queryPath, text: k }
         for k in neighborKeys(obj)
-        if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
+        if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated) && !std.setMember(k, grouped)
       ] + linksItems(obj);
+
+    local nodeGroups(obj) =
+      local spec = nodeGroupsSpec(obj);
+      local curated = curatedLinks(obj);
+      [
+        group
+        for title in std.objectFields(spec)
+        for group in [{
+          title: title,
+          items: [
+            { link: obj[k]._queryPath, text: k }
+            for k in spec[title]
+            if std.objectHas(obj, k) && isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
+          ],
+        }]
+        if std.length(group.items) > 0
+      ];
 
     local childGroups(obj) =
       local curated = curatedLinks(obj);
@@ -6698,7 +6908,7 @@ local nodesLabelsLib =
       [entry.group for entry in std.sort(keyed, function(entry) entry.key)];
 
     local neighborGroups(obj) =
-      linksGroups(obj) + orderGroups(childGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
+      linksGroups(obj) + orderGroups(childGroups(obj) + nodeGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
 
     local safeGet(obj, path) =
       std.foldl(
@@ -7632,6 +7842,28 @@ local nodesValuesLib =
             if c.href(target) == null then c.scalar(v)
             else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+          isMultiline(v)::
+            std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+          leaf:: {
+            local l = self,
+            prefix:: [],
+            data:: error 'leaf requires data',
+            target:: null,
+            depth:: 0,
+            html:
+              if !c.isMultiline(l.data) then
+                [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+              else
+                local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+                local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+                local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+                [{ element: 'div', children: l.prefix + [indicator] }] + [
+                  { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                  for line in lines
+                ],
+          },
+
           isLeaf(value)::
             !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -7649,13 +7881,17 @@ local nodesValuesLib =
                 ':',
               ] }] + c.children(value, links, depth + 1)
             else
-              [{ element: 'div', children: [
-                c.indent(depth),
-                bullet,
-                c.key(key, c.at(links, 'key')),
-                ': ',
-                c.value(value, c.at(links, 'value')),
-              ] }],
+              (c.leaf {
+                 prefix:: [
+                   c.indent(depth),
+                   bullet,
+                   c.key(key, c.at(links, 'key')),
+                   ': ',
+                 ],
+                 data:: value,
+                 target:: c.at(links, 'value'),
+                 depth:: depth,
+               }).html,
 
           children(value, links, depth)::
             if std.type(value) == 'object' then
@@ -7673,11 +7909,12 @@ local nodesValuesLib =
                     c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                     std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                   else
-                    [{ element: 'div', children: [
-                      c.indent(depth),
-                      '- ',
-                      c.value(item, c.at(itemLinks, 'value')),
-                    ] }],
+                    (c.leaf {
+                       prefix:: [c.indent(depth), '- '],
+                       data:: item,
+                       target:: c.at(itemLinks, 'value'),
+                       depth:: depth,
+                     }).html,
                 std.range(0, std.length(value) - 1)
               ),
         };
@@ -8246,6 +8483,28 @@ local nodesValuesLib =
               if c.href(target) == null then c.scalar(v)
               else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+            isMultiline(v)::
+              std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+            leaf:: {
+              local l = self,
+              prefix:: [],
+              data:: error 'leaf requires data',
+              target:: null,
+              depth:: 0,
+              html:
+                if !c.isMultiline(l.data) then
+                  [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+                else
+                  local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+                  local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+                  local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+                  [{ element: 'div', children: l.prefix + [indicator] }] + [
+                    { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                    for line in lines
+                  ],
+            },
+
             isLeaf(value)::
               !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -8263,13 +8522,17 @@ local nodesValuesLib =
                   ':',
                 ] }] + c.children(value, links, depth + 1)
               else
-                [{ element: 'div', children: [
-                  c.indent(depth),
-                  bullet,
-                  c.key(key, c.at(links, 'key')),
-                  ': ',
-                  c.value(value, c.at(links, 'value')),
-                ] }],
+                (c.leaf {
+                   prefix:: [
+                     c.indent(depth),
+                     bullet,
+                     c.key(key, c.at(links, 'key')),
+                     ': ',
+                   ],
+                   data:: value,
+                   target:: c.at(links, 'value'),
+                   depth:: depth,
+                 }).html,
 
             children(value, links, depth)::
               if std.type(value) == 'object' then
@@ -8287,11 +8550,12 @@ local nodesValuesLib =
                       c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                       std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                     else
-                      [{ element: 'div', children: [
-                        c.indent(depth),
-                        '- ',
-                        c.value(item, c.at(itemLinks, 'value')),
-                      ] }],
+                      (c.leaf {
+                         prefix:: [c.indent(depth), '- '],
+                         data:: item,
+                         target:: c.at(itemLinks, 'value'),
+                         depth:: depth,
+                       }).html,
                   std.range(0, std.length(value) - 1)
                 ),
           };
@@ -8574,13 +8838,37 @@ local nodesValuesLib =
       if !std.member(['data', '_view', 'links'], k) && std.substr(k, 0, 1) != '_' && std.type(obj[k]) == 'object'
     ];
 
+    local nodeGroupsSpec(obj) = std.get(std.get(obj, 'list', {}), 'nodeGroups', {});
+
+    local nodeGroupedKeys(obj) =
+      local spec = nodeGroupsSpec(obj);
+      std.set(std.flattenArrays([spec[title] for title in std.objectFields(spec)]));
+
     local neighborItems(obj) =
       local curated = curatedLinks(obj);
+      local grouped = nodeGroupedKeys(obj);
       [
         { link: obj[k]._queryPath, text: k }
         for k in neighborKeys(obj)
-        if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
+        if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated) && !std.setMember(k, grouped)
       ] + linksItems(obj);
+
+    local nodeGroups(obj) =
+      local spec = nodeGroupsSpec(obj);
+      local curated = curatedLinks(obj);
+      [
+        group
+        for title in std.objectFields(spec)
+        for group in [{
+          title: title,
+          items: [
+            { link: obj[k]._queryPath, text: k }
+            for k in spec[title]
+            if std.objectHas(obj, k) && isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
+          ],
+        }]
+        if std.length(group.items) > 0
+      ];
 
     local childGroups(obj) =
       local curated = curatedLinks(obj);
@@ -8601,7 +8889,7 @@ local nodesValuesLib =
       [entry.group for entry in std.sort(keyed, function(entry) entry.key)];
 
     local neighborGroups(obj) =
-      linksGroups(obj) + orderGroups(childGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
+      linksGroups(obj) + orderGroups(childGroups(obj) + nodeGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
 
     local safeGet(obj, path) =
       std.foldl(
@@ -9344,6 +9632,28 @@ local nodesLogsLib =
           if c.href(target) == null then c.scalar(v)
           else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+        isMultiline(v)::
+          std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+        leaf:: {
+          local l = self,
+          prefix:: [],
+          data:: error 'leaf requires data',
+          target:: null,
+          depth:: 0,
+          html:
+            if !c.isMultiline(l.data) then
+              [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+            else
+              local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+              local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+              local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+              [{ element: 'div', children: l.prefix + [indicator] }] + [
+                { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                for line in lines
+              ],
+        },
+
         isLeaf(value)::
           !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -9361,13 +9671,17 @@ local nodesLogsLib =
               ':',
             ] }] + c.children(value, links, depth + 1)
           else
-            [{ element: 'div', children: [
-              c.indent(depth),
-              bullet,
-              c.key(key, c.at(links, 'key')),
-              ': ',
-              c.value(value, c.at(links, 'value')),
-            ] }],
+            (c.leaf {
+               prefix:: [
+                 c.indent(depth),
+                 bullet,
+                 c.key(key, c.at(links, 'key')),
+                 ': ',
+               ],
+               data:: value,
+               target:: c.at(links, 'value'),
+               depth:: depth,
+             }).html,
 
         children(value, links, depth)::
           if std.type(value) == 'object' then
@@ -9385,11 +9699,12 @@ local nodesLogsLib =
                   c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                   std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                 else
-                  [{ element: 'div', children: [
-                    c.indent(depth),
-                    '- ',
-                    c.value(item, c.at(itemLinks, 'value')),
-                  ] }],
+                  (c.leaf {
+                     prefix:: [c.indent(depth), '- '],
+                     data:: item,
+                     target:: c.at(itemLinks, 'value'),
+                     depth:: depth,
+                   }).html,
               std.range(0, std.length(value) - 1)
             ),
       };
@@ -9958,6 +10273,28 @@ local nodesLogsLib =
             if c.href(target) == null then c.scalar(v)
             else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+          isMultiline(v)::
+            std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+          leaf:: {
+            local l = self,
+            prefix:: [],
+            data:: error 'leaf requires data',
+            target:: null,
+            depth:: 0,
+            html:
+              if !c.isMultiline(l.data) then
+                [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+              else
+                local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+                local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+                local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+                [{ element: 'div', children: l.prefix + [indicator] }] + [
+                  { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                  for line in lines
+                ],
+          },
+
           isLeaf(value)::
             !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -9975,13 +10312,17 @@ local nodesLogsLib =
                 ':',
               ] }] + c.children(value, links, depth + 1)
             else
-              [{ element: 'div', children: [
-                c.indent(depth),
-                bullet,
-                c.key(key, c.at(links, 'key')),
-                ': ',
-                c.value(value, c.at(links, 'value')),
-              ] }],
+              (c.leaf {
+                 prefix:: [
+                   c.indent(depth),
+                   bullet,
+                   c.key(key, c.at(links, 'key')),
+                   ': ',
+                 ],
+                 data:: value,
+                 target:: c.at(links, 'value'),
+                 depth:: depth,
+               }).html,
 
           children(value, links, depth)::
             if std.type(value) == 'object' then
@@ -9999,11 +10340,12 @@ local nodesLogsLib =
                     c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                     std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                   else
-                    [{ element: 'div', children: [
-                      c.indent(depth),
-                      '- ',
-                      c.value(item, c.at(itemLinks, 'value')),
-                    ] }],
+                    (c.leaf {
+                       prefix:: [c.indent(depth), '- '],
+                       data:: item,
+                       target:: c.at(itemLinks, 'value'),
+                       depth:: depth,
+                     }).html,
                 std.range(0, std.length(value) - 1)
               ),
         };
@@ -10270,6 +10612,28 @@ local nodesLogsLib =
           if c.href(target) == null then c.scalar(v)
           else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+        isMultiline(v)::
+          std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+        leaf:: {
+          local l = self,
+          prefix:: [],
+          data:: error 'leaf requires data',
+          target:: null,
+          depth:: 0,
+          html:
+            if !c.isMultiline(l.data) then
+              [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+            else
+              local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+              local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+              local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+              [{ element: 'div', children: l.prefix + [indicator] }] + [
+                { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                for line in lines
+              ],
+        },
+
         isLeaf(value)::
           !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -10287,13 +10651,17 @@ local nodesLogsLib =
               ':',
             ] }] + c.children(value, links, depth + 1)
           else
-            [{ element: 'div', children: [
-              c.indent(depth),
-              bullet,
-              c.key(key, c.at(links, 'key')),
-              ': ',
-              c.value(value, c.at(links, 'value')),
-            ] }],
+            (c.leaf {
+               prefix:: [
+                 c.indent(depth),
+                 bullet,
+                 c.key(key, c.at(links, 'key')),
+                 ': ',
+               ],
+               data:: value,
+               target:: c.at(links, 'value'),
+               depth:: depth,
+             }).html,
 
         children(value, links, depth)::
           if std.type(value) == 'object' then
@@ -10311,11 +10679,12 @@ local nodesLogsLib =
                   c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                   std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                 else
-                  [{ element: 'div', children: [
-                    c.indent(depth),
-                    '- ',
-                    c.value(item, c.at(itemLinks, 'value')),
-                  ] }],
+                  (c.leaf {
+                     prefix:: [c.indent(depth), '- '],
+                     data:: item,
+                     target:: c.at(itemLinks, 'value'),
+                     depth:: depth,
+                   }).html,
               std.range(0, std.length(value) - 1)
             ),
       };
@@ -11393,6 +11762,28 @@ local nodesLogrecordLib =
             if c.href(target) == null then c.scalar(v)
             else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+          isMultiline(v)::
+            std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+          leaf:: {
+            local l = self,
+            prefix:: [],
+            data:: error 'leaf requires data',
+            target:: null,
+            depth:: 0,
+            html:
+              if !c.isMultiline(l.data) then
+                [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+              else
+                local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+                local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+                local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+                [{ element: 'div', children: l.prefix + [indicator] }] + [
+                  { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                  for line in lines
+                ],
+          },
+
           isLeaf(value)::
             !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -11410,13 +11801,17 @@ local nodesLogrecordLib =
                 ':',
               ] }] + c.children(value, links, depth + 1)
             else
-              [{ element: 'div', children: [
-                c.indent(depth),
-                bullet,
-                c.key(key, c.at(links, 'key')),
-                ': ',
-                c.value(value, c.at(links, 'value')),
-              ] }],
+              (c.leaf {
+                 prefix:: [
+                   c.indent(depth),
+                   bullet,
+                   c.key(key, c.at(links, 'key')),
+                   ': ',
+                 ],
+                 data:: value,
+                 target:: c.at(links, 'value'),
+                 depth:: depth,
+               }).html,
 
           children(value, links, depth)::
             if std.type(value) == 'object' then
@@ -11434,11 +11829,12 @@ local nodesLogrecordLib =
                     c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                     std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                   else
-                    [{ element: 'div', children: [
-                      c.indent(depth),
-                      '- ',
-                      c.value(item, c.at(itemLinks, 'value')),
-                    ] }],
+                    (c.leaf {
+                       prefix:: [c.indent(depth), '- '],
+                       data:: item,
+                       target:: c.at(itemLinks, 'value'),
+                       depth:: depth,
+                     }).html,
                 std.range(0, std.length(value) - 1)
               ),
         };
@@ -12007,6 +12403,28 @@ local nodesLogrecordLib =
               if c.href(target) == null then c.scalar(v)
               else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+            isMultiline(v)::
+              std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+            leaf:: {
+              local l = self,
+              prefix:: [],
+              data:: error 'leaf requires data',
+              target:: null,
+              depth:: 0,
+              html:
+                if !c.isMultiline(l.data) then
+                  [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+                else
+                  local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+                  local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+                  local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+                  [{ element: 'div', children: l.prefix + [indicator] }] + [
+                    { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                    for line in lines
+                  ],
+            },
+
             isLeaf(value)::
               !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -12024,13 +12442,17 @@ local nodesLogrecordLib =
                   ':',
                 ] }] + c.children(value, links, depth + 1)
               else
-                [{ element: 'div', children: [
-                  c.indent(depth),
-                  bullet,
-                  c.key(key, c.at(links, 'key')),
-                  ': ',
-                  c.value(value, c.at(links, 'value')),
-                ] }],
+                (c.leaf {
+                   prefix:: [
+                     c.indent(depth),
+                     bullet,
+                     c.key(key, c.at(links, 'key')),
+                     ': ',
+                   ],
+                   data:: value,
+                   target:: c.at(links, 'value'),
+                   depth:: depth,
+                 }).html,
 
             children(value, links, depth)::
               if std.type(value) == 'object' then
@@ -12048,11 +12470,12 @@ local nodesLogrecordLib =
                       c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                       std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                     else
-                      [{ element: 'div', children: [
-                        c.indent(depth),
-                        '- ',
-                        c.value(item, c.at(itemLinks, 'value')),
-                      ] }],
+                      (c.leaf {
+                         prefix:: [c.indent(depth), '- '],
+                         data:: item,
+                         target:: c.at(itemLinks, 'value'),
+                         depth:: depth,
+                       }).html,
                   std.range(0, std.length(value) - 1)
                 ),
           };
@@ -12335,13 +12758,37 @@ local nodesLogrecordLib =
       if !std.member(['data', '_view', 'links'], k) && std.substr(k, 0, 1) != '_' && std.type(obj[k]) == 'object'
     ];
 
+    local nodeGroupsSpec(obj) = std.get(std.get(obj, 'list', {}), 'nodeGroups', {});
+
+    local nodeGroupedKeys(obj) =
+      local spec = nodeGroupsSpec(obj);
+      std.set(std.flattenArrays([spec[title] for title in std.objectFields(spec)]));
+
     local neighborItems(obj) =
       local curated = curatedLinks(obj);
+      local grouped = nodeGroupedKeys(obj);
       [
         { link: obj[k]._queryPath, text: k }
         for k in neighborKeys(obj)
-        if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
+        if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated) && !std.setMember(k, grouped)
       ] + linksItems(obj);
+
+    local nodeGroups(obj) =
+      local spec = nodeGroupsSpec(obj);
+      local curated = curatedLinks(obj);
+      [
+        group
+        for title in std.objectFields(spec)
+        for group in [{
+          title: title,
+          items: [
+            { link: obj[k]._queryPath, text: k }
+            for k in spec[title]
+            if std.objectHas(obj, k) && isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
+          ],
+        }]
+        if std.length(group.items) > 0
+      ];
 
     local childGroups(obj) =
       local curated = curatedLinks(obj);
@@ -12362,7 +12809,7 @@ local nodesLogrecordLib =
       [entry.group for entry in std.sort(keyed, function(entry) entry.key)];
 
     local neighborGroups(obj) =
-      linksGroups(obj) + orderGroups(childGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
+      linksGroups(obj) + orderGroups(childGroups(obj) + nodeGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
 
     local safeGet(obj, path) =
       std.foldl(
@@ -13307,6 +13754,28 @@ local nodesDashboardLib =
             if c.href(target) == null then c.scalar(v)
             else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+          isMultiline(v)::
+            std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+          leaf:: {
+            local l = self,
+            prefix:: [],
+            data:: error 'leaf requires data',
+            target:: null,
+            depth:: 0,
+            html:
+              if !c.isMultiline(l.data) then
+                [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+              else
+                local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+                local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+                local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+                [{ element: 'div', children: l.prefix + [indicator] }] + [
+                  { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                  for line in lines
+                ],
+          },
+
           isLeaf(value)::
             !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -13324,13 +13793,17 @@ local nodesDashboardLib =
                 ':',
               ] }] + c.children(value, links, depth + 1)
             else
-              [{ element: 'div', children: [
-                c.indent(depth),
-                bullet,
-                c.key(key, c.at(links, 'key')),
-                ': ',
-                c.value(value, c.at(links, 'value')),
-              ] }],
+              (c.leaf {
+                 prefix:: [
+                   c.indent(depth),
+                   bullet,
+                   c.key(key, c.at(links, 'key')),
+                   ': ',
+                 ],
+                 data:: value,
+                 target:: c.at(links, 'value'),
+                 depth:: depth,
+               }).html,
 
           children(value, links, depth)::
             if std.type(value) == 'object' then
@@ -13348,11 +13821,12 @@ local nodesDashboardLib =
                     c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                     std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                   else
-                    [{ element: 'div', children: [
-                      c.indent(depth),
-                      '- ',
-                      c.value(item, c.at(itemLinks, 'value')),
-                    ] }],
+                    (c.leaf {
+                       prefix:: [c.indent(depth), '- '],
+                       data:: item,
+                       target:: c.at(itemLinks, 'value'),
+                       depth:: depth,
+                     }).html,
                 std.range(0, std.length(value) - 1)
               ),
         };
@@ -13921,6 +14395,28 @@ local nodesDashboardLib =
               if c.href(target) == null then c.scalar(v)
               else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+            isMultiline(v)::
+              std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+            leaf:: {
+              local l = self,
+              prefix:: [],
+              data:: error 'leaf requires data',
+              target:: null,
+              depth:: 0,
+              html:
+                if !c.isMultiline(l.data) then
+                  [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+                else
+                  local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+                  local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+                  local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+                  [{ element: 'div', children: l.prefix + [indicator] }] + [
+                    { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                    for line in lines
+                  ],
+            },
+
             isLeaf(value)::
               !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -13938,13 +14434,17 @@ local nodesDashboardLib =
                   ':',
                 ] }] + c.children(value, links, depth + 1)
               else
-                [{ element: 'div', children: [
-                  c.indent(depth),
-                  bullet,
-                  c.key(key, c.at(links, 'key')),
-                  ': ',
-                  c.value(value, c.at(links, 'value')),
-                ] }],
+                (c.leaf {
+                   prefix:: [
+                     c.indent(depth),
+                     bullet,
+                     c.key(key, c.at(links, 'key')),
+                     ': ',
+                   ],
+                   data:: value,
+                   target:: c.at(links, 'value'),
+                   depth:: depth,
+                 }).html,
 
             children(value, links, depth)::
               if std.type(value) == 'object' then
@@ -13962,11 +14462,12 @@ local nodesDashboardLib =
                       c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                       std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                     else
-                      [{ element: 'div', children: [
-                        c.indent(depth),
-                        '- ',
-                        c.value(item, c.at(itemLinks, 'value')),
-                      ] }],
+                      (c.leaf {
+                         prefix:: [c.indent(depth), '- '],
+                         data:: item,
+                         target:: c.at(itemLinks, 'value'),
+                         depth:: depth,
+                       }).html,
                   std.range(0, std.length(value) - 1)
                 ),
           };
