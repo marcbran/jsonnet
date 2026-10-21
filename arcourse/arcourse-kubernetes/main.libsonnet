@@ -584,30 +584,60 @@ local graphLib =
     ],
   };
 
-  local groupOrder(groups) =
-    local dots(group) = std.length(std.findSubstr('.', group));
-    local category(group) =
-      if dots(group) == 0 then 0
-      else if std.endsWith(group, '.k8s.io') then 1
-      else 2;
-    std.sort(groups, function(group) [category(group)] + std.reverse(std.split(group, '.')));
+  local isSubdomainPattern(pattern) = std.startsWith(pattern, '*.');
 
-  local listViewField(columns, order) =
+  local matchesGroup(pattern, group) =
+    if pattern == '*' then true
+    else if isSubdomainPattern(pattern) then std.endsWith(group, pattern[1:])
+    else group == pattern || std.endsWith(group, '.' + pattern);
+
+  local patternSpecificity(pattern) =
+    if pattern == '*' then 0
+    else if isSubdomainPattern(pattern) then std.length(std.split(pattern[2:], '.')) + 0.5
+    else std.length(std.split(pattern, '.'));
+
+  local bestMatch(patterns, group) =
+    local matches = [
+      { index: i, specificity: patternSpecificity(patterns[i]) }
+      for i in std.range(0, std.length(patterns) - 1)
+      if matchesGroup(patterns[i], group)
+    ];
+    if std.length(matches) == 0 then null
+    else std.sort(matches, function(m) [-m.specificity, m.index])[0];
+
+  local groupLayout(groups, favorites, collapsed) =
+    local category(group) = if std.length(std.findSubstr('.', group)) == 0 then 0 else 1;
+    local favoriteRank(group) =
+      local m = bestMatch(favorites, group);
+      if m == null then std.length(favorites) else m.index;
+    local isCollapsed(group) =
+      local c = bestMatch(collapsed, group);
+      local f = bestMatch(favorites, group);
+      c != null && (f == null || c.specificity > f.specificity);
+    local ordered = std.sort(groups, function(group) [favoriteRank(group), category(group)] + std.reverse(std.split(group, '.')));
+    {
+      expanded: [g for g in ordered if !isCollapsed(g)],
+      collapsed: [g for g in ordered if isCollapsed(g)],
+    };
+
+  local listViewField(columns, layout, remainingTitle) =
     local le(indent) = j.Fodder.LineEnd(0, indent);
-    local columnsField = j.Field('columns', j.Number(std.toString(columns)));
+    local stringArray(values) = j.Array([j.String(v).fodder(le(8)) for v in values]).closeFodder(le(6));
+    local hasCollapsed = std.length(layout.collapsed) > 0;
+    local order = layout.expanded + (if hasCollapsed then [remainingTitle] else []);
+    local fields =
+      [j.Field('columns', j.Number(std.toString(columns)))] +
+      (if std.length(order) > 0 then [j.Field('groupOrder', stringArray(order))] else []) +
+      (if hasCollapsed then [j.Field('nodeGroups', j.Object([
+         j.Field(j.String(remainingTitle), j.Array([j.String(g).fodder(le(10)) for g in layout.collapsed]).closeFodder(le(8))) { fodder: [le(8)] },
+       ]).closeFodder(le(6)))] else []);
     j.Field(
       'list',
-      if std.length(order) == 0 then j.Object([columnsField])
-      else j.Object([
-        field { fodder: [le(6)] }
-        for field in [
-          columnsField,
-          j.Field('groupOrder', j.Array([j.String(group).fodder(le(8)) for group in order]).closeFodder(le(6))),
-        ]
-      ]).closeFodder(le(4))
+      if std.length(fields) == 1 then j.Object(fields)
+      else j.Object([field { fodder: [le(6)] } for field in fields]).closeFodder(le(4))
     ) { Hide: 0 };
 
-  local generate(resources, group, links=[], globalLinkSpecs=[], groupNodes=true, listColumns=4, order=[]) =
+  local generate(resources, group, links=[], globalLinkSpecs=[], collapsed=false, namespaceListField=null) =
     local le(indent=0) = j.Fodder.LineEnd(0, indent);
     local prettyArray(elements, indent=0) =
       j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -857,7 +887,7 @@ local graphLib =
     local namespaceViewFields(resource) =
       if group == '' && resource.name == 'namespaces' then [
         j.Field('resource', compactLiteral({ stacked: true })) { Hide: 0 },
-        listViewField(listColumns, order),
+        namespaceListField,
       ] else [];
     local clusterDetail(resource) =
       node(
@@ -875,9 +905,9 @@ local graphLib =
         (if hasVerb(resource, 'get') then [clusterDetail(resource)] else []);
 
     local hasNamespacedResources = std.length([r for r in resources if r.namespaced]) > 0;
-    local groupContextNodes = if groupNodes && group != '' then [emptyNode(['kubernetes', '$context', group])] else [];
+    local groupContextNodes = if collapsed && group != '' then [emptyNode(['kubernetes', '$context', group])] else [];
     local groupNamespaceNodes =
-      if groupNodes && group != '' && hasNamespacedResources
+      if collapsed && group != '' && hasNamespacedResources
       then [emptyNode(['kubernetes', '$context', '$namespace', group])]
       else [];
 
@@ -885,8 +915,11 @@ local graphLib =
     groupNamespaceNodes +
     std.flattenArrays([resourceNodes(r) for r in resources]);
 
-  local generateAll(groups, manifest=true, globalLinkSpecs=[], groupNodes=true, listColumns=4) =
-    local order = if groupNodes then [] else groupOrder(std.set([g.group for g in groups if g.group != '']));
+  local generateAll(groups, manifest=true, globalLinkSpecs=[], listColumns=4, favoriteGroups=[], collapsedGroups=[], remainingGroupsTitle='remaining groups') =
+    local layout = groupLayout(std.set([g.group for g in groups if g.group != '']), favoriteGroups, collapsedGroups);
+    local namespacedGroups = std.set([g.group for g in groups if std.length([r for r in g.resources if r.namespaced]) > 0]);
+    local namespaceLayout = layout { collapsed: [g for g in super.collapsed if std.setMember(g, namespacedGroups)] };
+    local namespaceListField = listViewField(listColumns, namespaceLayout, remainingGroupsTitle);
     local le(indent=0) = j.Fodder.LineEnd(0, indent);
     local prettyArray(elements, indent=0) =
       j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -917,11 +950,11 @@ local graphLib =
     ]);
     local contextNode = j.Array([
       j.Array([j.String('kubernetes'), j.String('$context')]),
-      prettyObject([listViewField(listColumns, order)], 2),
+      prettyObject([listViewField(listColumns, layout, remainingGroupsTitle)], 2),
     ]);
 
     local allRouteNodes = [contextsNode, contextNode] + std.flattenArrays([
-      generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs, groupNodes, listColumns, order)
+      generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs, std.member(layout.collapsed, g.group), namespaceListField)
       for g in groups
     ]);
     local binds = [
@@ -1095,7 +1128,9 @@ local graphLib =
   {
     _record: false,
     manifest:: true,
-    groupNodes:: true,
+    favoriteGroups:: [],
+    collapsedGroups:: [],
+    remainingGroupsTitle:: 'remaining groups',
     listColumns:: 4,
     contexts:: [],
     specs:: {},
@@ -1110,7 +1145,7 @@ local graphLib =
         ),
       },
     _view:: {
-      jsonnet: generateAll($.data.groups, $.manifest, $.globalLinkSpecs, $.groupNodes, $.listColumns),
+      jsonnet: generateAll($.data.groups, $.manifest, $.globalLinkSpecs, $.listColumns, $.favoriteGroups, $.collapsedGroups, $.remainingGroupsTitle),
     },
   };
 local nodeListsAppsLib =
@@ -1904,6 +1939,28 @@ local nodeListsAppsLib =
             if c.href(target) == null then c.scalar(v)
             else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+          isMultiline(v)::
+            std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+          leaf:: {
+            local l = self,
+            prefix:: [],
+            data:: error 'leaf requires data',
+            target:: null,
+            depth:: 0,
+            html:
+              if !c.isMultiline(l.data) then
+                [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+              else
+                local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+                local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+                local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+                [{ element: 'div', children: l.prefix + [indicator] }] + [
+                  { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                  for line in lines
+                ],
+          },
+
           isLeaf(value)::
             !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -1921,13 +1978,17 @@ local nodeListsAppsLib =
                 ':',
               ] }] + c.children(value, links, depth + 1)
             else
-              [{ element: 'div', children: [
-                c.indent(depth),
-                bullet,
-                c.key(key, c.at(links, 'key')),
-                ': ',
-                c.value(value, c.at(links, 'value')),
-              ] }],
+              (c.leaf {
+                 prefix:: [
+                   c.indent(depth),
+                   bullet,
+                   c.key(key, c.at(links, 'key')),
+                   ': ',
+                 ],
+                 data:: value,
+                 target:: c.at(links, 'value'),
+                 depth:: depth,
+               }).html,
 
           children(value, links, depth)::
             if std.type(value) == 'object' then
@@ -1945,11 +2006,12 @@ local nodeListsAppsLib =
                     c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                     std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                   else
-                    [{ element: 'div', children: [
-                      c.indent(depth),
-                      '- ',
-                      c.value(item, c.at(itemLinks, 'value')),
-                    ] }],
+                    (c.leaf {
+                       prefix:: [c.indent(depth), '- '],
+                       data:: item,
+                       target:: c.at(itemLinks, 'value'),
+                       depth:: depth,
+                     }).html,
                 std.range(0, std.length(value) - 1)
               ),
         };
@@ -2518,6 +2580,28 @@ local nodeListsAppsLib =
               if c.href(target) == null then c.scalar(v)
               else c.link(target, [c.scalar(v)], 'color: inherit'),
 
+            isMultiline(v)::
+              std.isString(v) && std.length(std.findSubstr('\n', v)) > 0,
+
+            leaf:: {
+              local l = self,
+              prefix:: [],
+              data:: error 'leaf requires data',
+              target:: null,
+              depth:: 0,
+              html:
+                if !c.isMultiline(l.data) then
+                  [{ element: 'div', children: l.prefix + [c.value(l.data, l.target)] }]
+                else
+                  local trailing = std.length(l.data) - std.length(std.rstripChars(l.data, '\n'));
+                  local indicator = if trailing == 0 then '|-' else if trailing == 1 then '|' else '|+';
+                  local lines = std.split(if trailing > 0 then std.substr(l.data, 0, std.length(l.data) - 1) else l.data, '\n');
+                  [{ element: 'div', children: l.prefix + [indicator] }] + [
+                    { element: 'div', children: [c.indent(l.depth + 1), c.value(line, l.target)] }
+                    for line in lines
+                  ],
+            },
+
             isLeaf(value)::
               !((std.type(value) == 'object' || std.type(value) == 'array') && std.length(value) > 0),
 
@@ -2535,13 +2619,17 @@ local nodeListsAppsLib =
                   ':',
                 ] }] + c.children(value, links, depth + 1)
               else
-                [{ element: 'div', children: [
-                  c.indent(depth),
-                  bullet,
-                  c.key(key, c.at(links, 'key')),
-                  ': ',
-                  c.value(value, c.at(links, 'value')),
-                ] }],
+                (c.leaf {
+                   prefix:: [
+                     c.indent(depth),
+                     bullet,
+                     c.key(key, c.at(links, 'key')),
+                     ': ',
+                   ],
+                   data:: value,
+                   target:: c.at(links, 'value'),
+                   depth:: depth,
+                 }).html,
 
             children(value, links, depth)::
               if std.type(value) == 'object' then
@@ -2559,11 +2647,12 @@ local nodeListsAppsLib =
                       c.row(kvs[0].key, kvs[0].value, c.at(itemLinks, kvs[0].key), depth, '- ') +
                       std.flatMap(function(kv) c.row(kv.key, kv.value, c.at(itemLinks, kv.key), depth, '  '), kvs[1:])
                     else
-                      [{ element: 'div', children: [
-                        c.indent(depth),
-                        '- ',
-                        c.value(item, c.at(itemLinks, 'value')),
-                      ] }],
+                      (c.leaf {
+                         prefix:: [c.indent(depth), '- '],
+                         data:: item,
+                         target:: c.at(itemLinks, 'value'),
+                         depth:: depth,
+                       }).html,
                   std.range(0, std.length(value) - 1)
                 ),
           };
@@ -2846,13 +2935,37 @@ local nodeListsAppsLib =
       if !std.member(['data', '_view', 'links'], k) && std.substr(k, 0, 1) != '_' && std.type(obj[k]) == 'object'
     ];
 
+    local nodeGroupsSpec(obj) = std.get(std.get(obj, 'list', {}), 'nodeGroups', {});
+
+    local nodeGroupedKeys(obj) =
+      local spec = nodeGroupsSpec(obj);
+      std.set(std.flattenArrays([spec[title] for title in std.objectFields(spec)]));
+
     local neighborItems(obj) =
       local curated = curatedLinks(obj);
+      local grouped = nodeGroupedKeys(obj);
       [
         { link: obj[k]._queryPath, text: k }
         for k in neighborKeys(obj)
-        if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
+        if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated) && !std.setMember(k, grouped)
       ] + linksItems(obj);
+
+    local nodeGroups(obj) =
+      local spec = nodeGroupsSpec(obj);
+      local curated = curatedLinks(obj);
+      [
+        group
+        for title in std.objectFields(spec)
+        for group in [{
+          title: title,
+          items: [
+            { link: obj[k]._queryPath, text: k }
+            for k in spec[title]
+            if std.objectHas(obj, k) && isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
+          ],
+        }]
+        if std.length(group.items) > 0
+      ];
 
     local childGroups(obj) =
       local curated = curatedLinks(obj);
@@ -2873,7 +2986,7 @@ local nodeListsAppsLib =
       [entry.group for entry in std.sort(keyed, function(entry) entry.key)];
 
     local neighborGroups(obj) =
-      linksGroups(obj) + orderGroups(childGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
+      linksGroups(obj) + orderGroups(childGroups(obj) + nodeGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
 
     local safeGet(obj, path) =
       std.foldl(
@@ -3044,6 +3157,12 @@ local nodeListsAppsLib =
       get(ctx, path, fields=[]): std.native('invoke:kubernetes')('neatGet', [ctx, path, fields]),
     },
   };
+  local time = {
+    now(): std.native('invoke:time')('now', []),
+    addDuration(epochMs, spec): std.native('invoke:time')('addDuration', [epochMs, spec]),
+    parse(value, layout): std.native('invoke:time')('parse', [value, layout]),
+    format(epochMs, layout): std.native('invoke:time')('format', [epochMs, layout]),
+  };
   local root = import 'root';
 
   local podSelectorTable = a.table.node + coreLib.podTableNode {
@@ -3071,10 +3190,21 @@ local nodeListsAppsLib =
     _summary: 'Restart %s/%s in %s' % [$.resource, $.resourceName, $.namespace],
     _action: {
       plugin: 'kubernetes',
-      name: 'restart',
+      name: 'patch',
       data: {
         ctx: $.context,
         path: std.format('/apis/apps/v1/namespaces/%s/%s/%s', [std.toString($.namespace), $.resource, $.resourceName]),
+        patch: {
+          spec: {
+            template: {
+              metadata: {
+                annotations: {
+                  'kubectl.kubernetes.io/restartedAt': time.format(time.now(), '2006-01-02T15:04:05Z07:00'),
+                },
+              },
+            },
+          },
+        },
       },
       redirect: $.redirectTo,
     },
@@ -3090,17 +3220,17 @@ local nodeListsAppsLib =
     [['kubernetes', '$context', '$namespace', 'apps', '$daemonset', 'pods'], podSelectorTable {
       selector: kubernetes.neat.get($.context, std.format('/apis/apps/v1/namespaces/%s/daemonsets/%s', [std.toString($.namespace), std.toString($.daemonset)])).spec.selector.matchLabels,
     }],
-    [['kubernetes', '$context', '$namespace', 'apps', '$deployment', 'restart'], restartNode {
+    [['kubernetes', '$context', '$namespace', 'apps', '$deployment', 'action', 'restart'], restartNode {
       resource:: 'deployments',
       resourceName:: $.deployment,
       redirectTo:: root.kubernetes.context($.context).namespace($.namespace).apps.deployment($.deployment).pods,
     }],
-    [['kubernetes', '$context', '$namespace', 'apps', '$statefulset', 'restart'], restartNode {
+    [['kubernetes', '$context', '$namespace', 'apps', '$statefulset', 'action', 'restart'], restartNode {
       resource:: 'statefulsets',
       resourceName:: $.statefulset,
       redirectTo:: root.kubernetes.context($.context).namespace($.namespace).apps.statefulset($.statefulset).pods,
     }],
-    [['kubernetes', '$context', '$namespace', 'apps', '$daemonset', 'restart'], restartNode {
+    [['kubernetes', '$context', '$namespace', 'apps', '$daemonset', 'action', 'restart'], restartNode {
       resource:: 'daemonsets',
       resourceName:: $.daemonset,
       redirectTo:: root.kubernetes.context($.context).namespace($.namespace).apps.daemonset($.daemonset).pods,
