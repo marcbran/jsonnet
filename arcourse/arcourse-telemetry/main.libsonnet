@@ -530,31 +530,40 @@ local g =
       path
     );
 
-  local nonDefaultParams(node) =
-    local params = if std.objectHasAll(node, '_params') then node._params else {};
-    local specs = if std.objectHasAll(node, '_paramSpecs') then node._paramSpecs else [];
-    local defaults = { [spec.name]: spec.default for spec in specs if std.objectHas(spec, 'default') };
-    {
-      [k]: params[k]
-      for k in std.objectFields(params)
-      if !std.objectHas(defaults, k) || defaults[k] != params[k]
-    };
+  local specDefaults(specs) = {
+    [spec.name]: spec.default
+    for spec in specs
+    if std.objectHas(spec, 'default') && spec.default != null
+  };
 
-  local mergeLayers(layers) =
-    std.foldl(function(acc, l) acc + l, layers, {});
+  local nonDefaultParams(node) =
+    local params = node._params;
+    if std.length(params) == 0 then {}
+    else
+      local defaults = node._defaultParams;
+      {
+        [k]: params[k]
+        for k in std.objectFields(params)
+        if !std.objectHas(defaults, k) || defaults[k] != params[k]
+      };
+
+  local mergeLayers(base, layers) =
+    std.foldl(function(acc, l) acc + l, layers, base);
 
   local node(path, body={}) =
     local layers = if std.isArray(body) then body else [body];
     local vars = std.map(varNameOf, std.filter(isVar, path));
-    { [var]: error 'variable %s is required' % var for var in vars } +
+    local base = { _params:: specDefaults(std.get(self, '_paramSpecs', [])) };
+    local requiredVars = { [var]: error 'variable %s is required' % var for var in vars };
+    mergeLayers(if std.length(vars) == 0 then base else requiredVars + base, layers) +
     {
       _node: true,
       _vars:: vars,
       _pathTemplate:: path,
+      _defaultParams:: super._params,
       _evalPath:: resolvePath(self, path),
       _queryPath:: local n = self; url({ path: urlPathSegments(n, path), params: nonDefaultParams(n) }),
-    } +
-    mergeLayers(layers);
+    };
 
   local toLayers(nodeSpecs) =
     std.flatMap(
@@ -1576,6 +1585,7 @@ local nodesChartLib =
           :root {
             color-scheme: light dark;
             --primary-color: light-dark(#0451a5, #569cd6);
+            --error-color: light-dark(#c62828, #f48771);
             --on-background-color: light-dark(
               color-mix(in srgb, var(--primary-color) 12%, black),
               color-mix(in srgb, var(--primary-color) 12%, white)
@@ -2343,6 +2353,48 @@ local nodesChartLib =
             ],
         },
       action:
+        local script = |||
+          function isDirty(controls) {
+            return Array.prototype.some.call(controls, function (control) {
+              if (control.options) {
+                const defaultIndex = Array.prototype.findIndex.call(control.options, function (option) {
+                  return option.defaultSelected;
+                });
+                return control.selectedIndex !== Math.max(defaultIndex, 0);
+              }
+              return control.value !== control.defaultValue;
+            });
+          }
+
+          if (typeof HTMLElement !== 'undefined') {
+            class ActionCard extends HTMLElement {
+              connectedCallback() {
+                this.update = this.update.bind(this);
+                this.addEventListener('input', this.update);
+                this.addEventListener('change', this.update);
+                window.addEventListener('pageshow', this.update);
+                this.update();
+              }
+
+              disconnectedCallback() {
+                window.removeEventListener('pageshow', this.update);
+              }
+
+              update() {
+                const apply = this.querySelector('form.apply button');
+                if (!apply) return;
+                apply.disabled = isDirty(this.querySelectorAll('form.params input, form.params select'));
+              }
+            }
+
+            if (!customElements.get('action-card')) customElements.define('action-card', ActionCard);
+          }
+
+          if (typeof module !== 'undefined' && module.exports) {
+            module.exports = { isDirty };
+          }
+        |||;
+
         local style = |||
           @scope (.action) {
             :scope {
@@ -2358,6 +2410,40 @@ local nodesChartLib =
             }
             form {
               margin: 0;
+            }
+            form.params {
+              display: flex;
+              flex-direction: column;
+              gap: 0.5em;
+            }
+            label {
+              display: flex;
+              align-items: baseline;
+              gap: 0.75em;
+            }
+            input, select {
+              font-family: inherit;
+              font-size: inherit;
+              color: var(--on-background-color);
+              background-color: var(--container-low-color);
+              border: 1px solid var(--border-color);
+              border-radius: 0.5em;
+              padding: 0.3em 0.6em;
+            }
+            input:focus, select:focus {
+              outline: 2px solid var(--primary-color);
+              outline-offset: 2px;
+            }
+            .issue {
+              color: var(--error-color);
+            }
+            .issue.hint {
+              color: inherit;
+              opacity: 0.6;
+            }
+            .buttons {
+              display: flex;
+              gap: 0.5em;
               align-self: flex-end;
             }
             button {
@@ -2378,31 +2464,196 @@ local nodesChartLib =
               outline: 2px solid var(--primary-color);
               outline-offset: 2px;
             }
+            button:disabled {
+              opacity: 0.4;
+              cursor: not-allowed;
+            }
+            button:disabled:hover {
+              color: var(--on-background-color);
+              border-color: var(--border-color);
+            }
           }
         |||;
+
+        local paramsFormId = 'action-params';
+
+        local issue = {
+          local c = self,
+          message:: error 'issue requires a message',
+          hint:: false,
+          html: {
+            element: 'p',
+            attributes: { class: if c.hint then 'issue hint' else 'issue' },
+            children: [c.message],
+          },
+        };
+
+        local numberControl = {
+          local c = self,
+          name:: error 'numberControl requires a name',
+          value:: null,
+          html: {
+            element: 'input',
+            attributes: { type: 'number', step: 'any', name: c.name, value: if c.value == null then null else std.toString(c.value) },
+          },
+        };
+
+        local textControl = {
+          local c = self,
+          name:: error 'textControl requires a name',
+          value:: null,
+          html: {
+            element: 'input',
+            attributes: { type: 'text', name: c.name, value: c.value },
+          },
+        };
+
+        local booleanOption = {
+          local c = self,
+          value:: error 'booleanOption requires a value',
+          selected:: false,
+          html: {
+            element: 'option',
+            attributes: { value: c.value, selected: c.selected },
+            children: [c.value],
+          },
+        };
+
+        local booleanControl = {
+          local c = self,
+          name:: error 'booleanControl requires a name',
+          value:: null,
+          local current = if c.value == null then '' else std.toString(c.value),
+          html: {
+            element: 'select',
+            attributes: { name: c.name },
+            children: [
+              booleanOption { value:: v, selected:: v == current }
+              for v in ['', 'true', 'false']
+            ],
+          },
+        };
+
+        local hiddenControl = {
+          local c = self,
+          name:: error 'hiddenControl requires a name',
+          value:: null,
+          html:
+            if c.value == null then []
+            else [{
+              element: 'input',
+              attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
+            }],
+        };
+
+        local controls = {
+          number: numberControl,
+          string: textControl,
+          boolean: booleanControl,
+        };
+
+        local field = {
+          local c = self,
+          spec:: error 'field requires a spec',
+          params:: {},
+          initialValues:: {},
+          issues:: [],
+          local name = c.spec.name,
+          local present = std.objectHas(c.params, name),
+          local initial = std.objectHas(c.initialValues, name),
+          local value = if present then c.params[name] else if initial then c.initialValues[name] else null,
+          html:
+            if std.objectHas(controls, c.spec.type) then [{
+              element: 'label',
+              children: [
+                { element: 'span', children: [name] },
+                controls[c.spec.type] { name:: name, value:: value },
+              ],
+            }] + [
+              issue { message:: i.message, hint:: !present }
+              for i in c.issues
+              if present || !initial
+            ]
+            else hiddenControl { name:: name, value:: value },
+        };
+
+        local paramsForm = {
+          local c = self,
+          paramSpecs:: [],
+          params:: {},
+          initialValues:: {},
+          issues:: [],
+          html: {
+            element: 'form',
+            attributes: { id: paramsFormId, class: 'params', method: 'get' },
+            children: [
+              field {
+                spec:: spec,
+                params:: c.params,
+                initialValues:: c.initialValues,
+                issues:: [i for i in c.issues if std.get(i, 'param', null) == spec.name],
+              }
+              for spec in c.paramSpecs
+            ],
+          },
+        };
+
+        local planButton = {
+          html: {
+            element: 'button',
+            attributes: { type: 'submit', form: paramsFormId },
+            children: ['Plan'],
+          },
+        };
+
+        local applyForm = {
+          local c = self,
+          evaluationId:: error 'applyForm requires an evaluationId',
+          label:: 'Apply',
+          html: {
+            element: 'form',
+            attributes: { class: 'apply', method: 'post', action: '/exec' },
+            children: [
+              { element: 'input', attributes: { type: 'hidden', name: 'evaluationId', value: c.evaluationId } },
+              { element: 'button', attributes: { type: 'submit' }, children: [c.label] },
+            ],
+          },
+        };
 
         {
           local c = self,
           evaluationId:: error 'Action requires an evaluationId',
           summary:: '',
           label:: 'Apply',
+          paramSpecs:: [],
+          params:: {},
+          initialValues:: {},
+          action:: null,
+          local hasParams = std.length(c.paramSpecs) > 0,
+          local issues = if c.action != null && std.objectHas(c.action, 'issues') then c.action.issues else [],
+          local applicable = c.action != null && !std.objectHas(c.action, 'issues'),
+          local paramNames = [spec.name for spec in c.paramSpecs if std.objectHas(controls, spec.type)],
+          local formIssues = [i for i in issues if !std.member(paramNames, std.get(i, 'param', null))],
           html: [
             { element: 'style', children: [style] },
+          ] + (if hasParams then [{ element: 'script', children: [{ html: script }] }] else []) + [
             {
-              element: 'div',
+              element: 'action-card',
               attributes: { class: 'action card' },
               children:
                 (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
                 [
-                  {
-                    element: 'form',
-                    attributes: { method: 'post', action: '/exec' },
-                    children: [
-                      { element: 'input', attributes: { type: 'hidden', name: 'evaluationId', value: c.evaluationId } },
-                      { element: 'button', attributes: { type: 'submit' }, children: [c.label] },
-                    ],
-                  },
-                ],
+                  issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
+                  for i in formIssues
+                ] +
+                (if hasParams then [paramsForm { paramSpecs:: c.paramSpecs, params:: c.params, initialValues:: c.initialValues, issues:: issues }] else []) +
+                [{
+                  element: 'div',
+                  attributes: { class: 'buttons' },
+                  children:
+                    (if hasParams then [planButton] else []) +
+                    (if applicable then [applyForm { evaluationId:: c.evaluationId, label:: c.label }] else []),
+                }],
             },
           ],
         },
@@ -3994,6 +4245,7 @@ local nodesListLib =
           :root {
             color-scheme: light dark;
             --primary-color: light-dark(#0451a5, #569cd6);
+            --error-color: light-dark(#c62828, #f48771);
             --on-background-color: light-dark(
               color-mix(in srgb, var(--primary-color) 12%, black),
               color-mix(in srgb, var(--primary-color) 12%, white)
@@ -4761,6 +5013,48 @@ local nodesListLib =
             ],
         },
       action:
+        local script = |||
+          function isDirty(controls) {
+            return Array.prototype.some.call(controls, function (control) {
+              if (control.options) {
+                const defaultIndex = Array.prototype.findIndex.call(control.options, function (option) {
+                  return option.defaultSelected;
+                });
+                return control.selectedIndex !== Math.max(defaultIndex, 0);
+              }
+              return control.value !== control.defaultValue;
+            });
+          }
+
+          if (typeof HTMLElement !== 'undefined') {
+            class ActionCard extends HTMLElement {
+              connectedCallback() {
+                this.update = this.update.bind(this);
+                this.addEventListener('input', this.update);
+                this.addEventListener('change', this.update);
+                window.addEventListener('pageshow', this.update);
+                this.update();
+              }
+
+              disconnectedCallback() {
+                window.removeEventListener('pageshow', this.update);
+              }
+
+              update() {
+                const apply = this.querySelector('form.apply button');
+                if (!apply) return;
+                apply.disabled = isDirty(this.querySelectorAll('form.params input, form.params select'));
+              }
+            }
+
+            if (!customElements.get('action-card')) customElements.define('action-card', ActionCard);
+          }
+
+          if (typeof module !== 'undefined' && module.exports) {
+            module.exports = { isDirty };
+          }
+        |||;
+
         local style = |||
           @scope (.action) {
             :scope {
@@ -4776,6 +5070,40 @@ local nodesListLib =
             }
             form {
               margin: 0;
+            }
+            form.params {
+              display: flex;
+              flex-direction: column;
+              gap: 0.5em;
+            }
+            label {
+              display: flex;
+              align-items: baseline;
+              gap: 0.75em;
+            }
+            input, select {
+              font-family: inherit;
+              font-size: inherit;
+              color: var(--on-background-color);
+              background-color: var(--container-low-color);
+              border: 1px solid var(--border-color);
+              border-radius: 0.5em;
+              padding: 0.3em 0.6em;
+            }
+            input:focus, select:focus {
+              outline: 2px solid var(--primary-color);
+              outline-offset: 2px;
+            }
+            .issue {
+              color: var(--error-color);
+            }
+            .issue.hint {
+              color: inherit;
+              opacity: 0.6;
+            }
+            .buttons {
+              display: flex;
+              gap: 0.5em;
               align-self: flex-end;
             }
             button {
@@ -4796,31 +5124,196 @@ local nodesListLib =
               outline: 2px solid var(--primary-color);
               outline-offset: 2px;
             }
+            button:disabled {
+              opacity: 0.4;
+              cursor: not-allowed;
+            }
+            button:disabled:hover {
+              color: var(--on-background-color);
+              border-color: var(--border-color);
+            }
           }
         |||;
+
+        local paramsFormId = 'action-params';
+
+        local issue = {
+          local c = self,
+          message:: error 'issue requires a message',
+          hint:: false,
+          html: {
+            element: 'p',
+            attributes: { class: if c.hint then 'issue hint' else 'issue' },
+            children: [c.message],
+          },
+        };
+
+        local numberControl = {
+          local c = self,
+          name:: error 'numberControl requires a name',
+          value:: null,
+          html: {
+            element: 'input',
+            attributes: { type: 'number', step: 'any', name: c.name, value: if c.value == null then null else std.toString(c.value) },
+          },
+        };
+
+        local textControl = {
+          local c = self,
+          name:: error 'textControl requires a name',
+          value:: null,
+          html: {
+            element: 'input',
+            attributes: { type: 'text', name: c.name, value: c.value },
+          },
+        };
+
+        local booleanOption = {
+          local c = self,
+          value:: error 'booleanOption requires a value',
+          selected:: false,
+          html: {
+            element: 'option',
+            attributes: { value: c.value, selected: c.selected },
+            children: [c.value],
+          },
+        };
+
+        local booleanControl = {
+          local c = self,
+          name:: error 'booleanControl requires a name',
+          value:: null,
+          local current = if c.value == null then '' else std.toString(c.value),
+          html: {
+            element: 'select',
+            attributes: { name: c.name },
+            children: [
+              booleanOption { value:: v, selected:: v == current }
+              for v in ['', 'true', 'false']
+            ],
+          },
+        };
+
+        local hiddenControl = {
+          local c = self,
+          name:: error 'hiddenControl requires a name',
+          value:: null,
+          html:
+            if c.value == null then []
+            else [{
+              element: 'input',
+              attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
+            }],
+        };
+
+        local controls = {
+          number: numberControl,
+          string: textControl,
+          boolean: booleanControl,
+        };
+
+        local field = {
+          local c = self,
+          spec:: error 'field requires a spec',
+          params:: {},
+          initialValues:: {},
+          issues:: [],
+          local name = c.spec.name,
+          local present = std.objectHas(c.params, name),
+          local initial = std.objectHas(c.initialValues, name),
+          local value = if present then c.params[name] else if initial then c.initialValues[name] else null,
+          html:
+            if std.objectHas(controls, c.spec.type) then [{
+              element: 'label',
+              children: [
+                { element: 'span', children: [name] },
+                controls[c.spec.type] { name:: name, value:: value },
+              ],
+            }] + [
+              issue { message:: i.message, hint:: !present }
+              for i in c.issues
+              if present || !initial
+            ]
+            else hiddenControl { name:: name, value:: value },
+        };
+
+        local paramsForm = {
+          local c = self,
+          paramSpecs:: [],
+          params:: {},
+          initialValues:: {},
+          issues:: [],
+          html: {
+            element: 'form',
+            attributes: { id: paramsFormId, class: 'params', method: 'get' },
+            children: [
+              field {
+                spec:: spec,
+                params:: c.params,
+                initialValues:: c.initialValues,
+                issues:: [i for i in c.issues if std.get(i, 'param', null) == spec.name],
+              }
+              for spec in c.paramSpecs
+            ],
+          },
+        };
+
+        local planButton = {
+          html: {
+            element: 'button',
+            attributes: { type: 'submit', form: paramsFormId },
+            children: ['Plan'],
+          },
+        };
+
+        local applyForm = {
+          local c = self,
+          evaluationId:: error 'applyForm requires an evaluationId',
+          label:: 'Apply',
+          html: {
+            element: 'form',
+            attributes: { class: 'apply', method: 'post', action: '/exec' },
+            children: [
+              { element: 'input', attributes: { type: 'hidden', name: 'evaluationId', value: c.evaluationId } },
+              { element: 'button', attributes: { type: 'submit' }, children: [c.label] },
+            ],
+          },
+        };
 
         {
           local c = self,
           evaluationId:: error 'Action requires an evaluationId',
           summary:: '',
           label:: 'Apply',
+          paramSpecs:: [],
+          params:: {},
+          initialValues:: {},
+          action:: null,
+          local hasParams = std.length(c.paramSpecs) > 0,
+          local issues = if c.action != null && std.objectHas(c.action, 'issues') then c.action.issues else [],
+          local applicable = c.action != null && !std.objectHas(c.action, 'issues'),
+          local paramNames = [spec.name for spec in c.paramSpecs if std.objectHas(controls, spec.type)],
+          local formIssues = [i for i in issues if !std.member(paramNames, std.get(i, 'param', null))],
           html: [
             { element: 'style', children: [style] },
+          ] + (if hasParams then [{ element: 'script', children: [{ html: script }] }] else []) + [
             {
-              element: 'div',
+              element: 'action-card',
               attributes: { class: 'action card' },
               children:
                 (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
                 [
-                  {
-                    element: 'form',
-                    attributes: { method: 'post', action: '/exec' },
-                    children: [
-                      { element: 'input', attributes: { type: 'hidden', name: 'evaluationId', value: c.evaluationId } },
-                      { element: 'button', attributes: { type: 'submit' }, children: [c.label] },
-                    ],
-                  },
-                ],
+                  issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
+                  for i in formIssues
+                ] +
+                (if hasParams then [paramsForm { paramSpecs:: c.paramSpecs, params:: c.params, initialValues:: c.initialValues, issues:: issues }] else []) +
+                [{
+                  element: 'div',
+                  attributes: { class: 'buttons' },
+                  children:
+                    (if hasParams then [planButton] else []) +
+                    (if applicable then [applyForm { evaluationId:: c.evaluationId, label:: c.label }] else []),
+                }],
             },
           ],
         },
@@ -5049,6 +5542,10 @@ local nodesListLib =
         fragment: c.action {
           evaluationId:: std.get($, '_evaluationId', ''),
           summary:: std.get($, '_summary', ''),
+          paramSpecs:: std.get($, '_paramSpecs', []),
+          params:: std.get($, '_params', {}),
+          initialValues:: std.get($, '_paramInitialValues', {}),
+          action:: std.get($, '_action', null),
         },
       },
     };
@@ -5976,6 +6473,7 @@ local nodesLabelsLib =
           :root {
             color-scheme: light dark;
             --primary-color: light-dark(#0451a5, #569cd6);
+            --error-color: light-dark(#c62828, #f48771);
             --on-background-color: light-dark(
               color-mix(in srgb, var(--primary-color) 12%, black),
               color-mix(in srgb, var(--primary-color) 12%, white)
@@ -6743,6 +7241,48 @@ local nodesLabelsLib =
             ],
         },
       action:
+        local script = |||
+          function isDirty(controls) {
+            return Array.prototype.some.call(controls, function (control) {
+              if (control.options) {
+                const defaultIndex = Array.prototype.findIndex.call(control.options, function (option) {
+                  return option.defaultSelected;
+                });
+                return control.selectedIndex !== Math.max(defaultIndex, 0);
+              }
+              return control.value !== control.defaultValue;
+            });
+          }
+
+          if (typeof HTMLElement !== 'undefined') {
+            class ActionCard extends HTMLElement {
+              connectedCallback() {
+                this.update = this.update.bind(this);
+                this.addEventListener('input', this.update);
+                this.addEventListener('change', this.update);
+                window.addEventListener('pageshow', this.update);
+                this.update();
+              }
+
+              disconnectedCallback() {
+                window.removeEventListener('pageshow', this.update);
+              }
+
+              update() {
+                const apply = this.querySelector('form.apply button');
+                if (!apply) return;
+                apply.disabled = isDirty(this.querySelectorAll('form.params input, form.params select'));
+              }
+            }
+
+            if (!customElements.get('action-card')) customElements.define('action-card', ActionCard);
+          }
+
+          if (typeof module !== 'undefined' && module.exports) {
+            module.exports = { isDirty };
+          }
+        |||;
+
         local style = |||
           @scope (.action) {
             :scope {
@@ -6758,6 +7298,40 @@ local nodesLabelsLib =
             }
             form {
               margin: 0;
+            }
+            form.params {
+              display: flex;
+              flex-direction: column;
+              gap: 0.5em;
+            }
+            label {
+              display: flex;
+              align-items: baseline;
+              gap: 0.75em;
+            }
+            input, select {
+              font-family: inherit;
+              font-size: inherit;
+              color: var(--on-background-color);
+              background-color: var(--container-low-color);
+              border: 1px solid var(--border-color);
+              border-radius: 0.5em;
+              padding: 0.3em 0.6em;
+            }
+            input:focus, select:focus {
+              outline: 2px solid var(--primary-color);
+              outline-offset: 2px;
+            }
+            .issue {
+              color: var(--error-color);
+            }
+            .issue.hint {
+              color: inherit;
+              opacity: 0.6;
+            }
+            .buttons {
+              display: flex;
+              gap: 0.5em;
               align-self: flex-end;
             }
             button {
@@ -6778,31 +7352,196 @@ local nodesLabelsLib =
               outline: 2px solid var(--primary-color);
               outline-offset: 2px;
             }
+            button:disabled {
+              opacity: 0.4;
+              cursor: not-allowed;
+            }
+            button:disabled:hover {
+              color: var(--on-background-color);
+              border-color: var(--border-color);
+            }
           }
         |||;
+
+        local paramsFormId = 'action-params';
+
+        local issue = {
+          local c = self,
+          message:: error 'issue requires a message',
+          hint:: false,
+          html: {
+            element: 'p',
+            attributes: { class: if c.hint then 'issue hint' else 'issue' },
+            children: [c.message],
+          },
+        };
+
+        local numberControl = {
+          local c = self,
+          name:: error 'numberControl requires a name',
+          value:: null,
+          html: {
+            element: 'input',
+            attributes: { type: 'number', step: 'any', name: c.name, value: if c.value == null then null else std.toString(c.value) },
+          },
+        };
+
+        local textControl = {
+          local c = self,
+          name:: error 'textControl requires a name',
+          value:: null,
+          html: {
+            element: 'input',
+            attributes: { type: 'text', name: c.name, value: c.value },
+          },
+        };
+
+        local booleanOption = {
+          local c = self,
+          value:: error 'booleanOption requires a value',
+          selected:: false,
+          html: {
+            element: 'option',
+            attributes: { value: c.value, selected: c.selected },
+            children: [c.value],
+          },
+        };
+
+        local booleanControl = {
+          local c = self,
+          name:: error 'booleanControl requires a name',
+          value:: null,
+          local current = if c.value == null then '' else std.toString(c.value),
+          html: {
+            element: 'select',
+            attributes: { name: c.name },
+            children: [
+              booleanOption { value:: v, selected:: v == current }
+              for v in ['', 'true', 'false']
+            ],
+          },
+        };
+
+        local hiddenControl = {
+          local c = self,
+          name:: error 'hiddenControl requires a name',
+          value:: null,
+          html:
+            if c.value == null then []
+            else [{
+              element: 'input',
+              attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
+            }],
+        };
+
+        local controls = {
+          number: numberControl,
+          string: textControl,
+          boolean: booleanControl,
+        };
+
+        local field = {
+          local c = self,
+          spec:: error 'field requires a spec',
+          params:: {},
+          initialValues:: {},
+          issues:: [],
+          local name = c.spec.name,
+          local present = std.objectHas(c.params, name),
+          local initial = std.objectHas(c.initialValues, name),
+          local value = if present then c.params[name] else if initial then c.initialValues[name] else null,
+          html:
+            if std.objectHas(controls, c.spec.type) then [{
+              element: 'label',
+              children: [
+                { element: 'span', children: [name] },
+                controls[c.spec.type] { name:: name, value:: value },
+              ],
+            }] + [
+              issue { message:: i.message, hint:: !present }
+              for i in c.issues
+              if present || !initial
+            ]
+            else hiddenControl { name:: name, value:: value },
+        };
+
+        local paramsForm = {
+          local c = self,
+          paramSpecs:: [],
+          params:: {},
+          initialValues:: {},
+          issues:: [],
+          html: {
+            element: 'form',
+            attributes: { id: paramsFormId, class: 'params', method: 'get' },
+            children: [
+              field {
+                spec:: spec,
+                params:: c.params,
+                initialValues:: c.initialValues,
+                issues:: [i for i in c.issues if std.get(i, 'param', null) == spec.name],
+              }
+              for spec in c.paramSpecs
+            ],
+          },
+        };
+
+        local planButton = {
+          html: {
+            element: 'button',
+            attributes: { type: 'submit', form: paramsFormId },
+            children: ['Plan'],
+          },
+        };
+
+        local applyForm = {
+          local c = self,
+          evaluationId:: error 'applyForm requires an evaluationId',
+          label:: 'Apply',
+          html: {
+            element: 'form',
+            attributes: { class: 'apply', method: 'post', action: '/exec' },
+            children: [
+              { element: 'input', attributes: { type: 'hidden', name: 'evaluationId', value: c.evaluationId } },
+              { element: 'button', attributes: { type: 'submit' }, children: [c.label] },
+            ],
+          },
+        };
 
         {
           local c = self,
           evaluationId:: error 'Action requires an evaluationId',
           summary:: '',
           label:: 'Apply',
+          paramSpecs:: [],
+          params:: {},
+          initialValues:: {},
+          action:: null,
+          local hasParams = std.length(c.paramSpecs) > 0,
+          local issues = if c.action != null && std.objectHas(c.action, 'issues') then c.action.issues else [],
+          local applicable = c.action != null && !std.objectHas(c.action, 'issues'),
+          local paramNames = [spec.name for spec in c.paramSpecs if std.objectHas(controls, spec.type)],
+          local formIssues = [i for i in issues if !std.member(paramNames, std.get(i, 'param', null))],
           html: [
             { element: 'style', children: [style] },
+          ] + (if hasParams then [{ element: 'script', children: [{ html: script }] }] else []) + [
             {
-              element: 'div',
+              element: 'action-card',
               attributes: { class: 'action card' },
               children:
                 (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
                 [
-                  {
-                    element: 'form',
-                    attributes: { method: 'post', action: '/exec' },
-                    children: [
-                      { element: 'input', attributes: { type: 'hidden', name: 'evaluationId', value: c.evaluationId } },
-                      { element: 'button', attributes: { type: 'submit' }, children: [c.label] },
-                    ],
-                  },
-                ],
+                  issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
+                  for i in formIssues
+                ] +
+                (if hasParams then [paramsForm { paramSpecs:: c.paramSpecs, params:: c.params, initialValues:: c.initialValues, issues:: issues }] else []) +
+                [{
+                  element: 'div',
+                  attributes: { class: 'buttons' },
+                  children:
+                    (if hasParams then [planButton] else []) +
+                    (if applicable then [applyForm { evaluationId:: c.evaluationId, label:: c.label }] else []),
+                }],
             },
           ],
         },
@@ -7031,6 +7770,10 @@ local nodesLabelsLib =
         fragment: c.action {
           evaluationId:: std.get($, '_evaluationId', ''),
           summary:: std.get($, '_summary', ''),
+          paramSpecs:: std.get($, '_paramSpecs', []),
+          params:: std.get($, '_params', {}),
+          initialValues:: std.get($, '_paramInitialValues', {}),
+          action:: std.get($, '_action', null),
         },
       },
     };
@@ -7957,6 +8700,7 @@ local nodesValuesLib =
           :root {
             color-scheme: light dark;
             --primary-color: light-dark(#0451a5, #569cd6);
+            --error-color: light-dark(#c62828, #f48771);
             --on-background-color: light-dark(
               color-mix(in srgb, var(--primary-color) 12%, black),
               color-mix(in srgb, var(--primary-color) 12%, white)
@@ -8724,6 +9468,48 @@ local nodesValuesLib =
             ],
         },
       action:
+        local script = |||
+          function isDirty(controls) {
+            return Array.prototype.some.call(controls, function (control) {
+              if (control.options) {
+                const defaultIndex = Array.prototype.findIndex.call(control.options, function (option) {
+                  return option.defaultSelected;
+                });
+                return control.selectedIndex !== Math.max(defaultIndex, 0);
+              }
+              return control.value !== control.defaultValue;
+            });
+          }
+
+          if (typeof HTMLElement !== 'undefined') {
+            class ActionCard extends HTMLElement {
+              connectedCallback() {
+                this.update = this.update.bind(this);
+                this.addEventListener('input', this.update);
+                this.addEventListener('change', this.update);
+                window.addEventListener('pageshow', this.update);
+                this.update();
+              }
+
+              disconnectedCallback() {
+                window.removeEventListener('pageshow', this.update);
+              }
+
+              update() {
+                const apply = this.querySelector('form.apply button');
+                if (!apply) return;
+                apply.disabled = isDirty(this.querySelectorAll('form.params input, form.params select'));
+              }
+            }
+
+            if (!customElements.get('action-card')) customElements.define('action-card', ActionCard);
+          }
+
+          if (typeof module !== 'undefined' && module.exports) {
+            module.exports = { isDirty };
+          }
+        |||;
+
         local style = |||
           @scope (.action) {
             :scope {
@@ -8739,6 +9525,40 @@ local nodesValuesLib =
             }
             form {
               margin: 0;
+            }
+            form.params {
+              display: flex;
+              flex-direction: column;
+              gap: 0.5em;
+            }
+            label {
+              display: flex;
+              align-items: baseline;
+              gap: 0.75em;
+            }
+            input, select {
+              font-family: inherit;
+              font-size: inherit;
+              color: var(--on-background-color);
+              background-color: var(--container-low-color);
+              border: 1px solid var(--border-color);
+              border-radius: 0.5em;
+              padding: 0.3em 0.6em;
+            }
+            input:focus, select:focus {
+              outline: 2px solid var(--primary-color);
+              outline-offset: 2px;
+            }
+            .issue {
+              color: var(--error-color);
+            }
+            .issue.hint {
+              color: inherit;
+              opacity: 0.6;
+            }
+            .buttons {
+              display: flex;
+              gap: 0.5em;
               align-self: flex-end;
             }
             button {
@@ -8759,31 +9579,196 @@ local nodesValuesLib =
               outline: 2px solid var(--primary-color);
               outline-offset: 2px;
             }
+            button:disabled {
+              opacity: 0.4;
+              cursor: not-allowed;
+            }
+            button:disabled:hover {
+              color: var(--on-background-color);
+              border-color: var(--border-color);
+            }
           }
         |||;
+
+        local paramsFormId = 'action-params';
+
+        local issue = {
+          local c = self,
+          message:: error 'issue requires a message',
+          hint:: false,
+          html: {
+            element: 'p',
+            attributes: { class: if c.hint then 'issue hint' else 'issue' },
+            children: [c.message],
+          },
+        };
+
+        local numberControl = {
+          local c = self,
+          name:: error 'numberControl requires a name',
+          value:: null,
+          html: {
+            element: 'input',
+            attributes: { type: 'number', step: 'any', name: c.name, value: if c.value == null then null else std.toString(c.value) },
+          },
+        };
+
+        local textControl = {
+          local c = self,
+          name:: error 'textControl requires a name',
+          value:: null,
+          html: {
+            element: 'input',
+            attributes: { type: 'text', name: c.name, value: c.value },
+          },
+        };
+
+        local booleanOption = {
+          local c = self,
+          value:: error 'booleanOption requires a value',
+          selected:: false,
+          html: {
+            element: 'option',
+            attributes: { value: c.value, selected: c.selected },
+            children: [c.value],
+          },
+        };
+
+        local booleanControl = {
+          local c = self,
+          name:: error 'booleanControl requires a name',
+          value:: null,
+          local current = if c.value == null then '' else std.toString(c.value),
+          html: {
+            element: 'select',
+            attributes: { name: c.name },
+            children: [
+              booleanOption { value:: v, selected:: v == current }
+              for v in ['', 'true', 'false']
+            ],
+          },
+        };
+
+        local hiddenControl = {
+          local c = self,
+          name:: error 'hiddenControl requires a name',
+          value:: null,
+          html:
+            if c.value == null then []
+            else [{
+              element: 'input',
+              attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
+            }],
+        };
+
+        local controls = {
+          number: numberControl,
+          string: textControl,
+          boolean: booleanControl,
+        };
+
+        local field = {
+          local c = self,
+          spec:: error 'field requires a spec',
+          params:: {},
+          initialValues:: {},
+          issues:: [],
+          local name = c.spec.name,
+          local present = std.objectHas(c.params, name),
+          local initial = std.objectHas(c.initialValues, name),
+          local value = if present then c.params[name] else if initial then c.initialValues[name] else null,
+          html:
+            if std.objectHas(controls, c.spec.type) then [{
+              element: 'label',
+              children: [
+                { element: 'span', children: [name] },
+                controls[c.spec.type] { name:: name, value:: value },
+              ],
+            }] + [
+              issue { message:: i.message, hint:: !present }
+              for i in c.issues
+              if present || !initial
+            ]
+            else hiddenControl { name:: name, value:: value },
+        };
+
+        local paramsForm = {
+          local c = self,
+          paramSpecs:: [],
+          params:: {},
+          initialValues:: {},
+          issues:: [],
+          html: {
+            element: 'form',
+            attributes: { id: paramsFormId, class: 'params', method: 'get' },
+            children: [
+              field {
+                spec:: spec,
+                params:: c.params,
+                initialValues:: c.initialValues,
+                issues:: [i for i in c.issues if std.get(i, 'param', null) == spec.name],
+              }
+              for spec in c.paramSpecs
+            ],
+          },
+        };
+
+        local planButton = {
+          html: {
+            element: 'button',
+            attributes: { type: 'submit', form: paramsFormId },
+            children: ['Plan'],
+          },
+        };
+
+        local applyForm = {
+          local c = self,
+          evaluationId:: error 'applyForm requires an evaluationId',
+          label:: 'Apply',
+          html: {
+            element: 'form',
+            attributes: { class: 'apply', method: 'post', action: '/exec' },
+            children: [
+              { element: 'input', attributes: { type: 'hidden', name: 'evaluationId', value: c.evaluationId } },
+              { element: 'button', attributes: { type: 'submit' }, children: [c.label] },
+            ],
+          },
+        };
 
         {
           local c = self,
           evaluationId:: error 'Action requires an evaluationId',
           summary:: '',
           label:: 'Apply',
+          paramSpecs:: [],
+          params:: {},
+          initialValues:: {},
+          action:: null,
+          local hasParams = std.length(c.paramSpecs) > 0,
+          local issues = if c.action != null && std.objectHas(c.action, 'issues') then c.action.issues else [],
+          local applicable = c.action != null && !std.objectHas(c.action, 'issues'),
+          local paramNames = [spec.name for spec in c.paramSpecs if std.objectHas(controls, spec.type)],
+          local formIssues = [i for i in issues if !std.member(paramNames, std.get(i, 'param', null))],
           html: [
             { element: 'style', children: [style] },
+          ] + (if hasParams then [{ element: 'script', children: [{ html: script }] }] else []) + [
             {
-              element: 'div',
+              element: 'action-card',
               attributes: { class: 'action card' },
               children:
                 (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
                 [
-                  {
-                    element: 'form',
-                    attributes: { method: 'post', action: '/exec' },
-                    children: [
-                      { element: 'input', attributes: { type: 'hidden', name: 'evaluationId', value: c.evaluationId } },
-                      { element: 'button', attributes: { type: 'submit' }, children: [c.label] },
-                    ],
-                  },
-                ],
+                  issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
+                  for i in formIssues
+                ] +
+                (if hasParams then [paramsForm { paramSpecs:: c.paramSpecs, params:: c.params, initialValues:: c.initialValues, issues:: issues }] else []) +
+                [{
+                  element: 'div',
+                  attributes: { class: 'buttons' },
+                  children:
+                    (if hasParams then [planButton] else []) +
+                    (if applicable then [applyForm { evaluationId:: c.evaluationId, label:: c.label }] else []),
+                }],
             },
           ],
         },
@@ -9012,6 +9997,10 @@ local nodesValuesLib =
         fragment: c.action {
           evaluationId:: std.get($, '_evaluationId', ''),
           summary:: std.get($, '_summary', ''),
+          paramSpecs:: std.get($, '_paramSpecs', []),
+          params:: std.get($, '_params', {}),
+          initialValues:: std.get($, '_paramInitialValues', {}),
+          action:: std.get($, '_action', null),
         },
       },
     };
@@ -9747,6 +10736,7 @@ local nodesLogsLib =
         :root {
           color-scheme: light dark;
           --primary-color: light-dark(#0451a5, #569cd6);
+          --error-color: light-dark(#c62828, #f48771);
           --on-background-color: light-dark(
             color-mix(in srgb, var(--primary-color) 12%, black),
             color-mix(in srgb, var(--primary-color) 12%, white)
@@ -10514,6 +11504,48 @@ local nodesLogsLib =
           ],
       },
     action:
+      local script = |||
+        function isDirty(controls) {
+          return Array.prototype.some.call(controls, function (control) {
+            if (control.options) {
+              const defaultIndex = Array.prototype.findIndex.call(control.options, function (option) {
+                return option.defaultSelected;
+              });
+              return control.selectedIndex !== Math.max(defaultIndex, 0);
+            }
+            return control.value !== control.defaultValue;
+          });
+        }
+
+        if (typeof HTMLElement !== 'undefined') {
+          class ActionCard extends HTMLElement {
+            connectedCallback() {
+              this.update = this.update.bind(this);
+              this.addEventListener('input', this.update);
+              this.addEventListener('change', this.update);
+              window.addEventListener('pageshow', this.update);
+              this.update();
+            }
+
+            disconnectedCallback() {
+              window.removeEventListener('pageshow', this.update);
+            }
+
+            update() {
+              const apply = this.querySelector('form.apply button');
+              if (!apply) return;
+              apply.disabled = isDirty(this.querySelectorAll('form.params input, form.params select'));
+            }
+          }
+
+          if (!customElements.get('action-card')) customElements.define('action-card', ActionCard);
+        }
+
+        if (typeof module !== 'undefined' && module.exports) {
+          module.exports = { isDirty };
+        }
+      |||;
+
       local style = |||
         @scope (.action) {
           :scope {
@@ -10529,6 +11561,40 @@ local nodesLogsLib =
           }
           form {
             margin: 0;
+          }
+          form.params {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5em;
+          }
+          label {
+            display: flex;
+            align-items: baseline;
+            gap: 0.75em;
+          }
+          input, select {
+            font-family: inherit;
+            font-size: inherit;
+            color: var(--on-background-color);
+            background-color: var(--container-low-color);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5em;
+            padding: 0.3em 0.6em;
+          }
+          input:focus, select:focus {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+          }
+          .issue {
+            color: var(--error-color);
+          }
+          .issue.hint {
+            color: inherit;
+            opacity: 0.6;
+          }
+          .buttons {
+            display: flex;
+            gap: 0.5em;
             align-self: flex-end;
           }
           button {
@@ -10549,31 +11615,196 @@ local nodesLogsLib =
             outline: 2px solid var(--primary-color);
             outline-offset: 2px;
           }
+          button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+          }
+          button:disabled:hover {
+            color: var(--on-background-color);
+            border-color: var(--border-color);
+          }
         }
       |||;
+
+      local paramsFormId = 'action-params';
+
+      local issue = {
+        local c = self,
+        message:: error 'issue requires a message',
+        hint:: false,
+        html: {
+          element: 'p',
+          attributes: { class: if c.hint then 'issue hint' else 'issue' },
+          children: [c.message],
+        },
+      };
+
+      local numberControl = {
+        local c = self,
+        name:: error 'numberControl requires a name',
+        value:: null,
+        html: {
+          element: 'input',
+          attributes: { type: 'number', step: 'any', name: c.name, value: if c.value == null then null else std.toString(c.value) },
+        },
+      };
+
+      local textControl = {
+        local c = self,
+        name:: error 'textControl requires a name',
+        value:: null,
+        html: {
+          element: 'input',
+          attributes: { type: 'text', name: c.name, value: c.value },
+        },
+      };
+
+      local booleanOption = {
+        local c = self,
+        value:: error 'booleanOption requires a value',
+        selected:: false,
+        html: {
+          element: 'option',
+          attributes: { value: c.value, selected: c.selected },
+          children: [c.value],
+        },
+      };
+
+      local booleanControl = {
+        local c = self,
+        name:: error 'booleanControl requires a name',
+        value:: null,
+        local current = if c.value == null then '' else std.toString(c.value),
+        html: {
+          element: 'select',
+          attributes: { name: c.name },
+          children: [
+            booleanOption { value:: v, selected:: v == current }
+            for v in ['', 'true', 'false']
+          ],
+        },
+      };
+
+      local hiddenControl = {
+        local c = self,
+        name:: error 'hiddenControl requires a name',
+        value:: null,
+        html:
+          if c.value == null then []
+          else [{
+            element: 'input',
+            attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
+          }],
+      };
+
+      local controls = {
+        number: numberControl,
+        string: textControl,
+        boolean: booleanControl,
+      };
+
+      local field = {
+        local c = self,
+        spec:: error 'field requires a spec',
+        params:: {},
+        initialValues:: {},
+        issues:: [],
+        local name = c.spec.name,
+        local present = std.objectHas(c.params, name),
+        local initial = std.objectHas(c.initialValues, name),
+        local value = if present then c.params[name] else if initial then c.initialValues[name] else null,
+        html:
+          if std.objectHas(controls, c.spec.type) then [{
+            element: 'label',
+            children: [
+              { element: 'span', children: [name] },
+              controls[c.spec.type] { name:: name, value:: value },
+            ],
+          }] + [
+            issue { message:: i.message, hint:: !present }
+            for i in c.issues
+            if present || !initial
+          ]
+          else hiddenControl { name:: name, value:: value },
+      };
+
+      local paramsForm = {
+        local c = self,
+        paramSpecs:: [],
+        params:: {},
+        initialValues:: {},
+        issues:: [],
+        html: {
+          element: 'form',
+          attributes: { id: paramsFormId, class: 'params', method: 'get' },
+          children: [
+            field {
+              spec:: spec,
+              params:: c.params,
+              initialValues:: c.initialValues,
+              issues:: [i for i in c.issues if std.get(i, 'param', null) == spec.name],
+            }
+            for spec in c.paramSpecs
+          ],
+        },
+      };
+
+      local planButton = {
+        html: {
+          element: 'button',
+          attributes: { type: 'submit', form: paramsFormId },
+          children: ['Plan'],
+        },
+      };
+
+      local applyForm = {
+        local c = self,
+        evaluationId:: error 'applyForm requires an evaluationId',
+        label:: 'Apply',
+        html: {
+          element: 'form',
+          attributes: { class: 'apply', method: 'post', action: '/exec' },
+          children: [
+            { element: 'input', attributes: { type: 'hidden', name: 'evaluationId', value: c.evaluationId } },
+            { element: 'button', attributes: { type: 'submit' }, children: [c.label] },
+          ],
+        },
+      };
 
       {
         local c = self,
         evaluationId:: error 'Action requires an evaluationId',
         summary:: '',
         label:: 'Apply',
+        paramSpecs:: [],
+        params:: {},
+        initialValues:: {},
+        action:: null,
+        local hasParams = std.length(c.paramSpecs) > 0,
+        local issues = if c.action != null && std.objectHas(c.action, 'issues') then c.action.issues else [],
+        local applicable = c.action != null && !std.objectHas(c.action, 'issues'),
+        local paramNames = [spec.name for spec in c.paramSpecs if std.objectHas(controls, spec.type)],
+        local formIssues = [i for i in issues if !std.member(paramNames, std.get(i, 'param', null))],
         html: [
           { element: 'style', children: [style] },
+        ] + (if hasParams then [{ element: 'script', children: [{ html: script }] }] else []) + [
           {
-            element: 'div',
+            element: 'action-card',
             attributes: { class: 'action card' },
             children:
               (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
               [
-                {
-                  element: 'form',
-                  attributes: { method: 'post', action: '/exec' },
-                  children: [
-                    { element: 'input', attributes: { type: 'hidden', name: 'evaluationId', value: c.evaluationId } },
-                    { element: 'button', attributes: { type: 'submit' }, children: [c.label] },
-                  ],
-                },
-              ],
+                issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
+                for i in formIssues
+              ] +
+              (if hasParams then [paramsForm { paramSpecs:: c.paramSpecs, params:: c.params, initialValues:: c.initialValues, issues:: issues }] else []) +
+              [{
+                element: 'div',
+                attributes: { class: 'buttons' },
+                children:
+                  (if hasParams then [planButton] else []) +
+                  (if applicable then [applyForm { evaluationId:: c.evaluationId, label:: c.label }] else []),
+              }],
           },
         ],
       },
@@ -11877,6 +13108,7 @@ local nodesLogrecordLib =
           :root {
             color-scheme: light dark;
             --primary-color: light-dark(#0451a5, #569cd6);
+            --error-color: light-dark(#c62828, #f48771);
             --on-background-color: light-dark(
               color-mix(in srgb, var(--primary-color) 12%, black),
               color-mix(in srgb, var(--primary-color) 12%, white)
@@ -12644,6 +13876,48 @@ local nodesLogrecordLib =
             ],
         },
       action:
+        local script = |||
+          function isDirty(controls) {
+            return Array.prototype.some.call(controls, function (control) {
+              if (control.options) {
+                const defaultIndex = Array.prototype.findIndex.call(control.options, function (option) {
+                  return option.defaultSelected;
+                });
+                return control.selectedIndex !== Math.max(defaultIndex, 0);
+              }
+              return control.value !== control.defaultValue;
+            });
+          }
+
+          if (typeof HTMLElement !== 'undefined') {
+            class ActionCard extends HTMLElement {
+              connectedCallback() {
+                this.update = this.update.bind(this);
+                this.addEventListener('input', this.update);
+                this.addEventListener('change', this.update);
+                window.addEventListener('pageshow', this.update);
+                this.update();
+              }
+
+              disconnectedCallback() {
+                window.removeEventListener('pageshow', this.update);
+              }
+
+              update() {
+                const apply = this.querySelector('form.apply button');
+                if (!apply) return;
+                apply.disabled = isDirty(this.querySelectorAll('form.params input, form.params select'));
+              }
+            }
+
+            if (!customElements.get('action-card')) customElements.define('action-card', ActionCard);
+          }
+
+          if (typeof module !== 'undefined' && module.exports) {
+            module.exports = { isDirty };
+          }
+        |||;
+
         local style = |||
           @scope (.action) {
             :scope {
@@ -12659,6 +13933,40 @@ local nodesLogrecordLib =
             }
             form {
               margin: 0;
+            }
+            form.params {
+              display: flex;
+              flex-direction: column;
+              gap: 0.5em;
+            }
+            label {
+              display: flex;
+              align-items: baseline;
+              gap: 0.75em;
+            }
+            input, select {
+              font-family: inherit;
+              font-size: inherit;
+              color: var(--on-background-color);
+              background-color: var(--container-low-color);
+              border: 1px solid var(--border-color);
+              border-radius: 0.5em;
+              padding: 0.3em 0.6em;
+            }
+            input:focus, select:focus {
+              outline: 2px solid var(--primary-color);
+              outline-offset: 2px;
+            }
+            .issue {
+              color: var(--error-color);
+            }
+            .issue.hint {
+              color: inherit;
+              opacity: 0.6;
+            }
+            .buttons {
+              display: flex;
+              gap: 0.5em;
               align-self: flex-end;
             }
             button {
@@ -12679,31 +13987,196 @@ local nodesLogrecordLib =
               outline: 2px solid var(--primary-color);
               outline-offset: 2px;
             }
+            button:disabled {
+              opacity: 0.4;
+              cursor: not-allowed;
+            }
+            button:disabled:hover {
+              color: var(--on-background-color);
+              border-color: var(--border-color);
+            }
           }
         |||;
+
+        local paramsFormId = 'action-params';
+
+        local issue = {
+          local c = self,
+          message:: error 'issue requires a message',
+          hint:: false,
+          html: {
+            element: 'p',
+            attributes: { class: if c.hint then 'issue hint' else 'issue' },
+            children: [c.message],
+          },
+        };
+
+        local numberControl = {
+          local c = self,
+          name:: error 'numberControl requires a name',
+          value:: null,
+          html: {
+            element: 'input',
+            attributes: { type: 'number', step: 'any', name: c.name, value: if c.value == null then null else std.toString(c.value) },
+          },
+        };
+
+        local textControl = {
+          local c = self,
+          name:: error 'textControl requires a name',
+          value:: null,
+          html: {
+            element: 'input',
+            attributes: { type: 'text', name: c.name, value: c.value },
+          },
+        };
+
+        local booleanOption = {
+          local c = self,
+          value:: error 'booleanOption requires a value',
+          selected:: false,
+          html: {
+            element: 'option',
+            attributes: { value: c.value, selected: c.selected },
+            children: [c.value],
+          },
+        };
+
+        local booleanControl = {
+          local c = self,
+          name:: error 'booleanControl requires a name',
+          value:: null,
+          local current = if c.value == null then '' else std.toString(c.value),
+          html: {
+            element: 'select',
+            attributes: { name: c.name },
+            children: [
+              booleanOption { value:: v, selected:: v == current }
+              for v in ['', 'true', 'false']
+            ],
+          },
+        };
+
+        local hiddenControl = {
+          local c = self,
+          name:: error 'hiddenControl requires a name',
+          value:: null,
+          html:
+            if c.value == null then []
+            else [{
+              element: 'input',
+              attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
+            }],
+        };
+
+        local controls = {
+          number: numberControl,
+          string: textControl,
+          boolean: booleanControl,
+        };
+
+        local field = {
+          local c = self,
+          spec:: error 'field requires a spec',
+          params:: {},
+          initialValues:: {},
+          issues:: [],
+          local name = c.spec.name,
+          local present = std.objectHas(c.params, name),
+          local initial = std.objectHas(c.initialValues, name),
+          local value = if present then c.params[name] else if initial then c.initialValues[name] else null,
+          html:
+            if std.objectHas(controls, c.spec.type) then [{
+              element: 'label',
+              children: [
+                { element: 'span', children: [name] },
+                controls[c.spec.type] { name:: name, value:: value },
+              ],
+            }] + [
+              issue { message:: i.message, hint:: !present }
+              for i in c.issues
+              if present || !initial
+            ]
+            else hiddenControl { name:: name, value:: value },
+        };
+
+        local paramsForm = {
+          local c = self,
+          paramSpecs:: [],
+          params:: {},
+          initialValues:: {},
+          issues:: [],
+          html: {
+            element: 'form',
+            attributes: { id: paramsFormId, class: 'params', method: 'get' },
+            children: [
+              field {
+                spec:: spec,
+                params:: c.params,
+                initialValues:: c.initialValues,
+                issues:: [i for i in c.issues if std.get(i, 'param', null) == spec.name],
+              }
+              for spec in c.paramSpecs
+            ],
+          },
+        };
+
+        local planButton = {
+          html: {
+            element: 'button',
+            attributes: { type: 'submit', form: paramsFormId },
+            children: ['Plan'],
+          },
+        };
+
+        local applyForm = {
+          local c = self,
+          evaluationId:: error 'applyForm requires an evaluationId',
+          label:: 'Apply',
+          html: {
+            element: 'form',
+            attributes: { class: 'apply', method: 'post', action: '/exec' },
+            children: [
+              { element: 'input', attributes: { type: 'hidden', name: 'evaluationId', value: c.evaluationId } },
+              { element: 'button', attributes: { type: 'submit' }, children: [c.label] },
+            ],
+          },
+        };
 
         {
           local c = self,
           evaluationId:: error 'Action requires an evaluationId',
           summary:: '',
           label:: 'Apply',
+          paramSpecs:: [],
+          params:: {},
+          initialValues:: {},
+          action:: null,
+          local hasParams = std.length(c.paramSpecs) > 0,
+          local issues = if c.action != null && std.objectHas(c.action, 'issues') then c.action.issues else [],
+          local applicable = c.action != null && !std.objectHas(c.action, 'issues'),
+          local paramNames = [spec.name for spec in c.paramSpecs if std.objectHas(controls, spec.type)],
+          local formIssues = [i for i in issues if !std.member(paramNames, std.get(i, 'param', null))],
           html: [
             { element: 'style', children: [style] },
+          ] + (if hasParams then [{ element: 'script', children: [{ html: script }] }] else []) + [
             {
-              element: 'div',
+              element: 'action-card',
               attributes: { class: 'action card' },
               children:
                 (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
                 [
-                  {
-                    element: 'form',
-                    attributes: { method: 'post', action: '/exec' },
-                    children: [
-                      { element: 'input', attributes: { type: 'hidden', name: 'evaluationId', value: c.evaluationId } },
-                      { element: 'button', attributes: { type: 'submit' }, children: [c.label] },
-                    ],
-                  },
-                ],
+                  issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
+                  for i in formIssues
+                ] +
+                (if hasParams then [paramsForm { paramSpecs:: c.paramSpecs, params:: c.params, initialValues:: c.initialValues, issues:: issues }] else []) +
+                [{
+                  element: 'div',
+                  attributes: { class: 'buttons' },
+                  children:
+                    (if hasParams then [planButton] else []) +
+                    (if applicable then [applyForm { evaluationId:: c.evaluationId, label:: c.label }] else []),
+                }],
             },
           ],
         },
@@ -12932,6 +14405,10 @@ local nodesLogrecordLib =
         fragment: c.action {
           evaluationId:: std.get($, '_evaluationId', ''),
           summary:: std.get($, '_summary', ''),
+          paramSpecs:: std.get($, '_paramSpecs', []),
+          params:: std.get($, '_params', {}),
+          initialValues:: std.get($, '_paramInitialValues', {}),
+          action:: std.get($, '_action', null),
         },
       },
     };
@@ -13869,6 +15346,7 @@ local nodesDashboardLib =
           :root {
             color-scheme: light dark;
             --primary-color: light-dark(#0451a5, #569cd6);
+            --error-color: light-dark(#c62828, #f48771);
             --on-background-color: light-dark(
               color-mix(in srgb, var(--primary-color) 12%, black),
               color-mix(in srgb, var(--primary-color) 12%, white)
@@ -14636,6 +16114,48 @@ local nodesDashboardLib =
             ],
         },
       action:
+        local script = |||
+          function isDirty(controls) {
+            return Array.prototype.some.call(controls, function (control) {
+              if (control.options) {
+                const defaultIndex = Array.prototype.findIndex.call(control.options, function (option) {
+                  return option.defaultSelected;
+                });
+                return control.selectedIndex !== Math.max(defaultIndex, 0);
+              }
+              return control.value !== control.defaultValue;
+            });
+          }
+
+          if (typeof HTMLElement !== 'undefined') {
+            class ActionCard extends HTMLElement {
+              connectedCallback() {
+                this.update = this.update.bind(this);
+                this.addEventListener('input', this.update);
+                this.addEventListener('change', this.update);
+                window.addEventListener('pageshow', this.update);
+                this.update();
+              }
+
+              disconnectedCallback() {
+                window.removeEventListener('pageshow', this.update);
+              }
+
+              update() {
+                const apply = this.querySelector('form.apply button');
+                if (!apply) return;
+                apply.disabled = isDirty(this.querySelectorAll('form.params input, form.params select'));
+              }
+            }
+
+            if (!customElements.get('action-card')) customElements.define('action-card', ActionCard);
+          }
+
+          if (typeof module !== 'undefined' && module.exports) {
+            module.exports = { isDirty };
+          }
+        |||;
+
         local style = |||
           @scope (.action) {
             :scope {
@@ -14651,6 +16171,40 @@ local nodesDashboardLib =
             }
             form {
               margin: 0;
+            }
+            form.params {
+              display: flex;
+              flex-direction: column;
+              gap: 0.5em;
+            }
+            label {
+              display: flex;
+              align-items: baseline;
+              gap: 0.75em;
+            }
+            input, select {
+              font-family: inherit;
+              font-size: inherit;
+              color: var(--on-background-color);
+              background-color: var(--container-low-color);
+              border: 1px solid var(--border-color);
+              border-radius: 0.5em;
+              padding: 0.3em 0.6em;
+            }
+            input:focus, select:focus {
+              outline: 2px solid var(--primary-color);
+              outline-offset: 2px;
+            }
+            .issue {
+              color: var(--error-color);
+            }
+            .issue.hint {
+              color: inherit;
+              opacity: 0.6;
+            }
+            .buttons {
+              display: flex;
+              gap: 0.5em;
               align-self: flex-end;
             }
             button {
@@ -14671,31 +16225,196 @@ local nodesDashboardLib =
               outline: 2px solid var(--primary-color);
               outline-offset: 2px;
             }
+            button:disabled {
+              opacity: 0.4;
+              cursor: not-allowed;
+            }
+            button:disabled:hover {
+              color: var(--on-background-color);
+              border-color: var(--border-color);
+            }
           }
         |||;
+
+        local paramsFormId = 'action-params';
+
+        local issue = {
+          local c = self,
+          message:: error 'issue requires a message',
+          hint:: false,
+          html: {
+            element: 'p',
+            attributes: { class: if c.hint then 'issue hint' else 'issue' },
+            children: [c.message],
+          },
+        };
+
+        local numberControl = {
+          local c = self,
+          name:: error 'numberControl requires a name',
+          value:: null,
+          html: {
+            element: 'input',
+            attributes: { type: 'number', step: 'any', name: c.name, value: if c.value == null then null else std.toString(c.value) },
+          },
+        };
+
+        local textControl = {
+          local c = self,
+          name:: error 'textControl requires a name',
+          value:: null,
+          html: {
+            element: 'input',
+            attributes: { type: 'text', name: c.name, value: c.value },
+          },
+        };
+
+        local booleanOption = {
+          local c = self,
+          value:: error 'booleanOption requires a value',
+          selected:: false,
+          html: {
+            element: 'option',
+            attributes: { value: c.value, selected: c.selected },
+            children: [c.value],
+          },
+        };
+
+        local booleanControl = {
+          local c = self,
+          name:: error 'booleanControl requires a name',
+          value:: null,
+          local current = if c.value == null then '' else std.toString(c.value),
+          html: {
+            element: 'select',
+            attributes: { name: c.name },
+            children: [
+              booleanOption { value:: v, selected:: v == current }
+              for v in ['', 'true', 'false']
+            ],
+          },
+        };
+
+        local hiddenControl = {
+          local c = self,
+          name:: error 'hiddenControl requires a name',
+          value:: null,
+          html:
+            if c.value == null then []
+            else [{
+              element: 'input',
+              attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
+            }],
+        };
+
+        local controls = {
+          number: numberControl,
+          string: textControl,
+          boolean: booleanControl,
+        };
+
+        local field = {
+          local c = self,
+          spec:: error 'field requires a spec',
+          params:: {},
+          initialValues:: {},
+          issues:: [],
+          local name = c.spec.name,
+          local present = std.objectHas(c.params, name),
+          local initial = std.objectHas(c.initialValues, name),
+          local value = if present then c.params[name] else if initial then c.initialValues[name] else null,
+          html:
+            if std.objectHas(controls, c.spec.type) then [{
+              element: 'label',
+              children: [
+                { element: 'span', children: [name] },
+                controls[c.spec.type] { name:: name, value:: value },
+              ],
+            }] + [
+              issue { message:: i.message, hint:: !present }
+              for i in c.issues
+              if present || !initial
+            ]
+            else hiddenControl { name:: name, value:: value },
+        };
+
+        local paramsForm = {
+          local c = self,
+          paramSpecs:: [],
+          params:: {},
+          initialValues:: {},
+          issues:: [],
+          html: {
+            element: 'form',
+            attributes: { id: paramsFormId, class: 'params', method: 'get' },
+            children: [
+              field {
+                spec:: spec,
+                params:: c.params,
+                initialValues:: c.initialValues,
+                issues:: [i for i in c.issues if std.get(i, 'param', null) == spec.name],
+              }
+              for spec in c.paramSpecs
+            ],
+          },
+        };
+
+        local planButton = {
+          html: {
+            element: 'button',
+            attributes: { type: 'submit', form: paramsFormId },
+            children: ['Plan'],
+          },
+        };
+
+        local applyForm = {
+          local c = self,
+          evaluationId:: error 'applyForm requires an evaluationId',
+          label:: 'Apply',
+          html: {
+            element: 'form',
+            attributes: { class: 'apply', method: 'post', action: '/exec' },
+            children: [
+              { element: 'input', attributes: { type: 'hidden', name: 'evaluationId', value: c.evaluationId } },
+              { element: 'button', attributes: { type: 'submit' }, children: [c.label] },
+            ],
+          },
+        };
 
         {
           local c = self,
           evaluationId:: error 'Action requires an evaluationId',
           summary:: '',
           label:: 'Apply',
+          paramSpecs:: [],
+          params:: {},
+          initialValues:: {},
+          action:: null,
+          local hasParams = std.length(c.paramSpecs) > 0,
+          local issues = if c.action != null && std.objectHas(c.action, 'issues') then c.action.issues else [],
+          local applicable = c.action != null && !std.objectHas(c.action, 'issues'),
+          local paramNames = [spec.name for spec in c.paramSpecs if std.objectHas(controls, spec.type)],
+          local formIssues = [i for i in issues if !std.member(paramNames, std.get(i, 'param', null))],
           html: [
             { element: 'style', children: [style] },
+          ] + (if hasParams then [{ element: 'script', children: [{ html: script }] }] else []) + [
             {
-              element: 'div',
+              element: 'action-card',
               attributes: { class: 'action card' },
               children:
                 (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
                 [
-                  {
-                    element: 'form',
-                    attributes: { method: 'post', action: '/exec' },
-                    children: [
-                      { element: 'input', attributes: { type: 'hidden', name: 'evaluationId', value: c.evaluationId } },
-                      { element: 'button', attributes: { type: 'submit' }, children: [c.label] },
-                    ],
-                  },
-                ],
+                  issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
+                  for i in formIssues
+                ] +
+                (if hasParams then [paramsForm { paramSpecs:: c.paramSpecs, params:: c.params, initialValues:: c.initialValues, issues:: issues }] else []) +
+                [{
+                  element: 'div',
+                  attributes: { class: 'buttons' },
+                  children:
+                    (if hasParams then [planButton] else []) +
+                    (if applicable then [applyForm { evaluationId:: c.evaluationId, label:: c.label }] else []),
+                }],
             },
           ],
         },
