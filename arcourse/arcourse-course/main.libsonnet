@@ -2003,13 +2003,17 @@ local a =
       std.objectFields(links)
     );
 
+  local filterItems(obj, title, items) =
+    local hidden = std.get(std.get(std.get(obj, 'list', {}), 'hiddenItems', {}), title, []);
+    [item for item in items if !std.member(hidden, item.text)];
+
   local linksGroups(obj) =
     local links = std.get(obj, 'links', {});
     if std.type(links) != 'object' then []
     else std.flatMap(
       function(k)
         local value = links[k];
-        if std.type(value) == 'object' && !isNode(value) then [{ title: k, items: collectNeighbors(value, linkStrings=true) }]
+        if std.type(value) == 'object' && !isNode(value) then [{ title: k, items: filterItems(obj, k, collectNeighbors(value, linkStrings=true)) }]
         else [],
       std.objectFields(links)
     );
@@ -2035,11 +2039,11 @@ local a =
   local neighborItems(obj) =
     local curated = curatedLinks(obj);
     local grouped = nodeGroupedKeys(obj);
-    [
+    filterItems(obj, '', [
       { link: obj[k]._queryPath, text: k }
       for k in neighborKeys(obj)
       if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated) && !std.setMember(k, grouped)
-    ] + linksItems(obj);
+    ] + linksItems(obj));
 
   local nodeGroups(obj) =
     local spec = nodeGroupsSpec(obj);
@@ -2049,11 +2053,11 @@ local a =
       for title in std.objectFields(spec)
       for group in [{
         title: title,
-        items: [
+        items: filterItems(obj, title, [
           { link: obj[k]._queryPath, text: k }
           for k in spec[title]
           if std.objectHas(obj, k) && isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
-        ],
+        ]),
       }]
       if std.length(group.items) > 0
     ];
@@ -2064,7 +2068,7 @@ local a =
       group
       for k in neighborKeys(obj)
       if !isNode(obj[k])
-      for group in [{ title: k, items: [item for item in collectNeighbors(obj[k]) if !std.setMember(item.link, curated)] }]
+      for group in [{ title: k, items: filterItems(obj, k, [item for item in collectNeighbors(obj[k]) if !std.setMember(item.link, curated)]) }]
       if std.length(group.items) > 0
     ];
 
@@ -2077,7 +2081,13 @@ local a =
     [entry.group for entry in std.sort(keyed, function(entry) entry.key)];
 
   local neighborGroups(obj) =
-    linksGroups(obj) + orderGroups(childGroups(obj) + nodeGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
+    local list = std.get(obj, 'list', {});
+    local hidden = std.get(list, 'hiddenGroups', []);
+    [
+      group
+      for group in orderGroups(linksGroups(obj) + childGroups(obj) + nodeGroups(obj), std.get(list, 'groupOrder', []))
+      if !std.member(hidden, group.title)
+    ];
 
   local safeGet(obj, path) =
     std.foldl(
