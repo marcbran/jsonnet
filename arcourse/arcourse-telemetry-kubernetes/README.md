@@ -22,7 +22,7 @@ local arcourse-telemetry-kubernetes = import 'arcourse/arcourse-telemetry-kubern
 
 ## Description
 
-`pod`, `container`, `pvc`, `deployment`, `node`) via kube-state-metrics and
+`pod`, `container`, `pvc`, `deployment`, `statefulset`, `daemonset`, `node`) via kube-state-metrics and
 cAdvisor queries, with drilldown charts and cross-links to the matching
 `arcourse-kubernetes` resource nodes (and back). The `context`, `namespace`,
 `pod`, and `container` entities also expose `logs` views: each field of an
@@ -44,7 +44,7 @@ mounted at `root.kubernetes`. Each entity is exposed as an overridable field;
 
 ### container
 
-Entity spec for the container dimension, with restarts/cpu/memory drilldowns and all/errors logs views.
+Entity spec for the container dimension, with restarts, cpu/memory usage, utilisation and throttling drilldowns and all/errors logs views. `usageMatchers` selects one cAdvisor source.
 
 ```jsonnet
 arcourse-telemetry-kubernetes.container
@@ -60,9 +60,18 @@ arcourse-telemetry-kubernetes.context
 ```
 
 
+### daemonset
+
+Entity spec for the daemonset dimension, with capacity, rollout and pod state drilldowns and a misscheduled pods drilldown.
+
+```jsonnet
+arcourse-telemetry-kubernetes.daemonset
+```
+
+
 ### deployment
 
-Entity spec for the deployment dimension, with an availability drilldown.
+Entity spec for the deployment dimension, with capacity, rollout and pod state drilldowns. The Stuck rollout state needs the `reason` label on kube-state-metrics conditions.
 
 ```jsonnet
 arcourse-telemetry-kubernetes.deployment
@@ -80,7 +89,7 @@ arcourse-telemetry-kubernetes.namespace
 
 ### node
 
-Entity spec for the node dimension, with a conditions drilldown.
+Entity spec for the node dimension, with state, requested resources, pods and node-exporter utilisation drilldowns. `nodeExporterInfo` maps node-exporter series to nodes, by `nodename` by default.
 
 ```jsonnet
 arcourse-telemetry-kubernetes.node
@@ -98,7 +107,7 @@ arcourse-telemetry-kubernetes.nodeList
 
 ### pod
 
-Entity spec for the pod dimension, with a pod-phase state timeline drilldown and all/errors logs views.
+Entity spec for the pod dimension, with a pod state timeline drilldown and all/errors logs views.
 
 ```jsonnet
 arcourse-telemetry-kubernetes.pod
@@ -107,9 +116,18 @@ arcourse-telemetry-kubernetes.pod
 
 ### pvc
 
-Entity spec for the persistent volume claim dimension, with a usage drilldown.
+Entity spec for the persistent volume claim dimension, with state, usage and inodes drilldowns.
 
 ```jsonnet
 arcourse-telemetry-kubernetes.pvc
+```
+
+
+### statefulset
+
+Entity spec for the statefulset dimension, with capacity, rollout and pod state drilldowns.
+
+```jsonnet
+arcourse-telemetry-kubernetes.statefulset
 ```
 
