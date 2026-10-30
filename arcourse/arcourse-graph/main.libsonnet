@@ -1,40 +1,4 @@
-local url =
-  local hexDigits = '0123456789ABCDEF';
-
-  local unreserved(b) =
-    (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
-    || b == 45 || b == 95 || b == 46 || b == 126;
-
-  local unreservedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~';
-
-  local percentEncode(s) =
-    if std.length(std.stripChars(s, unreservedChars)) == 0 then s
-    else std.join('', [
-      if unreserved(b) then std.char(b)
-      else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
-      for b in std.encodeUTF8(s)
-    ]);
-
-  local queryValue(value) =
-    if std.isString(value) then value
-    else if std.isArray(value) then std.manifestJsonMinified(value)
-    else std.toString(value);
-
-  local query(params) =
-    local keys = std.objectFields(params);
-    if std.length(keys) == 0 then ''
-    else '?' + std.join('&', [
-      percentEncode(k) + '=' + percentEncode(queryValue(params[k]))
-      for k in keys
-    ]);
-
-  function(u)
-    local scheme = std.get(u, 'scheme', null);
-    local path = std.get(u, 'path', []);
-    (if scheme != null then scheme + '://' else '')
-    + std.get(u, 'host', '')
-    + (if std.length(path) > 0 then '/' + std.join('/', [percentEncode(seg) for seg in path]) else '')
-    + query(std.get(u, 'params', {}));
+local url(u) = std.native('invoke:url')('format', [u]);
 
 local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
 local varNameOf(seg) = std.substr(seg, 1, std.length(seg) - 1);
@@ -89,6 +53,9 @@ local node(path, body={}) =
     _queryPath:: local n = self; url({ path: urlPathSegments(n, path), params: nonDefaultParams(n) }),
   };
 
+local intermediate(path, vars) =
+  std.foldl(function(acc, v) acc { [v]:: vars[v] }, std.objectFields(vars), { _pathTemplate:: path });
+
 local toLayers(nodeSpecs) =
   std.flatMap(
     function(spec)
@@ -115,7 +82,7 @@ local shape(layers) =
     };
   build([{ path: layers[i].path, index: i } for i in std.range(0, std.length(layers) - 1)]);
 
-local instantiateFromShape(shapeNode, layers, defaultView={}, vars={}) =
+local instantiateFromShape(shapeNode, layers, defaultView={}, vars={}, path=[]) =
   local withDefaultView(obj) =
     if std.objectHasAll(obj, '_view') then obj else obj + defaultView;
   local leafs = [layers[i] for i in shapeNode.leafs];
@@ -123,12 +90,12 @@ local instantiateFromShape(shapeNode, layers, defaultView={}, vars={}) =
     [if isVar(k) then varNameOf(k) else k]:
       if isVar(k) then
         local vName = varNameOf(k);
-        function(val) instantiateFromShape(shapeNode.children[k], layers, defaultView, vars { [vName]: val })
+        function(val) instantiateFromShape(shapeNode.children[k], layers, defaultView, vars { [vName]: val }, path + [k])
       else
-        instantiateFromShape(shapeNode.children[k], layers, defaultView, vars)
+        instantiateFromShape(shapeNode.children[k], layers, defaultView, vars, path + [k])
     for k in std.objectFields(shapeNode.children)
   };
-  if std.length(leafs) == 0 then withDefaultView(children)
+  if std.length(leafs) == 0 then withDefaultView(intermediate(path, vars) + children)
   else withDefaultView(node(leafs[0].fullPath, [l.layer for l in leafs]) + vars + children);
 
 local rootFromShape(layers, compiledShape, defaultView={}) =
@@ -145,6 +112,7 @@ local graph(nodeSpecs, defaultView={}) =
 
 {
   node: node,
+  intermediate: intermediate,
   graph: graph,
   toLayers: toLayers,
   shape: shape,
