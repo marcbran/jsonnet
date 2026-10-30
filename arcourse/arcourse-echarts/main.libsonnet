@@ -179,6 +179,10 @@ local c = {
     },
   panel:
     local style = |||
+      .deck:has(> .panel) {
+        display: flex;
+        align-items: stretch;
+      }
       @scope (.panel) {
         :scope {
           display: block;
@@ -1865,12 +1869,10 @@ local ui = {
       local c = self,
       name:: error 'hiddenControl requires a name',
       value:: null,
-      html:
-        if c.value == null then []
-        else [{
-          element: 'input',
-          attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
-        }],
+      html: [
+        { element: 'input', attributes: { type: 'hidden', name: c.name, value: std.toString(v) } }
+        for v in if c.value == null then [] else if std.isArray(c.value) then c.value else [c.value]
+      ],
     };
 
     local controls = {
@@ -2052,6 +2054,8 @@ local charts =
       series:: [],
       unit:: null,
       decimals:: 2,
+      timeMin:: null,
+      timeMax:: null,
       option::
         local styled = [
           s { type: 'line', showSymbol: true, symbolSize: 16, itemStyle: { opacity: 0 } }
@@ -2072,7 +2076,7 @@ local charts =
             icon: 'roundRect',
           },
           grid: { top: 40, bottom: 40, containLabel: true },
-          xAxis: common.timeAxis,
+          xAxis: common.timeAxis + std.prune({ min: c.timeMin, max: c.timeMax }),
           yAxis: { type: 'value' } + (
             if scale.suffix != null then { axisLabel: { formatter: '{value} ' + scale.suffix } } else {}
           ),
@@ -2141,13 +2145,15 @@ local charts =
       title:: null,
       rows:: [],
       segments:: [],
+      timeMin:: null,
+      timeMax:: null,
       option::
         local rowIndex = { [c.rows[i]]: i for i in std.range(0, std.length(c.rows) - 1) };
         {
           title: { text: c.title },
           tooltip: { trigger: 'item', formatter: '{b}' },
           grid: { top: 40, bottom: 40, containLabel: true },
-          xAxis: common.timeAxis,
+          xAxis: common.timeAxis + std.prune({ min: c.timeMin, max: c.timeMax }),
           yAxis: { type: 'category', data: c.rows },
           series: [{
             type: 'custom',
@@ -2361,7 +2367,10 @@ local baseView = {
   local n = self,
   _view:: {
     fragment: error 'view requires a fragment',
-    page: ui.page { fragment:: [echartsScript, componentScript, n._view.fragment] },
+    page: ui.page {
+      fragment:: [echartsScript, componentScript, n._view.fragment],
+      breadcrumbs:: ui.breadcrumbs { pathTemplate:: std.get(n, '_pathTemplate', []), node:: n },
+    },
     html: html.manifestHtml(self.page),
   },
 };
