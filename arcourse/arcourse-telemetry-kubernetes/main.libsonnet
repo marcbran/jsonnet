@@ -475,43 +475,7 @@ local telemetry =
       },
     };
   local g =
-    local url =
-      local hexDigits = '0123456789ABCDEF';
-
-      local unreserved(b) =
-        (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
-        || b == 45 || b == 95 || b == 46 || b == 126;
-
-      local unreservedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~';
-
-      local percentEncode(s) =
-        if std.length(std.stripChars(s, unreservedChars)) == 0 then s
-        else std.join('', [
-          if unreserved(b) then std.char(b)
-          else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
-          for b in std.encodeUTF8(s)
-        ]);
-
-      local queryValue(value) =
-        if std.isString(value) then value
-        else if std.isArray(value) then std.manifestJsonMinified(value)
-        else std.toString(value);
-
-      local query(params) =
-        local keys = std.objectFields(params);
-        if std.length(keys) == 0 then ''
-        else '?' + std.join('&', [
-          percentEncode(k) + '=' + percentEncode(queryValue(params[k]))
-          for k in keys
-        ]);
-
-      function(u)
-        local scheme = std.get(u, 'scheme', null);
-        local path = std.get(u, 'path', []);
-        (if scheme != null then scheme + '://' else '')
-        + std.get(u, 'host', '')
-        + (if std.length(path) > 0 then '/' + std.join('/', [percentEncode(seg) for seg in path]) else '')
-        + query(std.get(u, 'params', {}));
+    local url(u) = std.native('invoke:url')('format', [u]);
 
     local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
     local varNameOf(seg) = std.substr(seg, 1, std.length(seg) - 1);
@@ -566,6 +530,9 @@ local telemetry =
         _queryPath:: local n = self; url({ path: urlPathSegments(n, path), params: nonDefaultParams(n) }),
       };
 
+    local intermediate(path, vars) =
+      std.foldl(function(acc, v) acc { [v]:: vars[v] }, std.objectFields(vars), { _pathTemplate:: path });
+
     local toLayers(nodeSpecs) =
       std.flatMap(
         function(spec)
@@ -592,7 +559,7 @@ local telemetry =
         };
       build([{ path: layers[i].path, index: i } for i in std.range(0, std.length(layers) - 1)]);
 
-    local instantiateFromShape(shapeNode, layers, defaultView={}, vars={}) =
+    local instantiateFromShape(shapeNode, layers, defaultView={}, vars={}, path=[]) =
       local withDefaultView(obj) =
         if std.objectHasAll(obj, '_view') then obj else obj + defaultView;
       local leafs = [layers[i] for i in shapeNode.leafs];
@@ -600,12 +567,12 @@ local telemetry =
         [if isVar(k) then varNameOf(k) else k]:
           if isVar(k) then
             local vName = varNameOf(k);
-            function(val) instantiateFromShape(shapeNode.children[k], layers, defaultView, vars { [vName]: val })
+            function(val) instantiateFromShape(shapeNode.children[k], layers, defaultView, vars { [vName]: val }, path + [k])
           else
-            instantiateFromShape(shapeNode.children[k], layers, defaultView, vars)
+            instantiateFromShape(shapeNode.children[k], layers, defaultView, vars, path + [k])
         for k in std.objectFields(shapeNode.children)
       };
-      if std.length(leafs) == 0 then withDefaultView(children)
+      if std.length(leafs) == 0 then withDefaultView(intermediate(path, vars) + children)
       else withDefaultView(node(leafs[0].fullPath, [l.layer for l in leafs]) + vars + children);
 
     local rootFromShape(layers, compiledShape, defaultView={}) =
@@ -622,6 +589,7 @@ local telemetry =
 
     {
       node: node,
+      intermediate: intermediate,
       graph: graph,
       toLayers: toLayers,
       shape: shape,
@@ -644,7 +612,7 @@ local telemetry =
       telemetry.query([
         item { datasource: datasource, from: resolvedFrom, to: resolvedTo }
         for item in items
-      ]);
+      ]) + { from: resolvedFrom, to: resolvedTo };
   local browseLib = function(query)
     local result(datasource, expr, from='now-5m', to='now') =
       query(datasource, [{ type: 'promql', expr: expr, instant: true }], from, to).results[0];
@@ -853,6 +821,10 @@ local telemetry =
           },
         panel:
           local style = |||
+            .deck:has(> .panel) {
+              display: flex;
+              align-items: stretch;
+            }
             @scope (.panel) {
               :scope {
                 display: block;
@@ -2539,12 +2511,10 @@ local telemetry =
             local c = self,
             name:: error 'hiddenControl requires a name',
             value:: null,
-            html:
-              if c.value == null then []
-              else [{
-                element: 'input',
-                attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
-              }],
+            html: [
+              { element: 'input', attributes: { type: 'hidden', name: c.name, value: std.toString(v) } }
+              for v in if c.value == null then [] else if std.isArray(c.value) then c.value else [c.value]
+            ],
           };
 
           local controls = {
@@ -2726,6 +2696,8 @@ local telemetry =
             series:: [],
             unit:: null,
             decimals:: 2,
+            timeMin:: null,
+            timeMax:: null,
             option::
               local styled = [
                 s { type: 'line', showSymbol: true, symbolSize: 16, itemStyle: { opacity: 0 } }
@@ -2746,7 +2718,7 @@ local telemetry =
                   icon: 'roundRect',
                 },
                 grid: { top: 40, bottom: 40, containLabel: true },
-                xAxis: common.timeAxis,
+                xAxis: common.timeAxis + std.prune({ min: c.timeMin, max: c.timeMax }),
                 yAxis: { type: 'value' } + (
                   if scale.suffix != null then { axisLabel: { formatter: '{value} ' + scale.suffix } } else {}
                 ),
@@ -2815,13 +2787,15 @@ local telemetry =
             title:: null,
             rows:: [],
             segments:: [],
+            timeMin:: null,
+            timeMax:: null,
             option::
               local rowIndex = { [c.rows[i]]: i for i in std.range(0, std.length(c.rows) - 1) };
               {
                 title: { text: c.title },
                 tooltip: { trigger: 'item', formatter: '{b}' },
                 grid: { top: 40, bottom: 40, containLabel: true },
-                xAxis: common.timeAxis,
+                xAxis: common.timeAxis + std.prune({ min: c.timeMin, max: c.timeMax }),
                 yAxis: { type: 'category', data: c.rows },
                 series: [{
                   type: 'custom',
@@ -3035,7 +3009,10 @@ local telemetry =
         local n = self,
         _view:: {
           fragment: error 'view requires a fragment',
-          page: ui.page { fragment:: [echartsScript, componentScript, n._view.fragment] },
+          page: ui.page {
+            fragment:: [echartsScript, componentScript, n._view.fragment],
+            breadcrumbs:: ui.breadcrumbs { pathTemplate:: std.get(n, '_pathTemplate', []), node:: n },
+          },
           html: html.manifestHtml(self.page),
         },
       };
@@ -3100,18 +3077,31 @@ local telemetry =
         else if rest != '' then '{%s}' % rest
         else 'value';
 
+      local dropPlaceholders(text) =
+        local parts = std.split(text, '{{');
+        parts[0] + std.join('', [
+          local closing = std.findSubstr('}}', part);
+          if std.length(closing) == 0 then '{{' + part else std.substr(part, closing[0] + 2, std.length(part) - closing[0] - 2)
+          for part in parts[1:]
+        ]);
+
       local applyLegendFormat(legendFormat, labels) =
-        std.foldl(
+        dropPlaceholders(std.foldl(
           function(acc, k) std.strReplace(acc, '{{%s}}' % k, labels[k]),
           std.objectFields(labels),
           legendFormat
-        );
+        ));
 
       local seriesName(labels, legendFormat) =
         if legendFormat != null then applyLegendFormat(legendFormat, labels)
         else defaultSeriesName(labels);
 
       local hasPoints(series) = std.length(series.points) > 0;
+
+      local queriedRange = {
+        timeMin:: std.parseInt(self.data.from),
+        timeMax:: std.parseInt(self.data.to),
+      };
 
       local minList(l) = std.foldl(function(a, b) if b < a then b else a, l[1:], l[0]);
 
@@ -3161,7 +3151,7 @@ local telemetry =
           },
         },
 
-        line: a.line.chart {
+        line: a.line.chart + queriedRange {
           local n = self,
           links: std.foldl(
             function(acc, i) acc + linksFromResult(
@@ -3182,7 +3172,7 @@ local telemetry =
           ]),
         },
 
-        stateTimeline: a.stateTimeline.chart {
+        stateTimeline: a.stateTimeline.chart + queriedRange {
           local n = self,
           local render(template, labels, value) =
             if template != null then applyLegendFormat(template, labels { value: std.toString(value) }) else null,
@@ -3274,11 +3264,15 @@ local telemetry =
             {
               expr: $.expr % $,
               legendFormat: if std.objectHasAll($, 'legend') then $.legend else '{{%s}}' % ctx.groupBy,
-              link:: if !li.linksNext then null else function(series)
-                c.chainFields(
-                  c.chain(rootNode, [[v, $[v]] for v in li.ancestorVars] + [[li.var, series[li.label]]]),
-                  li.nextPathSuffix
-                ),
+              link::
+                if li.linksNext then function(series)
+                  c.chainFields(
+                    c.chain(rootNode, [[v, $[v]] for v in li.ancestorVars] + [[li.var, series[li.label]]]),
+                    li.nextPathSuffix
+                  )
+                else if li.isLeaf && std.objectHasAll(ctx, 'leafLink') then function(series)
+                  c.chainFields(c.chain(rootNode, [[v, $[v]] for v in li.ancestorVars]), ['metrics', ctx.leafLink])
+                else null,
             },
           ],
         }]
@@ -3349,58 +3343,20 @@ local telemetry =
   local nodesListLib =
     local a =
       local linkspecs =
-        local url =
-          local hexDigits = '0123456789ABCDEF';
+        local url(u) = std.native('invoke:url')('format', [u]);
 
-          local unreserved(b) =
-            (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
-            || b == 45 || b == 95 || b == 46 || b == 126;
-
-          local unreservedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~';
-
-          local percentEncode(s) =
-            if std.length(std.stripChars(s, unreservedChars)) == 0 then s
-            else std.join('', [
-              if unreserved(b) then std.char(b)
-              else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
-              for b in std.encodeUTF8(s)
-            ]);
-
-          local queryValue(value) =
-            if std.isString(value) then value
-            else if std.isArray(value) then std.manifestJsonMinified(value)
-            else std.toString(value);
-
-          local query(params) =
-            local keys = std.objectFields(params);
-            if std.length(keys) == 0 then ''
-            else '?' + std.join('&', [
-              percentEncode(k) + '=' + percentEncode(queryValue(params[k]))
-              for k in keys
-            ]);
-
-          function(u)
-            local scheme = std.get(u, 'scheme', null);
-            local path = std.get(u, 'path', []);
-            (if scheme != null then scheme + '://' else '')
-            + std.get(u, 'host', '')
-            + (if std.length(path) > 0 then '/' + std.join('/', [percentEncode(seg) for seg in path]) else '')
-            + query(std.get(u, 'params', {}));
-
-        local walk(current, remaining, buildFn) =
+        local walk(current, remaining) =
           if std.length(remaining) == 0 then
-            if std.type(current) == 'array' then
-              std.foldl(function(acc, item) acc + buildFn(item), current, {})
-            else buildFn(current)
+            if std.type(current) == 'array' then current else [current]
           else
             local next =
               if std.type(current) == 'object' then std.get(current, remaining[0], null)
               else null;
-            if next == null then {}
+            if next == null then []
             else if std.type(next) == 'array' then
-              std.foldl(function(acc, item) acc + walk(item, remaining[1:], buildFn), next, {})
+              std.flatMap(function(item) walk(item, remaining[1:]), next)
             else
-              walk(next, remaining[1:], buildFn);
+              walk(next, remaining[1:]);
 
         local itemPath(item, path) =
           std.foldl(
@@ -3409,16 +3365,26 @@ local telemetry =
             item
           );
 
-        local nestValue(labels, index, value) =
-          if index == std.length(labels) - 1 then { [labels[index]]: value }
-          else { [labels[index]]+: nestValue(labels, index + 1, value) };
+        local keyLabels(keySegs, item) = [
+          if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
+          for seg in keySegs
+        ];
 
-        local nestKeys(keySegs, item, value) =
-          local labels = [
-            if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
-            for seg in keySegs
-          ];
-          nestValue(labels, 0, value);
+        local nestEntries(entries, depth) =
+          local nestGroup(group) =
+            local ending = [e for e in group if std.length(e.labels) == depth + 1];
+            local deeper = [e for e in group if std.length(e.labels) > depth + 1];
+            if std.length(deeper) == 0 then ending[std.length(ending) - 1].value
+            else if std.length(ending) == 0 then nestEntries(deeper, depth + 1)
+            else ending[std.length(ending) - 1].value + nestEntries(deeper, depth + 1);
+          local sorted = std.sort(entries, function(e) e.labels[depth]);
+          local n = std.length(sorted);
+          local starts = [i for i in std.range(0, n - 1) if i == 0 || sorted[i].labels[depth] != sorted[i - 1].labels[depth]];
+          local bounds = starts + [n];
+          {
+            [sorted[bounds[j]].labels[depth]]: nestGroup(sorted[bounds[j]:bounds[j + 1]])
+            for j in std.range(0, std.length(starts) - 1)
+          };
 
         local splitPrefix(valueSegs) =
           if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
@@ -3486,54 +3452,48 @@ local telemetry =
           std.get(literal, 'host', []) + std.get(literal, 'path', [])
           + std.flattenArrays([literal.query[k] for k in std.objectFields(std.get(literal, 'query', {}))]);
 
-        local buildLinks(node, specs, root=import 'root') =
-          std.foldl(
-            function(acc, spec)
-              acc + (
-                if std.type(spec.value) == 'object' then
-                  walk(
-                    node.data,
-                    spec.at,
-                    function(item)
-                      if resolvable(item, urlSegments(spec.value))
-                      then nestKeys(spec.keys, item, resolveUrl(node, item, spec.value))
-                      else {}
-                  )
-                else
-                  local split = splitPrefix(spec.value);
-                  local base = resolveBase(root, node, split.prefix);
-                  walk(
-                    node.data,
-                    spec.at,
-                    function(item)
-                      if resolvable(item, spec.value)
-                      then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
-                      else {}
-                  )
-              ),
-            specs,
-            {}
-          );
-
-        local rowLinkSpec(specs, at) =
-          local matches = [spec for spec in specs if spec.at == at];
-          if std.length(matches) == 0 then null else matches[0];
-
-        local rowLinkFor(node, specs, at, root=import 'root') =
-          local spec = rowLinkSpec(specs, at);
-          if spec == null then null
+        local specEntries(node, spec, root) =
+          if std.type(spec.value) == 'object' then
+            local segs = urlSegments(spec.value);
+            [
+              if resolvable(item, segs)
+              then { labels: keyLabels(spec.keys, item), value: resolveUrl(node, item, spec.value) }
+              else null
+              for item in walk(node.data, spec.at)
+            ]
           else
             local split = splitPrefix(spec.value);
             local base = resolveBase(root, node, split.prefix);
-            function(item)
-              if resolvable(item, spec.value) then resolveFromBase(base, item, split.suffix) else null;
+            [
+              if resolvable(item, spec.value)
+              then { labels: keyLabels(spec.keys, item), value: resolveFromBase(base, item, split.suffix) }
+              else null
+              for item in walk(node.data, spec.at)
+            ];
+
+        local linksFromEntries(entriesPerSpec) =
+          local entries = [e for entries in entriesPerSpec for e in entries if e != null];
+          if std.length(entries) == 0 then {} else nestEntries(entries, 0);
+
+        local buildLinks(node, specs, root=import 'root') =
+          linksFromEntries([specEntries(node, spec, root) for spec in specs]);
+
+        local rowLinksFor(node, specs, at) =
+          local matches = [i for i in std.range(0, std.length(specs) - 1) if specs[i].at == at];
+          if std.length(matches) == 0 then []
+          else
+            local entries =
+              if std.objectHasAll(node, '_linkEntries') then node._linkEntries[matches[0]]
+              else specEntries(node, specs[matches[0]], import 'root');
+            [if e == null then null else e.value for e in entries];
 
         {
           buildLinks: buildLinks,
-          rowLinkFor: rowLinkFor,
+          rowLinksFor: rowLinksFor,
           withLinkSpecs: {
             linkSpecs:: [],
-            links: buildLinks(self, self.linkSpecs, import 'root'),
+            _linkEntries:: [specEntries(self, spec, import 'root') for spec in self.linkSpecs],
+            links: linksFromEntries(self._linkEntries),
           },
         };
       local c = {
@@ -5199,12 +5159,10 @@ local telemetry =
             local c = self,
             name:: error 'hiddenControl requires a name',
             value:: null,
-            html:
-              if c.value == null then []
-              else [{
-                element: 'input',
-                attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
-              }],
+            html: [
+              { element: 'input', attributes: { type: 'hidden', name: c.name, value: std.toString(v) } }
+              for v in if c.value == null then [] else if std.isArray(c.value) then c.value else [c.value]
+            ],
           };
 
           local controls = {
@@ -5510,11 +5468,10 @@ local telemetry =
         items: [projectItem(item, columns) for item in dataItems],
         _view+:: {
           fragment:
-            local rowLink = linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at);
             c.table {
               items:: $.items,
               columns:: columns,
-              rowLinks:: if rowLink == null then [] else [rowLink(item) for item in dataItems],
+              rowLinks:: linkspecs.rowLinksFor($, std.get($, 'linkSpecs', []), at),
               pagination:: std.get(std.get($, 'links', {}), 'pagination', null),
             },
         },
@@ -5587,58 +5544,20 @@ local telemetry =
   local nodesLabelsLib =
     local a =
       local linkspecs =
-        local url =
-          local hexDigits = '0123456789ABCDEF';
+        local url(u) = std.native('invoke:url')('format', [u]);
 
-          local unreserved(b) =
-            (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
-            || b == 45 || b == 95 || b == 46 || b == 126;
-
-          local unreservedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~';
-
-          local percentEncode(s) =
-            if std.length(std.stripChars(s, unreservedChars)) == 0 then s
-            else std.join('', [
-              if unreserved(b) then std.char(b)
-              else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
-              for b in std.encodeUTF8(s)
-            ]);
-
-          local queryValue(value) =
-            if std.isString(value) then value
-            else if std.isArray(value) then std.manifestJsonMinified(value)
-            else std.toString(value);
-
-          local query(params) =
-            local keys = std.objectFields(params);
-            if std.length(keys) == 0 then ''
-            else '?' + std.join('&', [
-              percentEncode(k) + '=' + percentEncode(queryValue(params[k]))
-              for k in keys
-            ]);
-
-          function(u)
-            local scheme = std.get(u, 'scheme', null);
-            local path = std.get(u, 'path', []);
-            (if scheme != null then scheme + '://' else '')
-            + std.get(u, 'host', '')
-            + (if std.length(path) > 0 then '/' + std.join('/', [percentEncode(seg) for seg in path]) else '')
-            + query(std.get(u, 'params', {}));
-
-        local walk(current, remaining, buildFn) =
+        local walk(current, remaining) =
           if std.length(remaining) == 0 then
-            if std.type(current) == 'array' then
-              std.foldl(function(acc, item) acc + buildFn(item), current, {})
-            else buildFn(current)
+            if std.type(current) == 'array' then current else [current]
           else
             local next =
               if std.type(current) == 'object' then std.get(current, remaining[0], null)
               else null;
-            if next == null then {}
+            if next == null then []
             else if std.type(next) == 'array' then
-              std.foldl(function(acc, item) acc + walk(item, remaining[1:], buildFn), next, {})
+              std.flatMap(function(item) walk(item, remaining[1:]), next)
             else
-              walk(next, remaining[1:], buildFn);
+              walk(next, remaining[1:]);
 
         local itemPath(item, path) =
           std.foldl(
@@ -5647,16 +5566,26 @@ local telemetry =
             item
           );
 
-        local nestValue(labels, index, value) =
-          if index == std.length(labels) - 1 then { [labels[index]]: value }
-          else { [labels[index]]+: nestValue(labels, index + 1, value) };
+        local keyLabels(keySegs, item) = [
+          if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
+          for seg in keySegs
+        ];
 
-        local nestKeys(keySegs, item, value) =
-          local labels = [
-            if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
-            for seg in keySegs
-          ];
-          nestValue(labels, 0, value);
+        local nestEntries(entries, depth) =
+          local nestGroup(group) =
+            local ending = [e for e in group if std.length(e.labels) == depth + 1];
+            local deeper = [e for e in group if std.length(e.labels) > depth + 1];
+            if std.length(deeper) == 0 then ending[std.length(ending) - 1].value
+            else if std.length(ending) == 0 then nestEntries(deeper, depth + 1)
+            else ending[std.length(ending) - 1].value + nestEntries(deeper, depth + 1);
+          local sorted = std.sort(entries, function(e) e.labels[depth]);
+          local n = std.length(sorted);
+          local starts = [i for i in std.range(0, n - 1) if i == 0 || sorted[i].labels[depth] != sorted[i - 1].labels[depth]];
+          local bounds = starts + [n];
+          {
+            [sorted[bounds[j]].labels[depth]]: nestGroup(sorted[bounds[j]:bounds[j + 1]])
+            for j in std.range(0, std.length(starts) - 1)
+          };
 
         local splitPrefix(valueSegs) =
           if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
@@ -5724,54 +5653,48 @@ local telemetry =
           std.get(literal, 'host', []) + std.get(literal, 'path', [])
           + std.flattenArrays([literal.query[k] for k in std.objectFields(std.get(literal, 'query', {}))]);
 
-        local buildLinks(node, specs, root=import 'root') =
-          std.foldl(
-            function(acc, spec)
-              acc + (
-                if std.type(spec.value) == 'object' then
-                  walk(
-                    node.data,
-                    spec.at,
-                    function(item)
-                      if resolvable(item, urlSegments(spec.value))
-                      then nestKeys(spec.keys, item, resolveUrl(node, item, spec.value))
-                      else {}
-                  )
-                else
-                  local split = splitPrefix(spec.value);
-                  local base = resolveBase(root, node, split.prefix);
-                  walk(
-                    node.data,
-                    spec.at,
-                    function(item)
-                      if resolvable(item, spec.value)
-                      then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
-                      else {}
-                  )
-              ),
-            specs,
-            {}
-          );
-
-        local rowLinkSpec(specs, at) =
-          local matches = [spec for spec in specs if spec.at == at];
-          if std.length(matches) == 0 then null else matches[0];
-
-        local rowLinkFor(node, specs, at, root=import 'root') =
-          local spec = rowLinkSpec(specs, at);
-          if spec == null then null
+        local specEntries(node, spec, root) =
+          if std.type(spec.value) == 'object' then
+            local segs = urlSegments(spec.value);
+            [
+              if resolvable(item, segs)
+              then { labels: keyLabels(spec.keys, item), value: resolveUrl(node, item, spec.value) }
+              else null
+              for item in walk(node.data, spec.at)
+            ]
           else
             local split = splitPrefix(spec.value);
             local base = resolveBase(root, node, split.prefix);
-            function(item)
-              if resolvable(item, spec.value) then resolveFromBase(base, item, split.suffix) else null;
+            [
+              if resolvable(item, spec.value)
+              then { labels: keyLabels(spec.keys, item), value: resolveFromBase(base, item, split.suffix) }
+              else null
+              for item in walk(node.data, spec.at)
+            ];
+
+        local linksFromEntries(entriesPerSpec) =
+          local entries = [e for entries in entriesPerSpec for e in entries if e != null];
+          if std.length(entries) == 0 then {} else nestEntries(entries, 0);
+
+        local buildLinks(node, specs, root=import 'root') =
+          linksFromEntries([specEntries(node, spec, root) for spec in specs]);
+
+        local rowLinksFor(node, specs, at) =
+          local matches = [i for i in std.range(0, std.length(specs) - 1) if specs[i].at == at];
+          if std.length(matches) == 0 then []
+          else
+            local entries =
+              if std.objectHasAll(node, '_linkEntries') then node._linkEntries[matches[0]]
+              else specEntries(node, specs[matches[0]], import 'root');
+            [if e == null then null else e.value for e in entries];
 
         {
           buildLinks: buildLinks,
-          rowLinkFor: rowLinkFor,
+          rowLinksFor: rowLinksFor,
           withLinkSpecs: {
             linkSpecs:: [],
-            links: buildLinks(self, self.linkSpecs, import 'root'),
+            _linkEntries:: [specEntries(self, spec, import 'root') for spec in self.linkSpecs],
+            links: linksFromEntries(self._linkEntries),
           },
         };
       local c = {
@@ -7437,12 +7360,10 @@ local telemetry =
             local c = self,
             name:: error 'hiddenControl requires a name',
             value:: null,
-            html:
-              if c.value == null then []
-              else [{
-                element: 'input',
-                attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
-              }],
+            html: [
+              { element: 'input', attributes: { type: 'hidden', name: c.name, value: std.toString(v) } }
+              for v in if c.value == null then [] else if std.isArray(c.value) then c.value else [c.value]
+            ],
           };
 
           local controls = {
@@ -7748,11 +7669,10 @@ local telemetry =
         items: [projectItem(item, columns) for item in dataItems],
         _view+:: {
           fragment:
-            local rowLink = linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at);
             c.table {
               items:: $.items,
               columns:: columns,
-              rowLinks:: if rowLink == null then [] else [rowLink(item) for item in dataItems],
+              rowLinks:: linkspecs.rowLinksFor($, std.get($, 'linkSpecs', []), at),
               pagination:: std.get(std.get($, 'links', {}), 'pagination', null),
             },
         },
@@ -7824,58 +7744,20 @@ local telemetry =
   local nodesValuesLib =
     local a =
       local linkspecs =
-        local url =
-          local hexDigits = '0123456789ABCDEF';
+        local url(u) = std.native('invoke:url')('format', [u]);
 
-          local unreserved(b) =
-            (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
-            || b == 45 || b == 95 || b == 46 || b == 126;
-
-          local unreservedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~';
-
-          local percentEncode(s) =
-            if std.length(std.stripChars(s, unreservedChars)) == 0 then s
-            else std.join('', [
-              if unreserved(b) then std.char(b)
-              else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
-              for b in std.encodeUTF8(s)
-            ]);
-
-          local queryValue(value) =
-            if std.isString(value) then value
-            else if std.isArray(value) then std.manifestJsonMinified(value)
-            else std.toString(value);
-
-          local query(params) =
-            local keys = std.objectFields(params);
-            if std.length(keys) == 0 then ''
-            else '?' + std.join('&', [
-              percentEncode(k) + '=' + percentEncode(queryValue(params[k]))
-              for k in keys
-            ]);
-
-          function(u)
-            local scheme = std.get(u, 'scheme', null);
-            local path = std.get(u, 'path', []);
-            (if scheme != null then scheme + '://' else '')
-            + std.get(u, 'host', '')
-            + (if std.length(path) > 0 then '/' + std.join('/', [percentEncode(seg) for seg in path]) else '')
-            + query(std.get(u, 'params', {}));
-
-        local walk(current, remaining, buildFn) =
+        local walk(current, remaining) =
           if std.length(remaining) == 0 then
-            if std.type(current) == 'array' then
-              std.foldl(function(acc, item) acc + buildFn(item), current, {})
-            else buildFn(current)
+            if std.type(current) == 'array' then current else [current]
           else
             local next =
               if std.type(current) == 'object' then std.get(current, remaining[0], null)
               else null;
-            if next == null then {}
+            if next == null then []
             else if std.type(next) == 'array' then
-              std.foldl(function(acc, item) acc + walk(item, remaining[1:], buildFn), next, {})
+              std.flatMap(function(item) walk(item, remaining[1:]), next)
             else
-              walk(next, remaining[1:], buildFn);
+              walk(next, remaining[1:]);
 
         local itemPath(item, path) =
           std.foldl(
@@ -7884,16 +7766,26 @@ local telemetry =
             item
           );
 
-        local nestValue(labels, index, value) =
-          if index == std.length(labels) - 1 then { [labels[index]]: value }
-          else { [labels[index]]+: nestValue(labels, index + 1, value) };
+        local keyLabels(keySegs, item) = [
+          if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
+          for seg in keySegs
+        ];
 
-        local nestKeys(keySegs, item, value) =
-          local labels = [
-            if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
-            for seg in keySegs
-          ];
-          nestValue(labels, 0, value);
+        local nestEntries(entries, depth) =
+          local nestGroup(group) =
+            local ending = [e for e in group if std.length(e.labels) == depth + 1];
+            local deeper = [e for e in group if std.length(e.labels) > depth + 1];
+            if std.length(deeper) == 0 then ending[std.length(ending) - 1].value
+            else if std.length(ending) == 0 then nestEntries(deeper, depth + 1)
+            else ending[std.length(ending) - 1].value + nestEntries(deeper, depth + 1);
+          local sorted = std.sort(entries, function(e) e.labels[depth]);
+          local n = std.length(sorted);
+          local starts = [i for i in std.range(0, n - 1) if i == 0 || sorted[i].labels[depth] != sorted[i - 1].labels[depth]];
+          local bounds = starts + [n];
+          {
+            [sorted[bounds[j]].labels[depth]]: nestGroup(sorted[bounds[j]:bounds[j + 1]])
+            for j in std.range(0, std.length(starts) - 1)
+          };
 
         local splitPrefix(valueSegs) =
           if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
@@ -7961,54 +7853,48 @@ local telemetry =
           std.get(literal, 'host', []) + std.get(literal, 'path', [])
           + std.flattenArrays([literal.query[k] for k in std.objectFields(std.get(literal, 'query', {}))]);
 
-        local buildLinks(node, specs, root=import 'root') =
-          std.foldl(
-            function(acc, spec)
-              acc + (
-                if std.type(spec.value) == 'object' then
-                  walk(
-                    node.data,
-                    spec.at,
-                    function(item)
-                      if resolvable(item, urlSegments(spec.value))
-                      then nestKeys(spec.keys, item, resolveUrl(node, item, spec.value))
-                      else {}
-                  )
-                else
-                  local split = splitPrefix(spec.value);
-                  local base = resolveBase(root, node, split.prefix);
-                  walk(
-                    node.data,
-                    spec.at,
-                    function(item)
-                      if resolvable(item, spec.value)
-                      then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
-                      else {}
-                  )
-              ),
-            specs,
-            {}
-          );
-
-        local rowLinkSpec(specs, at) =
-          local matches = [spec for spec in specs if spec.at == at];
-          if std.length(matches) == 0 then null else matches[0];
-
-        local rowLinkFor(node, specs, at, root=import 'root') =
-          local spec = rowLinkSpec(specs, at);
-          if spec == null then null
+        local specEntries(node, spec, root) =
+          if std.type(spec.value) == 'object' then
+            local segs = urlSegments(spec.value);
+            [
+              if resolvable(item, segs)
+              then { labels: keyLabels(spec.keys, item), value: resolveUrl(node, item, spec.value) }
+              else null
+              for item in walk(node.data, spec.at)
+            ]
           else
             local split = splitPrefix(spec.value);
             local base = resolveBase(root, node, split.prefix);
-            function(item)
-              if resolvable(item, spec.value) then resolveFromBase(base, item, split.suffix) else null;
+            [
+              if resolvable(item, spec.value)
+              then { labels: keyLabels(spec.keys, item), value: resolveFromBase(base, item, split.suffix) }
+              else null
+              for item in walk(node.data, spec.at)
+            ];
+
+        local linksFromEntries(entriesPerSpec) =
+          local entries = [e for entries in entriesPerSpec for e in entries if e != null];
+          if std.length(entries) == 0 then {} else nestEntries(entries, 0);
+
+        local buildLinks(node, specs, root=import 'root') =
+          linksFromEntries([specEntries(node, spec, root) for spec in specs]);
+
+        local rowLinksFor(node, specs, at) =
+          local matches = [i for i in std.range(0, std.length(specs) - 1) if specs[i].at == at];
+          if std.length(matches) == 0 then []
+          else
+            local entries =
+              if std.objectHasAll(node, '_linkEntries') then node._linkEntries[matches[0]]
+              else specEntries(node, specs[matches[0]], import 'root');
+            [if e == null then null else e.value for e in entries];
 
         {
           buildLinks: buildLinks,
-          rowLinkFor: rowLinkFor,
+          rowLinksFor: rowLinksFor,
           withLinkSpecs: {
             linkSpecs:: [],
-            links: buildLinks(self, self.linkSpecs, import 'root'),
+            _linkEntries:: [specEntries(self, spec, import 'root') for spec in self.linkSpecs],
+            links: linksFromEntries(self._linkEntries),
           },
         };
       local c = {
@@ -9674,12 +9560,10 @@ local telemetry =
             local c = self,
             name:: error 'hiddenControl requires a name',
             value:: null,
-            html:
-              if c.value == null then []
-              else [{
-                element: 'input',
-                attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
-              }],
+            html: [
+              { element: 'input', attributes: { type: 'hidden', name: c.name, value: std.toString(v) } }
+              for v in if c.value == null then [] else if std.isArray(c.value) then c.value else [c.value]
+            ],
           };
 
           local controls = {
@@ -9985,11 +9869,10 @@ local telemetry =
         items: [projectItem(item, columns) for item in dataItems],
         _view+:: {
           fragment:
-            local rowLink = linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at);
             c.table {
               items:: $.items,
               columns:: columns,
-              rowLinks:: if rowLink == null then [] else [rowLink(item) for item in dataItems],
+              rowLinks:: linkspecs.rowLinksFor($, std.get($, 'linkSpecs', []), at),
               pagination:: std.get(std.get($, 'links', {}), 'pagination', null),
             },
         },
@@ -11720,12 +11603,10 @@ local telemetry =
           local c = self,
           name:: error 'hiddenControl requires a name',
           value:: null,
-          html:
-            if c.value == null then []
-            else [{
-              element: 'input',
-              attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
-            }],
+          html: [
+            { element: 'input', attributes: { type: 'hidden', name: c.name, value: std.toString(v) } }
+            for v in if c.value == null then [] else if std.isArray(c.value) then c.value else [c.value]
+          ],
         };
 
         local controls = {
@@ -12177,6 +12058,9 @@ local telemetry =
         ],
       };
 
+    local encodePath(path) = std.join('/', [std.strReplace(std.strReplace(seg, '~', '~0'), '/', '~1') for seg in path]);
+    local decodePath(s) = [std.strReplace(std.strReplace(seg, '~1', '/'), '~0', '~') for seg in std.split(s, '/')];
+
     function(query, timeRange, record=null)
       {
         local n = self,
@@ -12188,8 +12072,8 @@ local telemetry =
         _paramSpecs: timeRange.paramSpecs + [{
           name: 'columns',
           type: 'array',
-          items: { type: 'array', items: 'string' },
-          default: [if std.isString(col) then [col] else col for col in n.columns],
+          items: 'string',
+          default: [encodePath(if std.isString(col) then [col] else col) for col in n.columns],
         }],
         _telemetryItems:: [{ type: n.type, expr: n.expr }],
         data: query(n.datasource, n._telemetryItems, n._params.from, n._params.to),
@@ -12207,8 +12091,8 @@ local telemetry =
         _view:: {
           local columnLink(path, value) =
             if std.isObject(value) || std.isArray(value) then null
-            else if std.any([std.isNumber(seg) for seg in path]) || std.member(n._params.columns, path) then null
-            else { key: n { _params+: { columns: n._params.columns + [path] } } },
+            else if std.any([std.isNumber(seg) for seg in path]) || std.member(n._params.columns, encodePath(path)) then null
+            else { key: n { _params+: { columns: n._params.columns + [encodePath(path)] } } },
           local embeddedLinks =
             if n.columnLinks then [
               { fields: ui.yaml.mapLeaves(std.get(rec, 'fields', {}), columnLink) }
@@ -12227,7 +12111,7 @@ local telemetry =
             logs {
               records:: records,
               links:: { [id]: n.links[id]._queryPath for id in std.objectFields(n.links) },
-              columns:: n._params.columns,
+              columns:: [decodePath(col) for col in n._params.columns],
               embeddedLinks:: embeddedLinks,
             },
             nav.html,
@@ -12242,58 +12126,20 @@ local telemetry =
   local nodesLogrecordLib =
     local ui =
       local linkspecs =
-        local url =
-          local hexDigits = '0123456789ABCDEF';
+        local url(u) = std.native('invoke:url')('format', [u]);
 
-          local unreserved(b) =
-            (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
-            || b == 45 || b == 95 || b == 46 || b == 126;
-
-          local unreservedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~';
-
-          local percentEncode(s) =
-            if std.length(std.stripChars(s, unreservedChars)) == 0 then s
-            else std.join('', [
-              if unreserved(b) then std.char(b)
-              else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
-              for b in std.encodeUTF8(s)
-            ]);
-
-          local queryValue(value) =
-            if std.isString(value) then value
-            else if std.isArray(value) then std.manifestJsonMinified(value)
-            else std.toString(value);
-
-          local query(params) =
-            local keys = std.objectFields(params);
-            if std.length(keys) == 0 then ''
-            else '?' + std.join('&', [
-              percentEncode(k) + '=' + percentEncode(queryValue(params[k]))
-              for k in keys
-            ]);
-
-          function(u)
-            local scheme = std.get(u, 'scheme', null);
-            local path = std.get(u, 'path', []);
-            (if scheme != null then scheme + '://' else '')
-            + std.get(u, 'host', '')
-            + (if std.length(path) > 0 then '/' + std.join('/', [percentEncode(seg) for seg in path]) else '')
-            + query(std.get(u, 'params', {}));
-
-        local walk(current, remaining, buildFn) =
+        local walk(current, remaining) =
           if std.length(remaining) == 0 then
-            if std.type(current) == 'array' then
-              std.foldl(function(acc, item) acc + buildFn(item), current, {})
-            else buildFn(current)
+            if std.type(current) == 'array' then current else [current]
           else
             local next =
               if std.type(current) == 'object' then std.get(current, remaining[0], null)
               else null;
-            if next == null then {}
+            if next == null then []
             else if std.type(next) == 'array' then
-              std.foldl(function(acc, item) acc + walk(item, remaining[1:], buildFn), next, {})
+              std.flatMap(function(item) walk(item, remaining[1:]), next)
             else
-              walk(next, remaining[1:], buildFn);
+              walk(next, remaining[1:]);
 
         local itemPath(item, path) =
           std.foldl(
@@ -12302,16 +12148,26 @@ local telemetry =
             item
           );
 
-        local nestValue(labels, index, value) =
-          if index == std.length(labels) - 1 then { [labels[index]]: value }
-          else { [labels[index]]+: nestValue(labels, index + 1, value) };
+        local keyLabels(keySegs, item) = [
+          if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
+          for seg in keySegs
+        ];
 
-        local nestKeys(keySegs, item, value) =
-          local labels = [
-            if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
-            for seg in keySegs
-          ];
-          nestValue(labels, 0, value);
+        local nestEntries(entries, depth) =
+          local nestGroup(group) =
+            local ending = [e for e in group if std.length(e.labels) == depth + 1];
+            local deeper = [e for e in group if std.length(e.labels) > depth + 1];
+            if std.length(deeper) == 0 then ending[std.length(ending) - 1].value
+            else if std.length(ending) == 0 then nestEntries(deeper, depth + 1)
+            else ending[std.length(ending) - 1].value + nestEntries(deeper, depth + 1);
+          local sorted = std.sort(entries, function(e) e.labels[depth]);
+          local n = std.length(sorted);
+          local starts = [i for i in std.range(0, n - 1) if i == 0 || sorted[i].labels[depth] != sorted[i - 1].labels[depth]];
+          local bounds = starts + [n];
+          {
+            [sorted[bounds[j]].labels[depth]]: nestGroup(sorted[bounds[j]:bounds[j + 1]])
+            for j in std.range(0, std.length(starts) - 1)
+          };
 
         local splitPrefix(valueSegs) =
           if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
@@ -12379,54 +12235,48 @@ local telemetry =
           std.get(literal, 'host', []) + std.get(literal, 'path', [])
           + std.flattenArrays([literal.query[k] for k in std.objectFields(std.get(literal, 'query', {}))]);
 
-        local buildLinks(node, specs, root=import 'root') =
-          std.foldl(
-            function(acc, spec)
-              acc + (
-                if std.type(spec.value) == 'object' then
-                  walk(
-                    node.data,
-                    spec.at,
-                    function(item)
-                      if resolvable(item, urlSegments(spec.value))
-                      then nestKeys(spec.keys, item, resolveUrl(node, item, spec.value))
-                      else {}
-                  )
-                else
-                  local split = splitPrefix(spec.value);
-                  local base = resolveBase(root, node, split.prefix);
-                  walk(
-                    node.data,
-                    spec.at,
-                    function(item)
-                      if resolvable(item, spec.value)
-                      then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
-                      else {}
-                  )
-              ),
-            specs,
-            {}
-          );
-
-        local rowLinkSpec(specs, at) =
-          local matches = [spec for spec in specs if spec.at == at];
-          if std.length(matches) == 0 then null else matches[0];
-
-        local rowLinkFor(node, specs, at, root=import 'root') =
-          local spec = rowLinkSpec(specs, at);
-          if spec == null then null
+        local specEntries(node, spec, root) =
+          if std.type(spec.value) == 'object' then
+            local segs = urlSegments(spec.value);
+            [
+              if resolvable(item, segs)
+              then { labels: keyLabels(spec.keys, item), value: resolveUrl(node, item, spec.value) }
+              else null
+              for item in walk(node.data, spec.at)
+            ]
           else
             local split = splitPrefix(spec.value);
             local base = resolveBase(root, node, split.prefix);
-            function(item)
-              if resolvable(item, spec.value) then resolveFromBase(base, item, split.suffix) else null;
+            [
+              if resolvable(item, spec.value)
+              then { labels: keyLabels(spec.keys, item), value: resolveFromBase(base, item, split.suffix) }
+              else null
+              for item in walk(node.data, spec.at)
+            ];
+
+        local linksFromEntries(entriesPerSpec) =
+          local entries = [e for entries in entriesPerSpec for e in entries if e != null];
+          if std.length(entries) == 0 then {} else nestEntries(entries, 0);
+
+        local buildLinks(node, specs, root=import 'root') =
+          linksFromEntries([specEntries(node, spec, root) for spec in specs]);
+
+        local rowLinksFor(node, specs, at) =
+          local matches = [i for i in std.range(0, std.length(specs) - 1) if specs[i].at == at];
+          if std.length(matches) == 0 then []
+          else
+            local entries =
+              if std.objectHasAll(node, '_linkEntries') then node._linkEntries[matches[0]]
+              else specEntries(node, specs[matches[0]], import 'root');
+            [if e == null then null else e.value for e in entries];
 
         {
           buildLinks: buildLinks,
-          rowLinkFor: rowLinkFor,
+          rowLinksFor: rowLinksFor,
           withLinkSpecs: {
             linkSpecs:: [],
-            links: buildLinks(self, self.linkSpecs, import 'root'),
+            _linkEntries:: [specEntries(self, spec, import 'root') for spec in self.linkSpecs],
+            links: linksFromEntries(self._linkEntries),
           },
         };
       local c = {
@@ -14092,12 +13942,10 @@ local telemetry =
             local c = self,
             name:: error 'hiddenControl requires a name',
             value:: null,
-            html:
-              if c.value == null then []
-              else [{
-                element: 'input',
-                attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
-              }],
+            html: [
+              { element: 'input', attributes: { type: 'hidden', name: c.name, value: std.toString(v) } }
+              for v in if c.value == null then [] else if std.isArray(c.value) then c.value else [c.value]
+            ],
           };
 
           local controls = {
@@ -14403,11 +14251,10 @@ local telemetry =
         items: [projectItem(item, columns) for item in dataItems],
         _view+:: {
           fragment:
-            local rowLink = linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at);
             c.table {
               items:: $.items,
               columns:: columns,
-              rowLinks:: if rowLink == null then [] else [rowLink(item) for item in dataItems],
+              rowLinks:: linkspecs.rowLinksFor($, std.get($, 'linkSpecs', []), at),
               pagination:: std.get(std.get($, 'links', {}), 'pagination', null),
             },
         },
@@ -14654,6 +14501,10 @@ local telemetry =
           },
         panel:
           local style = |||
+            .deck:has(> .panel) {
+              display: flex;
+              align-items: stretch;
+            }
             @scope (.panel) {
               :scope {
                 display: block;
@@ -16340,12 +16191,10 @@ local telemetry =
             local c = self,
             name:: error 'hiddenControl requires a name',
             value:: null,
-            html:
-              if c.value == null then []
-              else [{
-                element: 'input',
-                attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
-              }],
+            html: [
+              { element: 'input', attributes: { type: 'hidden', name: c.name, value: std.toString(v) } }
+              for v in if c.value == null then [] else if std.isArray(c.value) then c.value else [c.value]
+            ],
           };
 
           local controls = {
@@ -16527,6 +16376,8 @@ local telemetry =
             series:: [],
             unit:: null,
             decimals:: 2,
+            timeMin:: null,
+            timeMax:: null,
             option::
               local styled = [
                 s { type: 'line', showSymbol: true, symbolSize: 16, itemStyle: { opacity: 0 } }
@@ -16547,7 +16398,7 @@ local telemetry =
                   icon: 'roundRect',
                 },
                 grid: { top: 40, bottom: 40, containLabel: true },
-                xAxis: common.timeAxis,
+                xAxis: common.timeAxis + std.prune({ min: c.timeMin, max: c.timeMax }),
                 yAxis: { type: 'value' } + (
                   if scale.suffix != null then { axisLabel: { formatter: '{value} ' + scale.suffix } } else {}
                 ),
@@ -16616,13 +16467,15 @@ local telemetry =
             title:: null,
             rows:: [],
             segments:: [],
+            timeMin:: null,
+            timeMax:: null,
             option::
               local rowIndex = { [c.rows[i]]: i for i in std.range(0, std.length(c.rows) - 1) };
               {
                 title: { text: c.title },
                 tooltip: { trigger: 'item', formatter: '{b}' },
                 grid: { top: 40, bottom: 40, containLabel: true },
-                xAxis: common.timeAxis,
+                xAxis: common.timeAxis + std.prune({ min: c.timeMin, max: c.timeMax }),
                 yAxis: { type: 'category', data: c.rows },
                 series: [{
                   type: 'custom',
@@ -16836,7 +16689,10 @@ local telemetry =
         local n = self,
         _view:: {
           fragment: error 'view requires a fragment',
-          page: ui.page { fragment:: [echartsScript, componentScript, n._view.fragment] },
+          page: ui.page {
+            fragment:: [echartsScript, componentScript, n._view.fragment],
+            breadcrumbs:: ui.breadcrumbs { pathTemplate:: std.get(n, '_pathTemplate', []), node:: n },
+          },
           html: html.manifestHtml(self.page),
         },
       };
@@ -16891,15 +16747,15 @@ local telemetry =
         if node.type == 'panel' then node.chart._telemetryItems
         else std.flattenArrays([collectItems(child) for child in node.children]);
 
-      local resolveTree(node, results, index) =
+      local resolveTree(node, data, index) =
         if node.type == 'panel' then
           local count = std.length(node.chart._telemetryItems);
-          local resolved = node.chart { data: { results: results[index:index + count] } };
+          local resolved = node.chart { data: data { results: data.results[index:index + count] } };
           { node: node { chart: { option: resolved.option, links: resolved.links } }, next: index + count }
         else
           local acc = std.foldl(
             function(acc, child)
-              local r = resolveTree(child, results, acc.next);
+              local r = resolveTree(child, data, acc.next);
               { children: acc.children + [r.node], next: r.next },
             node.children,
             { children: [], next: index }
@@ -16912,7 +16768,7 @@ local telemetry =
         layout:: error 'Dashboard requires layout',
         _paramSpecs: timeRange.paramSpecs,
         data: query(n.datasource, collectItems(n.layout), n._params.from, n._params.to),
-        tree:: resolveTree(n.layout, n.data.results, 0).node,
+        tree:: resolveTree(n.layout, n.data, 0).node,
         _view+:: {
           local base = super.fragment,
           fragment: base { child:: [(timeRange.nav { from:: n._params.from, to:: n._params.to }).html, base.child] },
@@ -16950,6 +16806,363 @@ local telemetry =
     },
   };
 
+local workloadStateTimeline = {
+  local t = self,
+  local labelled(name, expr) = 'label_replace(0 * (%s) + 1, "state", "%s", "", "")' % [expr, name],
+  workload:: error 'workloadStateTimeline requires workload',
+  workloadTitle:: error 'workloadStateTimeline requires workloadTitle',
+  desiredMetric:: error 'workloadStateTimeline requires desiredMetric',
+  leafLink:: 'pods',
+  availableMetric:: error 'workloadStateTimeline requires availableMetric',
+  readyMetric:: error 'workloadStateTimeline requires readyMetric',
+  series(metric, extra=''):: 'max by (cluster, namespace, %s) (%s{%s%s})' % [t.workload, metric, t.matchers, extra],
+  desired:: t.series(t.desiredMetric),
+  conditions:: error 'workloadStateTimeline requires conditions',
+  states:: error 'workloadStateTimeline requires states',
+  unhealthy:: error 'workloadStateTimeline requires unhealthy',
+  expr:: 'max by (%s, state) (%s)' % [t.groupBy, std.join(' or ', [labelled(s, t.conditions[s]) for s in t.states])],
+  colorBy:: '{{state}}',
+  rowBy:: '{{%s}}' % t.workload,
+  labelBy:: '{{state}}',
+  tooltip:: '{{%s}} · {{state}} · {{from}} – {{to}}' % t.workload,
+  levels:: {
+    root: self.context,
+    context: {
+      expr:: 'count by (%s, state) (%s)' % [self.groupBy, std.join(' or ', [labelled(s, self.conditions[s]) for s in self.unhealthy])],
+      rowBy:: '{{%s}}: {{state}}' % self.groupBy,
+      labelBy:: '{{value}}',
+      tooltip:: '{{%s}} · {{state}}: {{value}} %ss · {{from}} – {{to}}' % [self.groupBy, self.workload],
+    },
+  },
+};
+
+local capacityTimeline = workloadStateTimeline {
+  local t = self,
+  local available = '(%s or %s)' % [t.series(t.availableMetric), t.series(t.readyMetric)],
+  local heldDesired = 'max by (cluster, namespace, %s) (min_over_time(%s{%s}[5m]))' % [t.workload, t.desiredMetric, t.matchers],
+  title:: '%s Capacity %s' % [t.workloadTitle, t.titleGroupBy],
+  zeroState:: 'ScaledToZero',
+  states:: ['Full', 'ScalingUp', 'Degraded', 'Down', t.zeroState],
+  unhealthy:: ['Degraded', 'Down'],
+  conditions:: {
+    Full: '(%s >= %s) and (%s > 0)' % [available, t.desired, t.desired],
+    ScalingUp: '(%s >= %s) < %s' % [available, heldDesired, t.desired],
+    Degraded: '(%s > 0) < %s' % [available, heldDesired],
+    Down: '(%s == 0) and (%s > 0)' % [available, heldDesired],
+    [t.zeroState]: '%s == 0' % t.desired,
+  },
+  colors:: {
+    Full: '#5b8a5b',
+    ScalingUp: '#5a7a94',
+    Degraded: '#b0902f',
+    Down: '#a35454',
+    [t.zeroState]: '#7a7a7a',
+  },
+  levels+:: {
+    context+: { title:: 'Unhealthy %s Capacity %s' % [self.workloadTitle, self.titleGroupBy] },
+  },
+};
+
+local deploymentWorkload = {
+  workload:: 'deployment',
+  workloadTitle:: 'Deployment',
+  desiredMetric:: 'kube_deployment_spec_replicas',
+  availableMetric:: 'kube_deployment_status_replicas_available',
+  readyMetric:: 'kube_deployment_status_replicas_ready',
+  podOwners:: 'max by (cluster, namespace, pod) (label_replace(kube_pod_owner{cluster="%(context)s", namespace="%(namespace)s", owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)") * on (cluster, namespace, replicaset) group_left () max by (cluster, namespace, replicaset) (kube_replicaset_owner{cluster="%(context)s", namespace="%(namespace)s", owner_kind="Deployment", owner_name="%(deployment)s"}))',
+};
+
+local statefulsetWorkload = {
+  workload:: 'statefulset',
+  workloadTitle:: 'StatefulSet',
+  desiredMetric:: 'kube_statefulset_replicas',
+  availableMetric:: 'kube_statefulset_status_replicas_available',
+  readyMetric:: 'kube_statefulset_status_replicas_ready',
+  podOwners:: 'max by (cluster, namespace, pod) (kube_pod_owner{cluster="%(context)s", namespace="%(namespace)s", owner_kind="StatefulSet", owner_name="%(statefulset)s"})',
+};
+
+local daemonsetWorkload = {
+  workload:: 'daemonset',
+  workloadTitle:: 'DaemonSet',
+  desiredMetric:: 'kube_daemonset_status_desired_number_scheduled',
+  availableMetric:: 'kube_daemonset_status_number_available',
+  readyMetric:: 'kube_daemonset_status_number_ready',
+  zeroState:: 'NoNodes',
+  podOwners:: 'max by (cluster, namespace, pod) (kube_pod_owner{cluster="%(context)s", namespace="%(namespace)s", owner_kind="DaemonSet", owner_name="%(daemonset)s"})',
+};
+
+local deploymentRolloutTimeline = workloadStateTimeline + deploymentWorkload {
+  local t = self,
+  local updated = t.series('kube_deployment_status_replicas_updated'),
+  local current = t.series('kube_deployment_status_replicas'),
+  local paused = '(%s == 1)' % t.series('kube_deployment_spec_paused'),
+  local stuck = '(%s == 1)' % t.series('kube_deployment_status_condition', ', condition="Progressing", status="false", reason="ProgressDeadlineExceeded"'),
+  title:: 'Deployment Rollout %s' % t.titleGroupBy,
+  states:: ['Settled', 'RollingOut', 'Stuck', 'Paused'],
+  unhealthy:: ['Stuck'],
+  conditions:: {
+    Settled: '((%s == %s) and (%s == %s)) unless %s unless %s' % [updated, t.desired, current, t.desired, paused, stuck],
+    RollingOut: '((%s < %s) or (%s > %s)) unless %s unless %s' % [updated, t.desired, current, t.desired, paused, stuck],
+    Stuck: '%s unless %s' % [stuck, paused],
+    Paused: paused,
+  },
+  colors:: {
+    Settled: '#5b8a5b',
+    RollingOut: '#5a7a94',
+    Stuck: '#a35454',
+    Paused: '#7a7a7a',
+  },
+  levels+:: {
+    context+: { title:: 'Stuck Deployment Rollouts %s' % self.titleGroupBy },
+  },
+};
+
+local statefulsetRolloutTimeline = workloadStateTimeline + statefulsetWorkload {
+  local t = self,
+  local outdated = 'max by (cluster, namespace, statefulset) (kube_statefulset_status_update_revision{%s} unless on (cluster, namespace, statefulset, revision) kube_statefulset_status_current_revision{%s})' % [t.matchers, t.matchers],
+  title:: 'StatefulSet Rollout %s' % t.titleGroupBy,
+  hidden:: ['root', 'context'],
+  states:: ['Settled', 'Outdated'],
+  unhealthy:: [],
+  conditions:: {
+    Settled: '%s unless on (cluster, namespace, statefulset) %s' % [t.desired, outdated],
+    Outdated: outdated,
+  },
+  colors:: {
+    Settled: '#5b8a5b',
+    Outdated: '#5a7a94',
+  },
+};
+
+local daemonsetRolloutTimeline = workloadStateTimeline + daemonsetWorkload {
+  local t = self,
+  local updated = t.series('kube_daemonset_status_updated_number_scheduled'),
+  title:: 'DaemonSet Rollout %s' % t.titleGroupBy,
+  hidden:: ['root', 'context'],
+  states:: ['Settled', 'Outdated'],
+  unhealthy:: [],
+  conditions:: {
+    Settled: '%s >= %s' % [updated, t.desired],
+    Outdated: '%s < %s' % [updated, t.desired],
+  },
+  colors:: {
+    Settled: '#5b8a5b',
+    Outdated: '#5a7a94',
+  },
+};
+
+local podStateTimeline = {
+  local t = self,
+  local key = 'cluster, namespace, pod',
+  local series(metric, extra='') = 'max by (%s) (%s{%s%s})' % [key, metric, t.podMatchers, extra],
+  local phase(name) = '(%s == 1)' % series('kube_pod_status_phase', ', phase="%s"' % name),
+  local deletedAt = series('kube_pod_deletion_timestamp'),
+  local age = '(time() - %s)' % series('kube_pod_created'),
+  local notReady = '(%s == 0)' % series('kube_pod_status_ready', ', condition="true"'),
+  local unscheduled = '(%s == 1)' % series('kube_pod_status_scheduled', ', condition="false"'),
+  local scheduledPending = '(%s unless on (%s) %s)' % [phase('Pending'), key, unscheduled],
+  local runningNotReady = '(%s and on (%s) %s)' % [phase('Running'), key, notReady],
+  local young = '(%s < 300)' % age,
+  local old = '(%s >= 300)' % age,
+  local alive(expr) = '((%s) unless on (%s) %s)' % [expr, key, deletedAt],
+  local reason = 'topk by (%s) (1, %s or %s or %s)' % [
+    key,
+    'max by (%s, reason) (kube_pod_status_reason{%s} == 1)' % [key, t.podMatchers],
+    'max by (%s, reason) (kube_pod_container_status_waiting_reason{%s} == 1)' % [key, t.podMatchers],
+    'max by (%s, reason) (kube_pod_init_container_status_waiting_reason{%s} == 1)' % [key, t.podMatchers],
+  ],
+  local labelled(name, expr) = 'label_replace(0 * (%s) + 1, "state", "%s", "", "")' % [expr, name],
+  local withReason(expr) = '((%s) * on (%s) group_left (reason) %s or ((%s) unless on (%s) %s))' % [expr, key, reason, expr, key, reason],
+  local filtered(expr) = if t.podFilter == null then expr else '(%s) and on (%s) %s' % [expr, key, t.podFilter],
+  local perPod(states) = 'max by (%s, state, reason) (%s)' % [t.podGroupBy, withReason(filtered(std.join(' or ', [labelled(s, t.conditions[s]) for s in states])))],
+  podMatchers:: t.matchers,
+  podGroupBy:: t.groupBy,
+  podFilter:: null,
+  conditions:: {
+    StuckTerminating: '(time() - %s) >= 300' % deletedAt,
+    Terminating: '(time() - %s) < 300' % deletedAt,
+    Succeeded: alive(phase('Succeeded')),
+    Failed: alive(phase('Failed')),
+    Unknown: alive(phase('Unknown')),
+    Unschedulable: alive('(%s and on (%s) %s) and on (%s) %s' % [phase('Pending'), key, unscheduled, key, old]),
+    Starting: alive('(%s or %s or (%s and on (%s) %s)) and on (%s) %s' % [scheduledPending, runningNotReady, phase('Pending'), key, unscheduled, key, young]),
+    Pending: alive('%s and on (%s) %s' % [scheduledPending, key, old]),
+    NotReady: alive('%s and on (%s) %s' % [runningNotReady, key, old]),
+    Ready: alive('%s unless on (%s) %s' % [phase('Running'), key, notReady]),
+  },
+  states:: ['StuckTerminating', 'Terminating', 'Succeeded', 'Failed', 'Unknown', 'Unschedulable', 'Starting', 'Pending', 'NotReady', 'Ready'],
+  unhealthy:: ['StuckTerminating', 'Failed', 'Unknown', 'Unschedulable', 'Pending', 'NotReady'],
+  title:: 'Pod State %s' % t.titleGroupBy,
+  expr:: perPod(t.states),
+  colorBy:: '{{state}}',
+  rowBy:: '{{pod}}',
+  labelBy:: '{{state}}',
+  tooltip:: '{{pod}} · {{state}} {{reason}} · {{from}} – {{to}}',
+  colors:: {
+    Ready: '#5b8a5b',
+    Starting: '#5a7a94',
+    Succeeded: '#5a7a94',
+    Terminating: '#7a7a7a',
+    Pending: '#b0902f',
+    Unschedulable: '#b0902f',
+    NotReady: '#a35454',
+    Failed: '#a35454',
+    StuckTerminating: '#a35454',
+    Unknown: '#7a7a7a',
+  },
+  levels:: {
+    root: self.context,
+    context: {
+      expr:: 'count by (%s, state) (%s)' % [self.groupBy, std.join(' or ', [labelled(s, self.conditions[s]) for s in self.unhealthy])],
+      title:: 'Unhealthy Pods %s' % self.titleGroupBy,
+      rowBy:: '{{%s}}: {{state}}' % self.groupBy,
+      labelBy:: '{{value}}',
+      tooltip:: '{{%s}} · {{state}}: {{value}} pods · {{from}} – {{to}}' % self.groupBy,
+    },
+    namespace: {
+      expr:: perPod([s for s in self.states if s != 'Ready' && s != 'Succeeded']),
+      title:: 'Pods Not Ready %s' % self.titleGroupBy,
+    },
+  },
+};
+
+local workloadPodsTimeline = podStateTimeline {
+  local t = self,
+  title:: '%s Pods' % t.workloadTitle,
+  hidden:: ['root', 'context', 'namespace'],
+  podMatchers:: 'cluster="%(context)s", namespace="%(namespace)s"',
+  podGroupBy:: 'pod',
+  podFilter:: t.podOwners,
+};
+
+local containerSeries = {
+  local t = self,
+  key:: 'cluster, namespace, pod, container',
+  usage(metric):: 'max by (%s) (%s{%s, %s})' % [t.key, metric, t.matchers, t.usageMatchers],
+  usageRate(metric):: 'max by (%s) (rate(%s{%s, %s}[5m]))' % [t.key, metric, t.matchers, t.usageMatchers],
+  state(expr):: 'max by (%s) (%s)' % [t.key, expr],
+  withBounds(usage, resource):: std.join(' or ', [
+    'label_replace(%s, "series", "usage", "", "")' % usage,
+    'label_replace(%s, "series", "request", "", "")' % t.state('kube_pod_container_resource_requests{%s, resource="%s"}' % [t.matchers, resource]),
+    'label_replace(%s, "series", "limit", "", "")' % t.state('kube_pod_container_resource_limits{%s, resource="%s"}' % [t.matchers, resource]),
+  ]),
+  worst(expr):: 'max by (%s) (%s)' % [t.groupBy, expr],
+  worstTitle:: if t.groupBy == 'container' then '' else 'of Worst Container ',
+};
+
+local nodeSeries = {
+  local t = self,
+  nodes:: 'max by (cluster, node) (kube_node_info{%s})' % t.matchers,
+  fromNodeExporter(expr, by=''):: '(max by (cluster, node%s) ((%s) * on (cluster, instance) group_left (node) %s) and on (cluster, node) %s)' % [by, expr, t.nodeExporterInfo, t.nodes],
+  activePods:: '(max by (cluster, namespace, pod) (kube_pod_status_phase{phase=~"Pending|Running"}) == 1)',
+  allocatable(resource):: 'max by (cluster, node) (kube_node_status_allocatable{%s, resource="%s"})' % [t.matchers, resource],
+  requested(resource)::
+    local podKey = 'cluster, namespace, pod, node';
+    local containers = 'sum by (%s) (max by (%s, container) (kube_pod_container_resource_requests{%s, resource="%s"}))' % [podKey, podKey, t.matchers, resource];
+    local init = 'max by (%s) (kube_pod_init_container_resource_requests{%s, resource="%s"})' % [podKey, t.matchers, resource];
+    local effective = 'max by (%s) (label_replace(%s, "source", "containers", "", "") or label_replace(%s, "source", "init", "", ""))' % [podKey, containers, init];
+    local requests = 'sum by (cluster, node) (%s * on (cluster, namespace, pod) group_left () %s)' % [effective, t.activePods];
+    '100 * (%s or 0 * %s) / %s' % [requests, t.allocatable(resource), t.allocatable(resource)],
+  worst(expr):: 'max by (%s) (%s)' % [t.groupBy, expr],
+  worstTitle:: if t.groupBy == 'node' then '' else 'of Worst Node ',
+};
+
+local nodeStateTimeline = {
+  local t = self,
+  local key = 'cluster, node',
+  local condition(name, status) = '(%s == 1)' % 'max by (%s) (kube_node_status_condition{%s, condition="%s", status="%s"})' % [key, t.matchers, name, status],
+  local notReady = '(%s == 0)' % 'max by (%s) (kube_node_status_condition{%s, condition="Ready", status="true"})' % [key, t.matchers],
+  local young = '((time() - max by (%s) (kube_node_created{%s})) < 300)' % [key, t.matchers],
+  local pressure = 'topk by (%s) (1, label_replace(max by (%s, condition) (kube_node_status_condition{%s, condition=~"MemoryPressure|DiskPressure|PIDPressure|NetworkUnavailable", status="true"}) == 1, "reason", "$1", "condition", "(.*)"))' % [key, key, t.matchers],
+  local cordoned = '(%s == 1)' % 'max by (%s) (kube_node_spec_unschedulable{%s})' % [key, t.matchers],
+  local labelled(name, expr) = 'label_replace(0 * (%s) + 1, "state", "%s", "", "")' % [expr, name],
+  conditions:: {
+    Joining: '%s and on (%s) %s' % [notReady, key, young],
+    Unreachable: '%s unless on (%s) %s' % [condition('Ready', 'unknown'), key, young],
+    NotReady: '%s unless on (%s) %s' % [condition('Ready', 'false'), key, young],
+    Pressure: '%s unless on (%s) %s' % [pressure, key, notReady],
+    Cordoned: '%s unless on (%s) %s unless on (%s) %s' % [cordoned, key, notReady, key, pressure],
+    Ready: '%s unless on (%s) %s unless on (%s) %s' % [condition('Ready', 'true'), key, pressure, key, cordoned],
+  },
+  states:: ['Joining', 'Unreachable', 'NotReady', 'Pressure', 'Cordoned', 'Ready'],
+  unhealthy:: ['Unreachable', 'NotReady', 'Pressure'],
+  title:: 'Node State %s' % t.titleGroupBy,
+  expr:: 'max by (%s, state, reason) (%s)' % [t.groupBy, std.join(' or ', [labelled(s, t.conditions[s]) for s in t.states])],
+  colorBy:: '{{state}}',
+  rowBy:: '{{node}}',
+  labelBy:: '{{state}}',
+  tooltip:: '{{node}} · {{state}} {{reason}} · {{from}} – {{to}}',
+  colors:: {
+    Ready: '#5b8a5b',
+    Joining: '#5a7a94',
+    Cordoned: '#7a7a7a',
+    Pressure: '#b0902f',
+    NotReady: '#a35454',
+    Unreachable: '#a35454',
+  },
+  levels:: {
+    root: {
+      expr:: 'count by (%s, state) (%s)' % [self.groupBy, std.join(' or ', [labelled(s, self.conditions[s]) for s in self.unhealthy])],
+      title:: 'Unhealthy Nodes %s' % self.titleGroupBy,
+      rowBy:: '{{%s}}: {{state}}' % self.groupBy,
+      labelBy:: '{{value}}',
+      tooltip:: '{{%s}} · {{state}}: {{value}} nodes · {{from}} – {{to}}' % self.groupBy,
+    },
+  },
+};
+
+local pvcSeries = {
+  local t = self,
+  stat(metric):: 'max by (cluster, namespace, persistentvolumeclaim) (%s{%s})' % [metric, t.matchers],
+  worst(expr):: 'max by (%s) (%s)' % [t.groupBy, expr],
+  worstTitle:: if t.groupBy == 'persistentvolumeclaim' then '' else 'of Worst PVC ',
+};
+
+local pvcStateTimeline = {
+  local t = self,
+  local key = 'cluster, namespace, persistentvolumeclaim',
+  local phase(name) = '(max by (%s) (kube_persistentvolumeclaim_status_phase{%s, phase="%s"}) == 1)' % [key, t.matchers, name],
+  local young = '((time() - max by (%s) (kube_persistentvolumeclaim_created{%s})) < 300)' % [key, t.matchers],
+  local waitsForConsumer = 'max by (%s) (kube_persistentvolumeclaim_info{%s} * on (cluster, storageclass) group_left () max by (cluster, storageclass) (kube_storageclass_info{volume_binding_mode="WaitForFirstConsumer"}))' % [key, t.matchers],
+  local resizing = '(max by (%s) (kube_persistentvolumeclaim_status_condition{%s, condition=~"Resizing|FileSystemResizePending", status="true"}) == 1)' % [key, t.matchers],
+  local unbound = '(%s unless on (%s) %s)' % [phase('Pending'), key, waitsForConsumer],
+  local labelled(name, expr) = 'label_replace(0 * (%s) + 1, "state", "%s", "", "")' % [expr, name],
+  conditions:: {
+    Lost: phase('Lost'),
+    WaitingForConsumer: '%s and on (%s) %s' % [phase('Pending'), key, waitsForConsumer],
+    Provisioning: '%s and on (%s) %s' % [unbound, key, young],
+    Pending: '%s unless on (%s) %s' % [unbound, key, young],
+    Resizing: '%s and on (%s) %s' % [phase('Bound'), key, resizing],
+    Bound: '%s unless on (%s) %s' % [phase('Bound'), key, resizing],
+  },
+  states:: ['Lost', 'WaitingForConsumer', 'Provisioning', 'Pending', 'Resizing', 'Bound'],
+  unhealthy:: ['Pending', 'Lost'],
+  title:: 'PVC State %s' % t.titleGroupBy,
+  expr:: 'max by (%s, state) (%s)' % [t.groupBy, std.join(' or ', [labelled(s, t.conditions[s]) for s in t.states])],
+  colorBy:: '{{state}}',
+  rowBy:: '{{persistentvolumeclaim}}',
+  labelBy:: '{{state}}',
+  tooltip:: '{{persistentvolumeclaim}} · {{state}} · {{from}} – {{to}}',
+  colors:: {
+    Bound: '#5b8a5b',
+    Provisioning: '#5a7a94',
+    WaitingForConsumer: '#5a7a94',
+    Resizing: '#5a7a94',
+    Pending: '#b0902f',
+    Lost: '#a35454',
+  },
+  levels:: {
+    root: self.context,
+    context: {
+      expr:: 'count by (%s, state) (%s)' % [self.groupBy, std.join(' or ', [labelled(s, self.conditions[s]) for s in self.unhealthy])],
+      title:: 'Unhealthy PVCs %s' % self.titleGroupBy,
+      rowBy:: '{{%s}}: {{state}}' % self.groupBy,
+      labelBy:: '{{value}}',
+      tooltip:: '{{%s}} · {{state}}: {{value}} PVCs · {{from}} – {{to}}' % self.groupBy,
+    },
+  },
+};
+
 {
   a:: telemetry,
 
@@ -16971,7 +17184,7 @@ local telemetry =
     vars:: ['context', 'namespace'],
     labels:: ['cluster', 'namespace'],
     entityPath:: ['kubernetes', '$context', '$namespace'],
-    listExpr:: 'count by (%(groupBy)s) (kube_pod_info{%(matchers)s})' % self,
+    listExpr:: 'count by (%(groupBy)s) (kube_pod_info{%(matchers)s}) or 0 * count by (%(groupBy)s) (kube_namespace_created{%(matchers)s})' % self,
     logs:: {
       all: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"}' % self },
       errors: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"} | detected_level=~"error|critical|fatal"' % self },
@@ -16990,34 +17203,7 @@ local telemetry =
       errors: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"} | pod="%(pod)s" | detected_level=~"error|critical|fatal"' % self },
     },
     drillDowns:: {
-      phase: $.a.promql.stateTimeline.chart {
-        expr:: 'sum by (%(groupBy)s, phase) (kube_pod_status_phase{%(matchers)s}) > 0' % self,
-        title:: 'Pod Phase %(titleGroupBy)s' % self,
-        colorBy:: '{{phase}}',
-        rowBy:: '{{namespace}}: {{phase}}',
-        labelBy:: '{{value}}',
-        tooltip:: '{{namespace}} · {{phase}}: {{value}} pods · {{from}} – {{to}}',
-        colors:: {
-          Running: '#5b8a5b',
-          Pending: '#b0902f',
-          Failed: '#a35454',
-          Succeeded: '#5a7a94',
-          Unknown: '#7a7a7a',
-        },
-        levels:: {
-          root: self.context,
-          context: {
-            expr:: 'sum by (%(groupBy)s, phase) (kube_pod_status_phase{%(matchers)s, phase!="Running", phase!="Succeeded"}) > 0' % self,
-            title:: 'Unhealthy Pod Phase %(titleGroupBy)s' % self,
-          },
-          namespace: self.pod,
-          pod: {
-            rowBy:: '{{pod}}',
-            labelBy:: '{{phase}}',
-            tooltip:: '{{pod}} · {{phase}} · {{from}} – {{to}}',
-          },
-        },
-      },
+      state: $.a.promql.stateTimeline.chart + podStateTimeline,
     },
   },
 
@@ -17025,27 +17211,58 @@ local telemetry =
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context', 'namespace', 'pod', 'container'],
     labels:: ['cluster', 'namespace', 'pod', 'container'],
-    listExpr:: 'container_memory_working_set_bytes{%(matchers)s}' % self,
+    usageMatchers:: 'image!="", container!="POD"',
+    listExpr:: 'kube_pod_container_info{%(matchers)s}' % self,
     logs:: {
       all: { expr:: '{cluster="%(context)s", namespace="%(namespace)s", container="%(container)s"} | pod="%(pod)s"' % self },
       errors: { expr:: '{cluster="%(context)s", namespace="%(namespace)s", container="%(container)s"} | pod="%(pod)s" | detected_level=~"error|critical|fatal"' % self },
     },
     drillDowns:: {
-      restarts: $.a.promql.line.chart {
-        expr::
-          |||
-            sum by (%(groupBy)s) (increase(kube_pod_container_status_restarts_total{%(matchers)s}[15m]))
-          ||| % self,
+      restarts: $.a.promql.line.chart + containerSeries {
+        local t = self,
+        local restarts = t.state('increase(kube_pod_container_status_restarts_total{%s}[15m])' % t.matchers),
+        local reasons = 'max by (%s, reason) (kube_pod_container_status_last_terminated_reason{%s})' % [t.key, t.matchers],
+        expr:: 'sum by (%s, reason) ((%s * on (%s) group_left (reason) %s) or (%s unless on (%s) %s)) > 0' % [t.groupBy, restarts, t.key, reasons, restarts, t.key, reasons],
+        legend:: '{{%s}}: {{reason}}' % t.groupBy,
         title:: 'Container Restarts %(titleGroupBy)s(15m)' % self,
       },
-      cpu: $.a.promql.line.chart {
-        expr:: 'sum by (%(groupBy)s) (rate(container_cpu_usage_seconds_total{%(matchers)s}[5m]))' % self,
+      cpu: $.a.promql.line.chart + containerSeries {
+        local t = self,
+        expr:: 'sum by (%s) (%s)' % [t.groupBy, t.usageRate('container_cpu_usage_seconds_total')],
         title:: 'CPU Usage %(titleGroupBy)s(cores)' % self,
+        levels:: {
+          container: {
+            expr:: t.withBounds(t.usageRate('container_cpu_usage_seconds_total'), 'cpu'),
+            legend:: '{{series}}',
+          },
+        },
       },
-      memory: $.a.promql.line.chart {
-        expr:: 'sum by (%(groupBy)s) (container_memory_working_set_bytes{%(matchers)s})' % self,
+      memory: $.a.promql.line.chart + containerSeries {
+        local t = self,
+        expr:: 'sum by (%s) (%s)' % [t.groupBy, t.usage('container_memory_working_set_bytes')],
         title:: 'Memory Usage %(titleGroupBy)s' % self,
         unit:: 'bytes',
+        levels:: {
+          container: {
+            expr:: t.withBounds(t.usage('container_memory_working_set_bytes'), 'memory'),
+            legend:: '{{series}}',
+          },
+        },
+      },
+      memoryUtilisation: $.a.promql.line.chart + containerSeries {
+        local t = self,
+        expr:: t.worst('100 * %s / on (%s) %s' % [t.usage('container_memory_working_set_bytes'), t.key, t.state('kube_pod_container_resource_limits{%s, resource="memory"}' % t.matchers)]),
+        title:: 'Memory Utilisation of Limit %(worstTitle)s%(titleGroupBy)s(%%)' % self,
+      },
+      cpuUtilisation: $.a.promql.line.chart + containerSeries {
+        local t = self,
+        expr:: t.worst('100 * %s / on (%s) %s' % [t.usageRate('container_cpu_usage_seconds_total'), t.key, t.state('kube_pod_container_resource_requests{%s, resource="cpu"}' % t.matchers)]),
+        title:: 'CPU Utilisation of Request %(worstTitle)s%(titleGroupBy)s(%%)' % self,
+      },
+      throttling: $.a.promql.line.chart + containerSeries {
+        local t = self,
+        expr:: t.worst('100 * %s / on (%s) %s' % [t.usageRate('container_cpu_cfs_throttled_periods_total'), t.key, t.usageRate('container_cpu_cfs_periods_total')]),
+        title:: 'CPU Throttling %(worstTitle)s%(titleGroupBy)s(%% of periods)' % self,
       },
     },
   },
@@ -17056,15 +17273,30 @@ local telemetry =
     entityPath:: ['kubernetes', '$context', '$namespace', '$persistentvolumeclaim'],
     labels:: ['cluster', 'namespace', 'persistentvolumeclaim'],
     titles:: ['Context', 'Namespace', 'PVC'],
-    listExpr:: 'kubelet_volume_stats_capacity_bytes{%(matchers)s}' % self,
+    listExpr:: 'kube_persistentvolumeclaim_info{%(matchers)s}' % self,
     drillDowns:: {
-      usage: $.a.promql.line.chart {
-        expr::
-          |||
-            100 * sum by (%(groupBy)s) (kubelet_volume_stats_used_bytes{%(matchers)s})
-            / sum by (%(groupBy)s) (kubelet_volume_stats_capacity_bytes{%(matchers)s})
-          ||| % self,
-        title:: 'PVC Usage (%%) %(titleGroupBy)s' % self,
+      state: $.a.promql.stateTimeline.chart + pvcStateTimeline,
+      usage: $.a.promql.line.chart + pvcSeries {
+        local t = self,
+        expr:: t.worst('100 * %s / %s' % [t.stat('kubelet_volume_stats_used_bytes'), t.stat('kubelet_volume_stats_capacity_bytes')]),
+        title:: 'PVC Usage %(worstTitle)s%(titleGroupBy)s(%% of capacity)' % self,
+        levels:: {
+          pvc: {
+            expr:: std.join(' or ', [
+              'label_replace(%s, "series", "used", "", "")' % t.stat('kubelet_volume_stats_used_bytes'),
+              'label_replace(%s, "series", "capacity", "", "")' % t.stat('kubelet_volume_stats_capacity_bytes'),
+              'label_replace(%s, "series", "requested", "", "")' % t.stat('kube_persistentvolumeclaim_resource_requests_storage_bytes'),
+            ]),
+            legend:: '{{series}}',
+            title:: 'PVC Usage',
+            unit:: 'bytes',
+          },
+        },
+      },
+      inodes: $.a.promql.line.chart + pvcSeries {
+        local t = self,
+        expr:: t.worst('100 * %s / (%s > 0)' % [t.stat('kubelet_volume_stats_inodes_used'), t.stat('kubelet_volume_stats_inodes')]),
+        title:: 'PVC Inodes %(worstTitle)s%(titleGroupBy)s(%% used)' % self,
       },
     },
   },
@@ -17076,13 +17308,40 @@ local telemetry =
     labels:: ['cluster', 'namespace', 'deployment'],
     listExpr:: 'kube_deployment_spec_replicas{%(matchers)s}' % self,
     drillDowns:: {
-      availability: $.a.promql.line.chart {
-        expr::
-          |||
-            sum by (%(groupBy)s) (kube_deployment_status_replicas_available{%(matchers)s})
-            / sum by (%(groupBy)s) (kube_deployment_spec_replicas{%(matchers)s})
-          ||| % self,
-        title:: 'Deployment Availability %(titleGroupBy)s' % self,
+      capacity: $.a.promql.stateTimeline.chart + capacityTimeline + deploymentWorkload,
+      rollout: $.a.promql.stateTimeline.chart + deploymentRolloutTimeline,
+      pods: $.a.promql.stateTimeline.chart + workloadPodsTimeline + deploymentWorkload,
+    },
+  },
+
+  statefulset:: {
+    base:: ['telemetry', 'kubernetes'],
+    vars:: ['context', 'namespace', 'statefulset'],
+    entityPath:: ['kubernetes', '$context', '$namespace', 'apps', '$statefulset'],
+    labels:: ['cluster', 'namespace', 'statefulset'],
+    titles:: ['Context', 'Namespace', 'StatefulSet'],
+    listExpr:: 'kube_statefulset_replicas{%(matchers)s}' % self,
+    drillDowns:: {
+      capacity: $.a.promql.stateTimeline.chart + capacityTimeline + statefulsetWorkload,
+      rollout: $.a.promql.stateTimeline.chart + statefulsetRolloutTimeline,
+      pods: $.a.promql.stateTimeline.chart + workloadPodsTimeline + statefulsetWorkload,
+    },
+  },
+
+  daemonset:: {
+    base:: ['telemetry', 'kubernetes'],
+    vars:: ['context', 'namespace', 'daemonset'],
+    entityPath:: ['kubernetes', '$context', '$namespace', 'apps', '$daemonset'],
+    labels:: ['cluster', 'namespace', 'daemonset'],
+    titles:: ['Context', 'Namespace', 'DaemonSet'],
+    listExpr:: 'kube_daemonset_status_desired_number_scheduled{%(matchers)s}' % self,
+    drillDowns:: {
+      capacity: $.a.promql.stateTimeline.chart + capacityTimeline + daemonsetWorkload,
+      rollout: $.a.promql.stateTimeline.chart + daemonsetRolloutTimeline,
+      pods: $.a.promql.stateTimeline.chart + workloadPodsTimeline + daemonsetWorkload,
+      misscheduled: $.a.promql.line.chart {
+        expr:: 'sum by (%(groupBy)s) (max by (cluster, namespace, daemonset) (kube_daemonset_status_number_misscheduled{%(matchers)s})) > 0' % self,
+        title:: 'Misscheduled DaemonSet Pods %(titleGroupBy)s' % self,
       },
     },
   },
@@ -17092,18 +17351,52 @@ local telemetry =
     vars:: ['context', 'node'],
     labels:: ['cluster', 'node'],
     entityPath:: ['kubernetes', '$context', '$node'],
+    nodeExporterInfo:: 'label_replace(max by (cluster, instance, nodename) (node_uname_info), "node", "$1", "nodename", "(.*)")',
     listExpr:: 'count by (%(groupBy)s) (kube_node_info{%(matchers)s})' % self,
     drillDowns:: {
-      conditions: $.a.promql.line.chart {
-        expr::
-          |||
-            sum by (%(groupBy)s, condition, status) (kube_node_status_condition{%(matchers)s})
-          ||| % self,
-        title:: 'Node Conditions %(titleGroupBy)s' % self,
-        legend:: '{{%(groupBy)s}}: {{condition}}: {{status}}' % self,
+      state: $.a.promql.stateTimeline.chart + nodeStateTimeline,
+      cpuRequested: $.a.promql.line.chart + nodeSeries {
+        local t = self,
+        expr:: t.worst(t.requested('cpu')),
+        title:: 'CPU Requested %(worstTitle)s%(titleGroupBy)s(%% of allocatable)' % self,
+      },
+      memoryRequested: $.a.promql.line.chart + nodeSeries {
+        local t = self,
+        expr:: t.worst(t.requested('memory')),
+        title:: 'Memory Requested %(worstTitle)s%(titleGroupBy)s(%% of allocatable)' % self,
+      },
+      pods: $.a.promql.line.chart + nodeSeries {
+        local t = self,
+        local active = 'count by (cluster, node) (max by (cluster, namespace, pod, node) (kube_pod_info{%s}) * on (cluster, namespace, pod) group_left () %s)' % [t.matchers, t.activePods],
+        expr:: t.worst('100 * (%s or 0 * %s) / %s' % [active, t.allocatable('pods'), t.allocatable('pods')]),
+        title:: 'Pods %(worstTitle)s%(titleGroupBy)s(%% of capacity)' % self,
+      },
+      cpuUtilisation: $.a.promql.line.chart + nodeSeries {
+        local t = self,
+        expr:: t.worst(t.fromNodeExporter('100 * (1 - avg by (cluster, instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])))')),
+        title:: 'CPU Utilisation %(worstTitle)s%(titleGroupBy)s(%%)' % self,
+      },
+      memoryUtilisation: $.a.promql.line.chart + nodeSeries {
+        local t = self,
+        expr:: t.worst(t.fromNodeExporter('100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)')),
+        title:: 'Memory Utilisation %(worstTitle)s%(titleGroupBy)s(%%)' % self,
+      },
+      filesystemUtilisation: $.a.promql.line.chart + nodeSeries {
+        local t = self,
+        local filesystems = 'fstype!~"tmpfs|ramfs|overlay|squashfs|nsfs|fuse.*|nfs.*|cifs|smb.*|ceph.*|glusterfs|9p", mountpoint!~".*/kubelet/pods/.*"',
+        local used = '100 * (1 - node_filesystem_avail_bytes{%s} / node_filesystem_size_bytes{%s}) unless node_filesystem_readonly == 1' % [filesystems, filesystems],
+        expr:: t.worst(t.fromNodeExporter(used)),
+        title:: 'Filesystem Utilisation %(worstTitle)s%(titleGroupBy)s(%% of worst filesystem)' % self,
+        levels:: {
+          node: {
+            expr:: 'max by (mountpoint) (%s)' % t.fromNodeExporter(used, ', mountpoint'),
+            legend:: '{{mountpoint}}',
+            title:: 'Filesystem Utilisation (%)',
+          },
+        },
       },
     },
   },
 
-  nodeList: $.a.promql.entities.nodeList([$.context, $.namespace, $.pod, $.container, $.pvc, $.deployment, $.node]),
+  nodeList: $.a.promql.entities.nodeList([$.context, $.namespace, $.pod, $.container, $.pvc, $.deployment, $.statefulset, $.daemonset, $.node]),
 }
