@@ -1038,9 +1038,7 @@ local graphLib =
   local resourcesFromSpec(spec, group, version, columns, links) =
     local groupVersion = if group == '' then version else group + '/' + version;
     local columnsForGroup = std.get(columns, groupVersion, []);
-    local linksForGroup = std.get(links, groupVersion, null);
-    local effectiveLinks = if linksForGroup != null then linksForGroup else linksFromSpec(spec);
-    local nodeLinks = if linksForGroup != null then linksForGroup else [];
+    local explicitLinks = std.get(links, groupVersion, []);
     local isNamespacedPath(path) =
       std.length(std.findSubstr('/namespaces/{', path)) > 0;
     local apiPrefix = if group == '' then '/api/' + version else '/apis/' + group + '/' + version;
@@ -1077,10 +1075,10 @@ local graphLib =
     {
       resources: dedupeResources([
         resourceFromLink(link)
-        for link in effectiveLinks
+        for link in linksFromSpec(spec) + explicitLinks
         if !isSubresourcePath(link.sourcePath)
       ]),
-      links: nodeLinks,
+      links: explicitLinks,
     };
 
   local defaultColumns(namespaced) =
@@ -1191,58 +1189,20 @@ local graphLib =
 local nodeListsAppsLib =
   local a =
     local linkspecs =
-      local url =
-        local hexDigits = '0123456789ABCDEF';
+      local url(u) = std.native('invoke:url')('format', [u]);
 
-        local unreserved(b) =
-          (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
-          || b == 45 || b == 95 || b == 46 || b == 126;
-
-        local unreservedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~';
-
-        local percentEncode(s) =
-          if std.length(std.stripChars(s, unreservedChars)) == 0 then s
-          else std.join('', [
-            if unreserved(b) then std.char(b)
-            else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
-            for b in std.encodeUTF8(s)
-          ]);
-
-        local queryValue(value) =
-          if std.isString(value) then value
-          else if std.isArray(value) then std.manifestJsonMinified(value)
-          else std.toString(value);
-
-        local query(params) =
-          local keys = std.objectFields(params);
-          if std.length(keys) == 0 then ''
-          else '?' + std.join('&', [
-            percentEncode(k) + '=' + percentEncode(queryValue(params[k]))
-            for k in keys
-          ]);
-
-        function(u)
-          local scheme = std.get(u, 'scheme', null);
-          local path = std.get(u, 'path', []);
-          (if scheme != null then scheme + '://' else '')
-          + std.get(u, 'host', '')
-          + (if std.length(path) > 0 then '/' + std.join('/', [percentEncode(seg) for seg in path]) else '')
-          + query(std.get(u, 'params', {}));
-
-      local walk(current, remaining, buildFn) =
+      local walk(current, remaining) =
         if std.length(remaining) == 0 then
-          if std.type(current) == 'array' then
-            std.foldl(function(acc, item) acc + buildFn(item), current, {})
-          else buildFn(current)
+          if std.type(current) == 'array' then current else [current]
         else
           local next =
             if std.type(current) == 'object' then std.get(current, remaining[0], null)
             else null;
-          if next == null then {}
+          if next == null then []
           else if std.type(next) == 'array' then
-            std.foldl(function(acc, item) acc + walk(item, remaining[1:], buildFn), next, {})
+            std.flatMap(function(item) walk(item, remaining[1:]), next)
           else
-            walk(next, remaining[1:], buildFn);
+            walk(next, remaining[1:]);
 
       local itemPath(item, path) =
         std.foldl(
@@ -1251,16 +1211,26 @@ local nodeListsAppsLib =
           item
         );
 
-      local nestValue(labels, index, value) =
-        if index == std.length(labels) - 1 then { [labels[index]]: value }
-        else { [labels[index]]+: nestValue(labels, index + 1, value) };
+      local keyLabels(keySegs, item) = [
+        if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
+        for seg in keySegs
+      ];
 
-      local nestKeys(keySegs, item, value) =
-        local labels = [
-          if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
-          for seg in keySegs
-        ];
-        nestValue(labels, 0, value);
+      local nestEntries(entries, depth) =
+        local nestGroup(group) =
+          local ending = [e for e in group if std.length(e.labels) == depth + 1];
+          local deeper = [e for e in group if std.length(e.labels) > depth + 1];
+          if std.length(deeper) == 0 then ending[std.length(ending) - 1].value
+          else if std.length(ending) == 0 then nestEntries(deeper, depth + 1)
+          else ending[std.length(ending) - 1].value + nestEntries(deeper, depth + 1);
+        local sorted = std.sort(entries, function(e) e.labels[depth]);
+        local n = std.length(sorted);
+        local starts = [i for i in std.range(0, n - 1) if i == 0 || sorted[i].labels[depth] != sorted[i - 1].labels[depth]];
+        local bounds = starts + [n];
+        {
+          [sorted[bounds[j]].labels[depth]]: nestGroup(sorted[bounds[j]:bounds[j + 1]])
+          for j in std.range(0, std.length(starts) - 1)
+        };
 
       local splitPrefix(valueSegs) =
         if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
@@ -1328,54 +1298,48 @@ local nodeListsAppsLib =
         std.get(literal, 'host', []) + std.get(literal, 'path', [])
         + std.flattenArrays([literal.query[k] for k in std.objectFields(std.get(literal, 'query', {}))]);
 
-      local buildLinks(node, specs, root=import 'root') =
-        std.foldl(
-          function(acc, spec)
-            acc + (
-              if std.type(spec.value) == 'object' then
-                walk(
-                  node.data,
-                  spec.at,
-                  function(item)
-                    if resolvable(item, urlSegments(spec.value))
-                    then nestKeys(spec.keys, item, resolveUrl(node, item, spec.value))
-                    else {}
-                )
-              else
-                local split = splitPrefix(spec.value);
-                local base = resolveBase(root, node, split.prefix);
-                walk(
-                  node.data,
-                  spec.at,
-                  function(item)
-                    if resolvable(item, spec.value)
-                    then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
-                    else {}
-                )
-            ),
-          specs,
-          {}
-        );
-
-      local rowLinkSpec(specs, at) =
-        local matches = [spec for spec in specs if spec.at == at];
-        if std.length(matches) == 0 then null else matches[0];
-
-      local rowLinkFor(node, specs, at, root=import 'root') =
-        local spec = rowLinkSpec(specs, at);
-        if spec == null then null
+      local specEntries(node, spec, root) =
+        if std.type(spec.value) == 'object' then
+          local segs = urlSegments(spec.value);
+          [
+            if resolvable(item, segs)
+            then { labels: keyLabels(spec.keys, item), value: resolveUrl(node, item, spec.value) }
+            else null
+            for item in walk(node.data, spec.at)
+          ]
         else
           local split = splitPrefix(spec.value);
           local base = resolveBase(root, node, split.prefix);
-          function(item)
-            if resolvable(item, spec.value) then resolveFromBase(base, item, split.suffix) else null;
+          [
+            if resolvable(item, spec.value)
+            then { labels: keyLabels(spec.keys, item), value: resolveFromBase(base, item, split.suffix) }
+            else null
+            for item in walk(node.data, spec.at)
+          ];
+
+      local linksFromEntries(entriesPerSpec) =
+        local entries = [e for entries in entriesPerSpec for e in entries if e != null];
+        if std.length(entries) == 0 then {} else nestEntries(entries, 0);
+
+      local buildLinks(node, specs, root=import 'root') =
+        linksFromEntries([specEntries(node, spec, root) for spec in specs]);
+
+      local rowLinksFor(node, specs, at) =
+        local matches = [i for i in std.range(0, std.length(specs) - 1) if specs[i].at == at];
+        if std.length(matches) == 0 then []
+        else
+          local entries =
+            if std.objectHasAll(node, '_linkEntries') then node._linkEntries[matches[0]]
+            else specEntries(node, specs[matches[0]], import 'root');
+          [if e == null then null else e.value for e in entries];
 
       {
         buildLinks: buildLinks,
-        rowLinkFor: rowLinkFor,
+        rowLinksFor: rowLinksFor,
         withLinkSpecs: {
           linkSpecs:: [],
-          links: buildLinks(self, self.linkSpecs, import 'root'),
+          _linkEntries:: [specEntries(self, spec, import 'root') for spec in self.linkSpecs],
+          links: linksFromEntries(self._linkEntries),
         },
       };
     local c = {
@@ -3041,12 +3005,10 @@ local nodeListsAppsLib =
           local c = self,
           name:: error 'hiddenControl requires a name',
           value:: null,
-          html:
-            if c.value == null then []
-            else [{
-              element: 'input',
-              attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
-            }],
+          html: [
+            { element: 'input', attributes: { type: 'hidden', name: c.name, value: std.toString(v) } }
+            for v in if c.value == null then [] else if std.isArray(c.value) then c.value else [c.value]
+          ],
         };
 
         local controls = {
@@ -3352,11 +3314,10 @@ local nodeListsAppsLib =
       items: [projectItem(item, columns) for item in dataItems],
       _view+:: {
         fragment:
-          local rowLink = linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at);
           c.table {
             items:: $.items,
             columns:: columns,
-            rowLinks:: if rowLink == null then [] else [rowLink(item) for item in dataItems],
+            rowLinks:: linkspecs.rowLinksFor($, std.get($, 'linkSpecs', []), at),
             pagination:: std.get(std.get($, 'links', {}), 'pagination', null),
           },
       },
@@ -3479,6 +3440,54 @@ local nodeListsAppsLib =
     ],
   };
 
+  local replicaSetTableNode = {
+    table+:: {
+      columns: [
+        { label: 'Name', path: ['metadata', 'name'] },
+        { label: 'Namespace', path: ['metadata', 'namespace'] },
+        {
+          label: 'Revision',
+          paths: [['metadata', 'annotations']],
+          value(item):: std.get(std.get(item.metadata, 'annotations', {}), 'deployment.kubernetes.io/revision', ''),
+        },
+        {
+          label: 'Desired',
+          paths: [['spec', 'replicas']],
+          value(item):: std.get(std.get(item, 'spec', {}), 'replicas', 1),
+        },
+        {
+          label: 'Current',
+          paths: [['status', 'replicas']],
+          value(item):: std.get(std.get(item, 'status', {}), 'replicas', 0),
+        },
+        {
+          label: 'Ready',
+          paths: [['status', 'readyReplicas']],
+          value(item):: std.get(std.get(item, 'status', {}), 'readyReplicas', 0),
+        },
+        { label: 'Created', path: ['metadata', 'creationTimestamp'] },
+      ],
+    },
+  };
+
+  local replicaSetTable = a.table.node + replicaSetTableNode {
+    allReplicaSets:: kubernetes.get($.context, std.format('/apis/apps/v1/namespaces/%s/replicasets', [std.toString($.namespace)])).items,
+    data:: {
+      items: std.reverse(std.sort([
+        rs
+        for rs in $.allReplicaSets
+        if std.member([o.uid for o in std.get(rs.metadata, 'ownerReferences', [])], $.ownerUid)
+      ], function(rs) rs.metadata.creationTimestamp)),
+    },
+    linkSpecs:: [
+      {
+        at: ['items'],
+        keys: [{ path: ['metadata', 'name'] }],
+        value: [{ const: 'kubernetes' }, { origin: 'context' }, { origin: 'namespace' }, { const: 'apps' }, { param: 'replicaset', path: ['metadata', 'name'] }],
+      },
+    ],
+  };
+
   local restartNode = a.action.node {
     resource:: error 'restartNode requires a resource',
     resourceName:: error 'restartNode requires a resourceName',
@@ -3535,8 +3544,16 @@ local nodeListsAppsLib =
   };
 
   local nodeList = [
+    [['kubernetes', '$context', 'apps', 'replicasets'], replicaSetTableNode],
+    [['kubernetes', '$context', '$namespace', 'apps', 'replicasets'], replicaSetTableNode],
     [['kubernetes', '$context', '$namespace', 'apps', '$deployment', 'pods'], podSelectorTable {
       selector: kubernetes.neat.get($.context, std.format('/apis/apps/v1/namespaces/%s/deployments/%s', [std.toString($.namespace), std.toString($.deployment)])).spec.selector.matchLabels,
+    }],
+    [['kubernetes', '$context', '$namespace', 'apps', '$deployment', 'replicasets'], replicaSetTable {
+      ownerUid: kubernetes.neat.get($.context, std.format('/apis/apps/v1/namespaces/%s/deployments/%s', [std.toString($.namespace), std.toString($.deployment)])).metadata.uid,
+    }],
+    [['kubernetes', '$context', '$namespace', 'apps', '$replicaset', 'pods'], podSelectorTable {
+      selector: kubernetes.neat.get($.context, std.format('/apis/apps/v1/namespaces/%s/replicasets/%s', [std.toString($.namespace), std.toString($.replicaset)])).spec.selector.matchLabels,
     }],
     [['kubernetes', '$context', '$namespace', 'apps', '$statefulset', 'pods'], podSelectorTable {
       selector: kubernetes.neat.get($.context, std.format('/apis/apps/v1/namespaces/%s/statefulsets/%s', [std.toString($.namespace), std.toString($.statefulset)])).spec.selector.matchLabels,
