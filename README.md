@@ -150,7 +150,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/html/plugin/html/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/http
 
-> Read-only HTTP GET requests against a REST API. Base URL and default headers are configured when the plugin is started or embedded in Go.
+> HTTP requests against a REST API. Base URL and default headers are configured when the plugin is started or embedded in Go.
 
 - [Readme](plugin/http/README.md): Documentation of installation and usage
 
@@ -177,7 +177,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/kubectl/plugin/kubectl/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/kubernetes
 
-> Read-only Kubernetes API requests authenticated via kubectl contexts.
+> Kubernetes API access authenticated via kubectl contexts.
 
 - [Readme](plugin/kubernetes/README.md): Documentation of installation and usage
 
@@ -202,6 +202,15 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/jsonnet-plugin-openapi): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/openapi/plugin/openapi/main.libsonnet): Inlined code published for usage in other projects
+## plugin/telemetry
+
+> Batched telemetry queries: send a mix of query mechanisms (`promql`, `logql`, ...) in one call, distinguished by a `type` field, and let the configured backend batch as many of them as it can into as few round trips as possible.
+
+- [Readme](plugin/telemetry/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-telemetry): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/telemetry/plugin/telemetry/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/time
 
 > Relative time resolution: get the current time, and add a signed duration spec to it. `y`(ear) and `M`(onth) use calendar-aware arithmetic, so they land on the right day even though months and years aren't a fixed length - `M` is uppercase since lowercase `m` means minute. `w`(eek) and `d`(ay) are fixed-length (7/1 days). The remainder - `h`, `m`, `s`, `ms`, `us`, `ns` - is also fixed-length duration.
