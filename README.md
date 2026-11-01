@@ -94,6 +94,15 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-ui): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-ui/arcourse/arcourse-ui/main.libsonnet): Inlined code published for usage in other projects
+## arcourse/aws/arcourse-aws-ec2
+
+> Arcourse nodes for Amazon Elastic Compute Cloud, below `aws/$account/$region/ec2`.
+
+- [Readme](arcourse/aws/arcourse-aws-ec2/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/services/ec2/arcourse): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws-ec2/arcourse/aws/arcourse-aws-ec2/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/aws/arcourse-aws-ecr
 
 > Arcourse nodes for Amazon Elastic Container Registry, below `aws/$account/$region/ecr`.
