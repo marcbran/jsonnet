@@ -94,6 +94,24 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-ui): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-ui/arcourse/arcourse-ui/main.libsonnet): Inlined code published for usage in other projects
+## arcourse/aws/arcourse-aws-ecr
+
+> Arcourse nodes for Amazon Elastic Container Registry, below `aws/$account/$region/ecr`.
+
+- [Readme](arcourse/aws/arcourse-aws-ecr/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/services/ecr/arcourse): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws-ecr/arcourse/aws/arcourse-aws-ecr/main.libsonnet): Inlined code published for usage in other projects
+## arcourse/aws/arcourse-aws
+
+> Arcourse entry nodes for AWS: the `aws` node listing the configured accounts and the
+
+- [Readme](arcourse/aws/arcourse-aws/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/arcourse): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws/arcourse/aws/arcourse-aws/main.libsonnet): Inlined code published for usage in other projects
 ## pkg
 
 > Jsonnet package definitions.
@@ -103,6 +121,15 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/jpoet/tree/main/pkg/pkg/lib): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/pkg/pkg/main.libsonnet): Inlined code published for usage in other projects
+## plugin/aws
+
+> Read-only calls against AWS service APIs, driven by the services' Smithy models. Services and credentials are configured when the plugin is started or embedded in Go.
+
+- [Readme](plugin/aws/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/aws/plugin/aws/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/html
 
 > Object-based DSL for creating HTML documents.
