@@ -112,6 +112,42 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/services/ecr/arcourse): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws-ecr/arcourse/aws/arcourse-aws-ecr/main.libsonnet): Inlined code published for usage in other projects
+## arcourse/aws/arcourse-aws-iam
+
+> Arcourse nodes for AWS Identity and Access Management, below `aws/$account/iam`.
+
+- [Readme](arcourse/aws/arcourse-aws-iam/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/services/iam/arcourse): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws-iam/arcourse/aws/arcourse-aws-iam/main.libsonnet): Inlined code published for usage in other projects
+## arcourse/aws/arcourse-aws-opensearch
+
+> Arcourse nodes for Amazon OpenSearch Service, below `aws/$account/$region/opensearch`.
+
+- [Readme](arcourse/aws/arcourse-aws-opensearch/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/services/opensearch/arcourse): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws-opensearch/arcourse/aws/arcourse-aws-opensearch/main.libsonnet): Inlined code published for usage in other projects
+## arcourse/aws/arcourse-aws-rds
+
+> Arcourse nodes for Amazon Relational Database Service, below `aws/$account/$region/rds`.
+
+- [Readme](arcourse/aws/arcourse-aws-rds/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/services/rds/arcourse): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws-rds/arcourse/aws/arcourse-aws-rds/main.libsonnet): Inlined code published for usage in other projects
+## arcourse/aws/arcourse-aws-s3
+
+> Arcourse nodes for Amazon Simple Storage Service, below `aws/$account/$region/s3`.
+
+- [Readme](arcourse/aws/arcourse-aws-s3/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/services/s3/arcourse): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws-s3/arcourse/aws/arcourse-aws-s3/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/aws/arcourse-aws
 
 > Arcourse entry nodes for AWS: the `aws` node listing the configured accounts and the
