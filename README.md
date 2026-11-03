@@ -157,6 +157,33 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/arcourse): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws/arcourse/aws/arcourse-aws/main.libsonnet): Inlined code published for usage in other projects
+## arcourse/gcp/arcourse-gcp-compute
+
+> Arcourse nodes for Compute Engine, below `gcp/$project/compute`.
+
+- [Readme](arcourse/gcp/arcourse-gcp-compute/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp/tree/main/services/compute/arcourse): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/gcp/arcourse-gcp-compute/arcourse/gcp/arcourse-gcp-compute/main.libsonnet): Inlined code published for usage in other projects
+## arcourse/gcp/arcourse-gcp-storage
+
+> Arcourse nodes for Cloud Storage, below `gcp/$project/storage`.
+
+- [Readme](arcourse/gcp/arcourse-gcp-storage/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp/tree/main/services/storage/arcourse): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/gcp/arcourse-gcp-storage/arcourse/gcp/arcourse-gcp-storage/main.libsonnet): Inlined code published for usage in other projects
+## arcourse/gcp/arcourse-gcp
+
+> Arcourse entry nodes for Google Cloud: the `gcp` node listing the configured projects and the
+
+- [Readme](arcourse/gcp/arcourse-gcp/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp/tree/main/arcourse): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/gcp/arcourse-gcp/arcourse/gcp/arcourse-gcp/main.libsonnet): Inlined code published for usage in other projects
 ## pkg
 
 > Jsonnet package definitions.
@@ -175,6 +202,15 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/jsonnet-plugin-aws): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/aws/plugin/aws/main.libsonnet): Inlined code published for usage in other projects
+## plugin/gcp
+
+> Read-only calls against Google Cloud APIs, driven by the services' Discovery documents. Services and credentials are configured when the plugin is started or embedded in Go.
+
+- [Readme](plugin/gcp/README.md): Documentation of installation and usage
+
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp): Original source code
+
+- [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/gcp/plugin/gcp/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/html
 
 > Object-based DSL for creating HTML documents.
