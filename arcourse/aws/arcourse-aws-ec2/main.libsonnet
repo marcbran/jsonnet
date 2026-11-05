@@ -386,13 +386,14 @@ local a = import 'arcourse-ui/main.libsonnet',
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'clientVpnEndpoints', '$ClientVpnEndpointId', 'authorizationPolicy'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetClientVpnEndpointAuthorizationPolicy',
       {
         ClientVpnEndpointId: $.ClientVpnEndpointId,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 'ec2', 'customerGateways'], a.table.node + aws.regional + {
     response:: call(
@@ -640,7 +641,7 @@ local a = import 'arcourse-ui/main.libsonnet',
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'instances', '$InstanceId', 'consoleOutput'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetConsoleOutput',
       {
@@ -648,12 +649,13 @@ local a = import 'arcourse-ui/main.libsonnet',
         Latest: std.get($._params, 'Latest', null),
       }
     ),
+    data: self.response,
     _paramSpecs+: [
       { default: null, name: 'Latest', type: 'boolean' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'instances', '$InstanceId', 'consoleScreenshot'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetConsoleScreenshot',
       {
@@ -661,27 +663,30 @@ local a = import 'arcourse-ui/main.libsonnet',
         WakeUp: std.get($._params, 'WakeUp', null),
       }
     ),
+    data: self.response,
     _paramSpecs+: [
       { default: null, name: 'WakeUp', type: 'boolean' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'instances', '$InstanceId', 'uefiData'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetInstanceUefiData',
       {
         InstanceId: $.InstanceId,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 'ec2', 'instances', '$InstanceId', 'launchTemplateData'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetLaunchTemplateData',
       {
         InstanceId: $.InstanceId,
       }
     ),
+    data: self.response,
     linkSpecs:: [
       {
         at: ['LaunchTemplateData'],
@@ -1454,7 +1459,7 @@ local a = import 'arcourse-ui/main.libsonnet',
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'subnets', '$SubnetId', 'cidrReservations'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetSubnetCidrReservations',
       {
@@ -1463,6 +1468,7 @@ local a = import 'arcourse-ui/main.libsonnet',
         NextToken: std.get($._params, 'NextToken', null),
       }
     ),
+    data: self.response,
     _paramSpecs+: [
       { default: null, name: 'MaxResults', type: 'number' },
       { default: null, name: 'NextToken', type: 'string' },
@@ -1541,13 +1547,14 @@ local a = import 'arcourse-ui/main.libsonnet',
     },
   }],
   [['aws', '$account', '$region', 'ec2', 'transitGatewayAttachments', '$TransitGatewayAttachmentId', 'natConfiguration'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetTransitGatewayAttachmentNatConfiguration',
       {
         TransitGatewayAttachmentId: $.TransitGatewayAttachmentId,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 'ec2', 'transitGateways'], a.table.node + aws.regional + aws.paginated + {
     inputToken:: 'NextToken',
@@ -1936,7 +1943,7 @@ local a = import 'arcourse-ui/main.libsonnet',
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'vpcs', '$VpcId', 'resourcesBlockingEncryptionEnforcement'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetVpcResourcesBlockingEncryptionEnforcement',
       {
@@ -1945,6 +1952,7 @@ local a = import 'arcourse-ui/main.libsonnet',
         NextToken: std.get($._params, 'NextToken', null),
       }
     ),
+    data: self.response,
     _paramSpecs+: [
       { default: null, name: 'MaxResults', type: 'number' },
       { default: null, name: 'NextToken', type: 'string' },
