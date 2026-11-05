@@ -184,13 +184,14 @@ local referenced = gcp.referenced {
     ],
   }],
   [['gcp', '$project', 'storage', 'buckets', '$bucket'], a.resource.node + gcp.project + referenced + {
-    data: call(
+    response:: call(
       self.ctx,
       'storage.buckets.get',
       {
         bucket: $.bucket,
       }
     ),
+    data: self.response,
   }],
   [['gcp', '$project', 'storage', 'buckets', '$bucket', 'objects'], a.table.node + gcp.project + gcp.paginated + {
     response:: call(
@@ -246,7 +247,7 @@ local referenced = gcp.referenced {
     ],
   }],
   [['gcp', '$project', 'storage', 'buckets', '$bucket', 'objects', '$object'], a.resource.node + gcp.project + referenced + {
-    data: call(
+    response:: call(
       self.ctx,
       'storage.objects.get',
       {
@@ -254,5 +255,6 @@ local referenced = gcp.referenced {
         object: $.object,
       }
     ),
+    data: self.response,
   }],
 ]
