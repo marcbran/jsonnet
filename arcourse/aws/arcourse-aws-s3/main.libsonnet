@@ -107,13 +107,14 @@ local a = import 'arcourse-ui/main.libsonnet',
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'HeadBucket',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'analyticsConfigurations'], a.table.node + aws.regional + {
     response:: call(
@@ -146,7 +147,7 @@ local a = import 'arcourse-ui/main.libsonnet',
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'analyticsConfigurations', '$Id'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketAnalyticsConfiguration',
       {
@@ -154,6 +155,7 @@ local a = import 'arcourse-ui/main.libsonnet',
         Id: $.Id,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'intelligentTieringConfigurations'], a.table.node + aws.regional + {
     response:: call(
@@ -185,7 +187,7 @@ local a = import 'arcourse-ui/main.libsonnet',
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'intelligentTieringConfigurations', '$Id'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketIntelligentTieringConfiguration',
       {
@@ -193,6 +195,7 @@ local a = import 'arcourse-ui/main.libsonnet',
         Id: $.Id,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'inventoryConfigurations'], a.table.node + aws.regional + {
     response:: call(
@@ -227,7 +230,7 @@ local a = import 'arcourse-ui/main.libsonnet',
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'inventoryConfigurations', '$Id'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketInventoryConfiguration',
       {
@@ -235,6 +238,7 @@ local a = import 'arcourse-ui/main.libsonnet',
         Id: $.Id,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'metricsConfigurations'], a.table.node + aws.regional + {
     response:: call(
@@ -267,7 +271,7 @@ local a = import 'arcourse-ui/main.libsonnet',
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'metricsConfigurations', '$Id'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketMetricsConfiguration',
       {
@@ -275,6 +279,7 @@ local a = import 'arcourse-ui/main.libsonnet',
         Id: $.Id,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'multipartUploads'], a.table.node + aws.regional + {
     response:: call(
@@ -385,7 +390,7 @@ local a = import 'arcourse-ui/main.libsonnet',
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'objects', '$Key'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'HeadObject',
       {
@@ -393,6 +398,7 @@ local a = import 'arcourse-ui/main.libsonnet',
         Key: $.Key,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'objects', '$Key', 'annotations'], a.table.node + aws.regional + aws.paginated + {
     inputToken:: 'ContinuationToken',
@@ -424,7 +430,7 @@ local a = import 'arcourse-ui/main.libsonnet',
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'objects', '$Key', 'acl'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetObjectAcl',
       {
@@ -433,12 +439,13 @@ local a = import 'arcourse-ui/main.libsonnet',
         VersionId: std.get($._params, 'VersionId', null),
       }
     ),
+    data: self.response,
     _paramSpecs+: [
       { default: null, name: 'VersionId', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'objects', '$Key', 'legalHold'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetObjectLegalHold',
       {
@@ -447,12 +454,13 @@ local a = import 'arcourse-ui/main.libsonnet',
         VersionId: std.get($._params, 'VersionId', null),
       }
     ),
+    data: self.response,
     _paramSpecs+: [
       { default: null, name: 'VersionId', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'objects', '$Key', 'retention'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetObjectRetention',
       {
@@ -461,12 +469,13 @@ local a = import 'arcourse-ui/main.libsonnet',
         VersionId: std.get($._params, 'VersionId', null),
       }
     ),
+    data: self.response,
     _paramSpecs+: [
       { default: null, name: 'VersionId', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'objects', '$Key', 'tagging'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetObjectTagging',
       {
@@ -475,81 +484,90 @@ local a = import 'arcourse-ui/main.libsonnet',
         VersionId: std.get($._params, 'VersionId', null),
       }
     ),
+    data: self.response,
     _paramSpecs+: [
       { default: null, name: 'VersionId', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'abac'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketAbac',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'accelerateConfiguration'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketAccelerateConfiguration',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'acl'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketAcl',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'cors'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketCors',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'encryption'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketEncryption',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'lifecycleConfiguration'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketLifecycleConfiguration',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'location'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketLocation',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'logging'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketLogging',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
     linkSpecs:: [
       {
         at: ['LoggingEnabled'],
@@ -559,120 +577,133 @@ local a = import 'arcourse-ui/main.libsonnet',
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'metadataConfiguration'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketMetadataConfiguration',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'metadataTableConfiguration'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketMetadataTableConfiguration',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'notificationConfiguration'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketNotificationConfiguration',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'ownershipControls'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketOwnershipControls',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'policyStatus'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketPolicyStatus',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'policy'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketPolicy',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'replication'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketReplication',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'requestPayment'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketRequestPayment',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'tagging'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketTagging',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'versioning'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketVersioning',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'website'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetBucketWebsite',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'objectLockConfiguration'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetObjectLockConfiguration',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'publicAccessBlock'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'GetPublicAccessBlock',
       {
         Bucket: $.Bucket,
       }
     ),
+    data: self.response,
   }],
 ]
