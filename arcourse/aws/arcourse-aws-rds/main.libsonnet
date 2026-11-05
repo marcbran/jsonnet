@@ -207,13 +207,14 @@ local a = import 'arcourse-ui/main.libsonnet',
     ],
   }],
   [['aws', '$account', '$region', 'rds', 'dbClusterSnapshots', '$DBClusterSnapshotIdentifier', 'attributes'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'DescribeDBClusterSnapshotAttributes',
       {
         DBClusterSnapshotIdentifier: $.DBClusterSnapshotIdentifier,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 'rds', 'dbClusters'], a.table.node + aws.regional + aws.paginated + {
     inputToken:: 'Marker',
@@ -494,13 +495,14 @@ local a = import 'arcourse-ui/main.libsonnet',
     ],
   }],
   [['aws', '$account', '$region', 'rds', 'dbInstances', '$DBInstanceIdentifier', 'validModifications'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'DescribeValidDBInstanceModifications',
       {
         DBInstanceIdentifier: $.DBInstanceIdentifier,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 'rds', 'dbParameterGroups'], a.table.node + aws.regional + aws.paginated + {
     inputToken:: 'Marker',
@@ -655,13 +657,14 @@ local a = import 'arcourse-ui/main.libsonnet',
     ],
   }],
   [['aws', '$account', '$region', 'rds', 'dbSnapshots', '$DBSnapshotIdentifier', 'attributes'], a.resource.node + aws.regional + {
-    data: call(
+    response:: call(
       self.ctx,
       'DescribeDBSnapshotAttributes',
       {
         DBSnapshotIdentifier: $.DBSnapshotIdentifier,
       }
     ),
+    data: self.response,
   }],
   [['aws', '$account', '$region', 'rds', 'dbSubnetGroups'], a.table.node + aws.regional + aws.paginated + {
     inputToken:: 'Marker',
