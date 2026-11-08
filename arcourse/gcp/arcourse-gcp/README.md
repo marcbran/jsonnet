@@ -2,7 +2,7 @@
 
 > Arcourse entry nodes for Google Cloud: the `gcp` node listing the configured projects and the
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp/tree/main/arcourse): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp/tree/main/pkg/arcourse-gcp): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/gcp/arcourse-gcp/arcourse/gcp/arcourse-gcp/main.libsonnet): Inlined code published for usage in other projects
 
