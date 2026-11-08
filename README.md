@@ -226,7 +226,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](plugin/http/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-http): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-http/tree/main/pkg/jsonnet-plugin-http): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/http/plugin/http/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/jsonnet
@@ -289,7 +289,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](plugin/time/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-time): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-time/tree/main/pkg/jsonnet-plugin-time): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/time/plugin/time/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/url
