@@ -2,7 +2,7 @@
 
 > Object-based DSL for creating HTML documents.
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-html): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-html/tree/main/pkg/jsonnet-plugin-html): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/html/plugin/html/main.libsonnet): Inlined code published for usage in other projects
 
