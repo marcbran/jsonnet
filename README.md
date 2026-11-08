@@ -163,7 +163,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](arcourse/gcp/arcourse-gcp-compute/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp/tree/main/services/compute/arcourse): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp/tree/main/pkg/arcourse-gcp-compute): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/gcp/arcourse-gcp-compute/arcourse/gcp/arcourse-gcp-compute/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/gcp/arcourse-gcp-storage
@@ -172,7 +172,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](arcourse/gcp/arcourse-gcp-storage/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp/tree/main/services/storage/arcourse): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp/tree/main/pkg/arcourse-gcp-storage): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/gcp/arcourse-gcp-storage/arcourse/gcp/arcourse-gcp-storage/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/gcp/arcourse-gcp
@@ -181,7 +181,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](arcourse/gcp/arcourse-gcp/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp/tree/main/arcourse): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp/tree/main/pkg/arcourse-gcp): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/gcp/arcourse-gcp/arcourse/gcp/arcourse-gcp/main.libsonnet): Inlined code published for usage in other projects
 ## pkg
@@ -208,7 +208,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](plugin/gcp/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp/tree/main/pkg/jsonnet-plugin-gcp): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/gcp/plugin/gcp/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/html
