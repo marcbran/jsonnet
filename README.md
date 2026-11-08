@@ -19,7 +19,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](arcourse/arcourse-echarts/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-echarts): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-telemetry/tree/main/pkg/arcourse-echarts): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-echarts/arcourse/arcourse-echarts/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/arcourse-grafana
@@ -82,7 +82,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](arcourse/arcourse-telemetry/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-telemetry): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-telemetry/tree/main/pkg/arcourse-telemetry): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-telemetry/arcourse/arcourse-telemetry/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/arcourse-ui
@@ -280,7 +280,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](plugin/telemetry/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-telemetry): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-telemetry/tree/main/pkg/jsonnet-plugin-telemetry): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/telemetry/plugin/telemetry/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/time
