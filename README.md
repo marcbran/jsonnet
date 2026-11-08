@@ -262,7 +262,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](plugin/markdown/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-markdown): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-markdown/tree/main/pkg/jsonnet-plugin-markdown): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/markdown/plugin/markdown/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/openapi
