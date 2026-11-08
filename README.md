@@ -235,7 +235,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](plugin/jsonnet/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-jsonnet): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-jsonnet/tree/main/pkg/jsonnet-plugin-jsonnet): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/jsonnet/plugin/jsonnet/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/kubectl
