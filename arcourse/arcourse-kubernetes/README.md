@@ -2,7 +2,7 @@
 
 > Arcourse graph for browsing Kubernetes resources.
 
-- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-kubernetes): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-kubernetes/tree/main/pkg/arcourse-kubernetes): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-kubernetes/arcourse/arcourse-kubernetes/main.libsonnet): Inlined code published for usage in other projects
 
