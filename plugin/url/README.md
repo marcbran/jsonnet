@@ -2,7 +2,7 @@
 
 > URL building, parsing and escaping backed by Go's `net/url`. Path segments and query parameters are escaped the way Go escapes them: a path segment keeps characters like `:`, `@` and `+`, while query keys and values escape them and encode spaces as `+`. Query parameters are objects whose values are strings, numbers, booleans or arrays of those; arrays become repeated keys and `null` values are omitted.
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-url): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-url/tree/main/pkg/jsonnet-plugin-url): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/url/plugin/url/main.libsonnet): Inlined code published for usage in other projects
 
