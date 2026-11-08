@@ -2,7 +2,7 @@
 
 > Generates an arcourse graph for browsing any OpenAPI-described service.
 
-- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-openapi): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-openapi/tree/main/pkg/arcourse-openapi): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-openapi/arcourse/arcourse-openapi/main.libsonnet): Inlined code published for usage in other projects
 
