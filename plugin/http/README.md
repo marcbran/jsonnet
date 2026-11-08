@@ -2,7 +2,7 @@
 
 > HTTP requests against a REST API. Base URL and default headers are configured when the plugin is started or embedded in Go.
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-http): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-http/tree/main/pkg/jsonnet-plugin-http): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/http/plugin/http/main.libsonnet): Inlined code published for usage in other projects
 
