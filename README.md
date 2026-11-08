@@ -100,7 +100,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](arcourse/aws/arcourse-aws-ec2/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/services/ec2/arcourse): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/pkg/arcourse-aws-ec2): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws-ec2/arcourse/aws/arcourse-aws-ec2/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/aws/arcourse-aws-ecr
@@ -109,7 +109,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](arcourse/aws/arcourse-aws-ecr/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/services/ecr/arcourse): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/pkg/arcourse-aws-ecr): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws-ecr/arcourse/aws/arcourse-aws-ecr/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/aws/arcourse-aws-iam
@@ -118,7 +118,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](arcourse/aws/arcourse-aws-iam/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/services/iam/arcourse): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/pkg/arcourse-aws-iam): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws-iam/arcourse/aws/arcourse-aws-iam/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/aws/arcourse-aws-opensearch
@@ -127,7 +127,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](arcourse/aws/arcourse-aws-opensearch/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/services/opensearch/arcourse): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/pkg/arcourse-aws-opensearch): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws-opensearch/arcourse/aws/arcourse-aws-opensearch/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/aws/arcourse-aws-rds
@@ -136,7 +136,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](arcourse/aws/arcourse-aws-rds/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/services/rds/arcourse): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/pkg/arcourse-aws-rds): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws-rds/arcourse/aws/arcourse-aws-rds/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/aws/arcourse-aws-s3
@@ -145,7 +145,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](arcourse/aws/arcourse-aws-s3/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/services/s3/arcourse): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/pkg/arcourse-aws-s3): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws-s3/arcourse/aws/arcourse-aws-s3/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/aws/arcourse-aws
@@ -154,7 +154,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](arcourse/aws/arcourse-aws/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/arcourse): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/pkg/arcourse-aws): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws/arcourse/aws/arcourse-aws/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/gcp/arcourse-gcp-compute
@@ -199,7 +199,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](plugin/aws/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/pkg/jsonnet-plugin-aws): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/aws/plugin/aws/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/gcp
