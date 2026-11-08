@@ -298,7 +298,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](plugin/url/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-url): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-url/tree/main/pkg/jsonnet-plugin-url): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/url/plugin/url/main.libsonnet): Inlined code published for usage in other projects
 ## promql
