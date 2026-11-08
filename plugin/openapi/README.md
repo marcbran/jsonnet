@@ -2,7 +2,7 @@
 
 > OpenAPI-oriented native functions and code generation support for Jsonnet.
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-openapi): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-openapi/tree/main/pkg/jsonnet-plugin-openapi): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/openapi/plugin/openapi/main.libsonnet): Inlined code published for usage in other projects
 
