@@ -2,7 +2,7 @@
 
 > Batched telemetry queries: send a mix of query mechanisms (`promql`, `logql`, ...) in one call, distinguished by a `type` field, and let the configured backend batch as many of them as it can into as few round trips as possible.
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-telemetry): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-telemetry/tree/main/pkg/jsonnet-plugin-telemetry): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/telemetry/plugin/telemetry/main.libsonnet): Inlined code published for usage in other projects
 
