@@ -22,15 +22,6 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/jsonnet-plugin-telemetry/tree/main/pkg/arcourse-echarts): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-echarts/arcourse/arcourse-echarts/main.libsonnet): Inlined code published for usage in other projects
-## arcourse/arcourse-grafana
-
-> Generates an arcourse graph for browsing Grafana datasources and rendering their
-
-- [Readme](arcourse/arcourse-grafana/README.md): Documentation of installation and usage
-
-- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-grafana): Original source code
-
-- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-grafana/arcourse/arcourse-grafana/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/arcourse-graph
 
 > Path-addressable node graph primitives used to compose arcourse resource explorers.
@@ -40,15 +31,6 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-graph): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-graph/arcourse/arcourse-graph/main.libsonnet): Inlined code published for usage in other projects
-## arcourse/arcourse-kubectl
-
-> Generates an arcourse graph for browsing Kubernetes resources via `kubectl`.
-
-- [Readme](arcourse/arcourse-kubectl/README.md): Documentation of installation and usage
-
-- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-kubectl): Original source code
-
-- [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-kubectl/arcourse/arcourse-kubectl/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/arcourse-kubernetes
 
 > Arcourse graph for browsing Kubernetes resources.
@@ -238,15 +220,6 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 - [Source Code](https://github.com/marcbran/jsonnet-plugin-jsonnet/tree/main/pkg/jsonnet-plugin-jsonnet): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/jsonnet/plugin/jsonnet/main.libsonnet): Inlined code published for usage in other projects
-## plugin/kubectl
-
-> Read-only access to Kubernetes resources via client-go, similar to `kubectl get`.
-
-- [Readme](plugin/kubectl/README.md): Documentation of installation and usage
-
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-kubectl): Original source code
-
-- [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/kubectl/plugin/kubectl/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/kubernetes
 
 > Kubernetes API access authenticated via kubectl contexts.
