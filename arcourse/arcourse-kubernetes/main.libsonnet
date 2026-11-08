@@ -523,6 +523,12 @@ local graphLib =
   local kubernetes = {
     contexts(): std.native('invoke:kubernetes')('contexts', []),
     get(ctx, path, fields=[]): std.native('invoke:kubernetes')('get', [ctx, path, fields]),
+    exec(ctx, target, command): std.native('invoke:kubernetes')('exec', [ctx, target, command]) + {
+      json:: std.parseJson(self.stdout),
+    },
+    proxy(ctx, target, path, options={}): std.native('invoke:kubernetes')('proxy', [ctx, target, path, options]) + {
+      json:: std.parseJson(self.body),
+    },
     neat: {
       get(ctx, path, fields=[]): std.native('invoke:kubernetes')('neatGet', [ctx, path, fields]),
     },
@@ -821,18 +827,20 @@ local graphLib =
       ])
       else error 'unsupported literal type: ' + std.type(value);
 
-    local dataField(expr, hidden=false) =
-      j.Field('data', expr) { Hide: if hidden then 0 else 1 };
+    local responseFields(expr, hidden=false) = [
+      j.Field('response', expr) { Hide: 0 },
+      j.Field('data', member(j.Self, 'response')) { Hide: if hidden then 0 else 1 },
+    ];
     local linkSpecEntry(spec) =
       prettyObject([objectField(field, compactLiteral(spec[field])) for field in ['at', 'keys', 'value']], 6);
     local dataObject(expr, linkSpecs=[], viewFields=[]) = prettyObject(
-      [dataField(expr)] +
+      responseFields(expr) +
       (if std.length(linkSpecs) > 0 then [j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] else []) +
       viewFields,
       2
     );
     local listObject(dataExpr, linkSpecs, columnsExpr=null) = prettyObject(
-      [dataField(dataExpr, columnsExpr != null), j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] +
+      responseFields(dataExpr, true) + [j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] +
       (if columnsExpr != null then [j.Field('table', prettyObject([
          j.Field('at', j.Array([j.String('items')])),
          j.Field('columns', columnsExpr),
@@ -943,7 +951,8 @@ local graphLib =
       j.Add(
         member(member(var('a'), 'list'), 'node'),
         prettyObject([
-          j.Field('data', call(member(var('kubernetes'), 'contexts'))),
+          j.Field('response', call(member(var('kubernetes'), 'contexts'))) { Hide: 0 },
+          j.Field('data', member(j.Self, 'response')) { Hide: 0 },
           j.Field('links', prettyObjectComp(
             [j.Field(member(var('c'), 'name'), call(member(member(var('root'), 'kubernetes'), 'context'), [member(var('c'), 'name')]))],
             [j.ForSpec('c', member(j.Dollar, 'data'))],
@@ -1188,6 +1197,15 @@ local graphLib =
   };
 local nodeListsAppsLib =
   local a =
+    local failure =
+      local isFailure(value) = std.isObject(value) && std.objectHas(value, '_failure');
+
+      {
+        isFailure: isFailure,
+        withFailure: {
+          _failure:: if isFailure(std.get(self, 'response')) then self.response._failure else null,
+        },
+      };
     local linkspecs =
       local url(u) = std.native('invoke:url')('format', [u]);
 
@@ -2729,6 +2747,51 @@ local nodeListsAppsLib =
             },
           ],
         },
+      failure:
+        local style = |||
+          @scope (.failure-card) {
+            :scope.card {
+              display: inline-flex;
+              flex-direction: column;
+              gap: 0.5em;
+              padding: 0.75em 1em;
+              border-color: var(--error-color);
+              font-family: monospace;
+            }
+            .failure-title {
+              margin: 0;
+              color: var(--error-color);
+              font-weight: bold;
+            }
+            .failure-message {
+              margin: 0;
+              white-space: pre-wrap;
+              overflow-wrap: anywhere;
+            }
+          }
+        |||;
+
+        {
+          local c = self,
+          failure:: error 'Failure requires failure',
+          local code = std.get(c.failure, 'code', null),
+          local reason = std.get(c.failure, 'reason', null),
+          local message = std.get(c.failure, 'message', null),
+          local title = std.join(' ', [std.toString(part) for part in [code, reason] if part != null && part != '']),
+          html: [
+            { element: 'style', children: [style] },
+            {
+              element: 'div',
+              attributes: { class: 'card failure-card', role: 'alert' },
+              children: [
+                { element: 'p', attributes: { class: 'failure-title' }, children: [if title == '' then 'Failure' else title] },
+              ] + (
+                if message == null || message == '' then []
+                else [{ element: 'p', attributes: { class: 'failure-message' }, children: [std.toString(message)] }]
+              ),
+            },
+          ],
+        },
       breadcrumbs:
         local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
         local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
@@ -3130,16 +3193,16 @@ local nodeListsAppsLib =
     local isNode(value) =
       std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');
 
-    local collectNeighbors(obj, textPrefix='', exclude=[], linkStrings=false) =
+    local collectNeighbors(obj, textPrefix='', exclude=[], linkStrings=false, parent=[]) =
       std.flatMap(
         function(k)
           if std.member(exclude, k) || std.substr(k, 0, 1) == '_' then []
           else
             local value = obj[k];
             local textPath = if textPrefix == '' then k else '%s/%s' % [textPrefix, k];
-            if isNode(value) then [{ link: value._queryPath, text: textPath }]
-            else if std.type(value) == 'object' then collectNeighbors(value, textPath, exclude, linkStrings)
-            else if linkStrings && std.type(value) == 'string' then [{ link: value, text: textPath, external: true }]
+            if isNode(value) then [{ link: value._queryPath, text: textPath, name:: k, parent:: parent }]
+            else if std.type(value) == 'object' then collectNeighbors(value, textPath, exclude, linkStrings, parent + [k])
+            else if linkStrings && std.type(value) == 'string' then [{ link: value, text: textPath, external: true, name:: k, parent:: parent }]
             else [],
         std.objectFields(obj)
       );
@@ -3160,13 +3223,26 @@ local nodeListsAppsLib =
       local hidden = std.get(std.get(std.get(obj, 'list', {}), 'hiddenItems', {}), title, []);
       [item for item in items if !std.member(hidden, item.text)];
 
+    local groupByParent(prefix, items) =
+      if std.all([std.length(item.parent) == 0 for item in items]) then [{ title: prefix, items: items }]
+      else
+        local titleOf(item) = std.join('/', [prefix] + item.parent);
+        [
+          { title: title, items: [item { text: item.name } for item in items if titleOf(item) == title] }
+          for title in std.set([titleOf(item) for item in items])
+        ];
+
     local linksGroups(obj) =
       local links = std.get(obj, 'links', {});
       if std.type(links) != 'object' then []
       else std.flatMap(
         function(k)
           local value = links[k];
-          if std.type(value) == 'object' && !isNode(value) then [{ title: k, items: filterItems(obj, k, collectNeighbors(value, linkStrings=true)) }]
+          if std.type(value) == 'object' && !isNode(value) then [
+            group
+            for parent in groupByParent(k, collectNeighbors(value, linkStrings=true))
+            for group in [{ title: parent.title, items: filterItems(obj, parent.title, parent.items) }]
+          ]
           else [],
         std.objectFields(links)
       );
@@ -3221,7 +3297,8 @@ local nodeListsAppsLib =
         group
         for k in neighborKeys(obj)
         if !isNode(obj[k])
-        for group in [{ title: k, items: filterItems(obj, k, [item for item in collectNeighbors(obj[k]) if !std.setMember(item.link, curated)]) }]
+        for parent in groupByParent(k, [item for item in collectNeighbors(obj[k]) if !std.setMember(item.link, curated)])
+        for group in [{ title: parent.title, items: filterItems(obj, parent.title, parent.items) }]
         if std.length(group.items) > 0
       ];
 
@@ -3364,16 +3441,28 @@ local nodeListsAppsLib =
       },
     };
 
-    local withNode = { node: self.view + linkspecs.withLinkSpecs };
+    local failureView = failure.withFailure {
+      _view+:: {
+        fragment: if $._failure != null then c.failure { failure:: $._failure } else super.fragment,
+      },
+    };
+
+    local withNode = {
+      view+: failureView,
+      node: self.view + linkspecs.withLinkSpecs,
+    };
 
     {
       default: { view: listView } + withNode,
-      list: { view: listView } + withNode,
-      table: { view: tableView } + withNode,
-      tree: { view: treeView } + withNode,
-      yaml: { view: yamlView } + withNode,
-      resource: { view: resourceView } + withNode,
-      action: { view: actionView } + withNode,
+      list: { view: listView, component: c.list } + withNode,
+      table: { view: tableView, component: c.table } + withNode,
+      tree: { view: treeView, component: c.tree } + withNode,
+      yaml: { view: yamlView, component: c.yaml } + withNode,
+      resource: { view: resourceView, component: c.resource } + withNode,
+      action: { view: actionView, component: c.action } + withNode,
+      failure: { view: failureView, component: c.failure },
+      page: { component: c.page },
+      breadcrumbs: { component: c.breadcrumbs },
     };
   local coreLib = {
     podTableNode:: {
@@ -3410,6 +3499,12 @@ local nodeListsAppsLib =
   local kubernetes = {
     contexts(): std.native('invoke:kubernetes')('contexts', []),
     get(ctx, path, fields=[]): std.native('invoke:kubernetes')('get', [ctx, path, fields]),
+    exec(ctx, target, command): std.native('invoke:kubernetes')('exec', [ctx, target, command]) + {
+      json:: std.parseJson(self.stdout),
+    },
+    proxy(ctx, target, path, options={}): std.native('invoke:kubernetes')('proxy', [ctx, target, path, options]) + {
+      json:: std.parseJson(self.body),
+    },
     neat: {
       get(ctx, path, fields=[]): std.native('invoke:kubernetes')('neatGet', [ctx, path, fields]),
     },
