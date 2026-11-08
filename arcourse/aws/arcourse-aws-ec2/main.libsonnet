@@ -59,11 +59,14 @@ local a =
         local rest = splitPrefix(valueSegs[1:]);
         { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
 
+    local originValue(node, name) =
+      if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else node[name];
+
     local resolveBase(root, node, prefixSegs) =
       std.foldl(
         function(acc, seg)
           if std.objectHas(seg, 'const') then acc[seg.const]
-          else acc[seg.origin](std.toString(node[seg.origin])),
+          else acc[seg.origin](std.toString(originValue(node, seg.origin))),
         prefixSegs,
         root
       );
@@ -99,7 +102,7 @@ local a =
 
     local resolveLiteralSegment(node, item, seg) =
       if std.objectHas(seg, 'const') then seg.const
-      else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
+      else if std.objectHas(seg, 'origin') then std.toString(originValue(node, seg.origin))
       else resolveKey(seg, item);
 
     local resolveLiteralSegments(node, item, segs) =
