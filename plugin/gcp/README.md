@@ -2,7 +2,7 @@
 
 > Read-only calls against Google Cloud APIs, driven by the services' Discovery documents. Services and credentials are configured when the plugin is started or embedded in Go.
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-gcp/tree/main/pkg/jsonnet-plugin-gcp): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/gcp/plugin/gcp/main.libsonnet): Inlined code published for usage in other projects
 
