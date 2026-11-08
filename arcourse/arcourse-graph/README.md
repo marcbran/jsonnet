@@ -28,6 +28,15 @@ the same path are layered (merged) together.
 
 ## Fields
 
+### failure
+
+`isFailure(value)` checks for a plugin `_failure` value; `withFailure` surfaces a failed
+
+```jsonnet
+arcourse-graph.failure
+```
+
+
 ### graph
 
 Builds a full node tree from `nodeSpecs`, applying `defaultView` to any node that
