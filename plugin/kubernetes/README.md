@@ -2,7 +2,7 @@
 
 > Kubernetes API access authenticated via kubectl contexts.
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-kubernetes): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-kubernetes/tree/main/pkg/jsonnet-plugin-kubernetes): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/kubernetes/plugin/kubernetes/main.libsonnet): Inlined code published for usage in other projects
 
