@@ -1,3 +1,12 @@
+local failure =
+  local isFailure(value) = std.isObject(value) && std.objectHas(value, '_failure');
+
+  {
+    isFailure: isFailure,
+    withFailure: {
+      _failure:: if isFailure(std.get(self, 'response')) then self.response._failure else null,
+    },
+  };
 local linkspecs =
   local url(u) = std.native('invoke:url')('format', [u]);
 
@@ -1539,6 +1548,51 @@ local c = {
         },
       ],
     },
+  failure:
+    local style = |||
+      @scope (.failure-card) {
+        :scope.card {
+          display: inline-flex;
+          flex-direction: column;
+          gap: 0.5em;
+          padding: 0.75em 1em;
+          border-color: var(--error-color);
+          font-family: monospace;
+        }
+        .failure-title {
+          margin: 0;
+          color: var(--error-color);
+          font-weight: bold;
+        }
+        .failure-message {
+          margin: 0;
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+        }
+      }
+    |||;
+
+    {
+      local c = self,
+      failure:: error 'Failure requires failure',
+      local code = std.get(c.failure, 'code', null),
+      local reason = std.get(c.failure, 'reason', null),
+      local message = std.get(c.failure, 'message', null),
+      local title = std.join(' ', [std.toString(part) for part in [code, reason] if part != null && part != '']),
+      html: [
+        { element: 'style', children: [style] },
+        {
+          element: 'div',
+          attributes: { class: 'card failure-card', role: 'alert' },
+          children: [
+            { element: 'p', attributes: { class: 'failure-title' }, children: [if title == '' then 'Failure' else title] },
+          ] + (
+            if message == null || message == '' then []
+            else [{ element: 'p', attributes: { class: 'failure-message' }, children: [std.toString(message)] }]
+          ),
+        },
+      ],
+    },
   breadcrumbs:
     local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
     local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
@@ -1940,16 +1994,16 @@ local html = {
 local isNode(value) =
   std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');
 
-local collectNeighbors(obj, textPrefix='', exclude=[], linkStrings=false) =
+local collectNeighbors(obj, textPrefix='', exclude=[], linkStrings=false, parent=[]) =
   std.flatMap(
     function(k)
       if std.member(exclude, k) || std.substr(k, 0, 1) == '_' then []
       else
         local value = obj[k];
         local textPath = if textPrefix == '' then k else '%s/%s' % [textPrefix, k];
-        if isNode(value) then [{ link: value._queryPath, text: textPath }]
-        else if std.type(value) == 'object' then collectNeighbors(value, textPath, exclude, linkStrings)
-        else if linkStrings && std.type(value) == 'string' then [{ link: value, text: textPath, external: true }]
+        if isNode(value) then [{ link: value._queryPath, text: textPath, name:: k, parent:: parent }]
+        else if std.type(value) == 'object' then collectNeighbors(value, textPath, exclude, linkStrings, parent + [k])
+        else if linkStrings && std.type(value) == 'string' then [{ link: value, text: textPath, external: true, name:: k, parent:: parent }]
         else [],
     std.objectFields(obj)
   );
@@ -1970,13 +2024,26 @@ local filterItems(obj, title, items) =
   local hidden = std.get(std.get(std.get(obj, 'list', {}), 'hiddenItems', {}), title, []);
   [item for item in items if !std.member(hidden, item.text)];
 
+local groupByParent(prefix, items) =
+  if std.all([std.length(item.parent) == 0 for item in items]) then [{ title: prefix, items: items }]
+  else
+    local titleOf(item) = std.join('/', [prefix] + item.parent);
+    [
+      { title: title, items: [item { text: item.name } for item in items if titleOf(item) == title] }
+      for title in std.set([titleOf(item) for item in items])
+    ];
+
 local linksGroups(obj) =
   local links = std.get(obj, 'links', {});
   if std.type(links) != 'object' then []
   else std.flatMap(
     function(k)
       local value = links[k];
-      if std.type(value) == 'object' && !isNode(value) then [{ title: k, items: filterItems(obj, k, collectNeighbors(value, linkStrings=true)) }]
+      if std.type(value) == 'object' && !isNode(value) then [
+        group
+        for parent in groupByParent(k, collectNeighbors(value, linkStrings=true))
+        for group in [{ title: parent.title, items: filterItems(obj, parent.title, parent.items) }]
+      ]
       else [],
     std.objectFields(links)
   );
@@ -2031,7 +2098,8 @@ local childGroups(obj) =
     group
     for k in neighborKeys(obj)
     if !isNode(obj[k])
-    for group in [{ title: k, items: filterItems(obj, k, [item for item in collectNeighbors(obj[k]) if !std.setMember(item.link, curated)]) }]
+    for parent in groupByParent(k, [item for item in collectNeighbors(obj[k]) if !std.setMember(item.link, curated)])
+    for group in [{ title: parent.title, items: filterItems(obj, parent.title, parent.items) }]
     if std.length(group.items) > 0
   ];
 
@@ -2174,14 +2242,26 @@ local actionView = baseView {
   },
 };
 
-local withNode = { node: self.view + linkspecs.withLinkSpecs };
+local failureView = failure.withFailure {
+  _view+:: {
+    fragment: if $._failure != null then c.failure { failure:: $._failure } else super.fragment,
+  },
+};
+
+local withNode = {
+  view+: failureView,
+  node: self.view + linkspecs.withLinkSpecs,
+};
 
 {
   default: { view: listView } + withNode,
-  list: { view: listView } + withNode,
-  table: { view: tableView } + withNode,
-  tree: { view: treeView } + withNode,
-  yaml: { view: yamlView } + withNode,
-  resource: { view: resourceView } + withNode,
-  action: { view: actionView } + withNode,
+  list: { view: listView, component: c.list } + withNode,
+  table: { view: tableView, component: c.table } + withNode,
+  tree: { view: treeView, component: c.tree } + withNode,
+  yaml: { view: yamlView, component: c.yaml } + withNode,
+  resource: { view: resourceView, component: c.resource } + withNode,
+  action: { view: actionView, component: c.action } + withNode,
+  failure: { view: failureView, component: c.failure },
+  page: { component: c.page },
+  breadcrumbs: { component: c.breadcrumbs },
 }
