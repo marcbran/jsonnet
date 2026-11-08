@@ -2,7 +2,7 @@
 
 > Read-only calls against AWS service APIs, driven by the services' Smithy models. Services and credentials are configured when the plugin is started or embedded in Go.
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/pkg/jsonnet-plugin-aws): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/aws/plugin/aws/main.libsonnet): Inlined code published for usage in other projects
 
