@@ -2,7 +2,7 @@
 
 > Shared views for rendering arcourse graph nodes as ECharts charts and dashboards,
 
-- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-echarts): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-telemetry/tree/main/pkg/arcourse-echarts): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-echarts/arcourse/arcourse-echarts/main.libsonnet): Inlined code published for usage in other projects
 
