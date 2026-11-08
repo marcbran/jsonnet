@@ -1,3 +1,12 @@
+local failure =
+  local isFailure(value) = std.isObject(value) && std.objectHas(value, '_failure');
+
+  {
+    isFailure: isFailure,
+    withFailure: {
+      _failure:: if isFailure(std.get(self, 'response')) then self.response._failure else null,
+    },
+  };
 local url(u) = std.native('invoke:url')('format', [u]);
 
 local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
@@ -117,4 +126,5 @@ local graph(nodeSpecs, defaultView={}) =
   toLayers: toLayers,
   shape: shape,
   graphFromShape: graphFromShape,
+  failure: failure,
 }
