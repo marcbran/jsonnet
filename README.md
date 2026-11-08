@@ -55,7 +55,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](arcourse/arcourse-kubernetes/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-kubernetes): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-kubernetes/tree/main/pkg/arcourse-kubernetes): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-kubernetes/arcourse/arcourse-kubernetes/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/arcourse-openapi
@@ -73,7 +73,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](arcourse/arcourse-telemetry-kubernetes/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-telemetry-kubernetes): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-kubernetes/tree/main/pkg/arcourse-telemetry-kubernetes): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-telemetry-kubernetes/arcourse/arcourse-telemetry-kubernetes/main.libsonnet): Inlined code published for usage in other projects
 ## arcourse/arcourse-telemetry
@@ -253,7 +253,7 @@ This enables lightweight and straightforward usage with the [jsonnet-bundler](ht
 
 - [Readme](plugin/kubernetes/README.md): Documentation of installation and usage
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-kubernetes): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-kubernetes/tree/main/pkg/jsonnet-plugin-kubernetes): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/kubernetes/plugin/kubernetes/main.libsonnet): Inlined code published for usage in other projects
 ## plugin/markdown
