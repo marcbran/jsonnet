@@ -2,7 +2,7 @@
 
 > Arcourse entry nodes for AWS: the `aws` node listing the configured accounts and the
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/arcourse): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-aws/tree/main/pkg/arcourse-aws): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/aws/arcourse-aws/arcourse/aws/arcourse-aws/main.libsonnet): Inlined code published for usage in other projects
 
