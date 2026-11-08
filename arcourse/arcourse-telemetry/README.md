@@ -2,7 +2,7 @@
 
 > Backend-agnostic `chart`/`logs`/`dashboard` nodes rendering telemetry
 
-- [Source Code](https://github.com/marcbran/arcourse/tree/main/pkg/arcourse-telemetry): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-telemetry/tree/main/pkg/arcourse-telemetry): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/arcourse/arcourse-telemetry/arcourse/arcourse-telemetry/main.libsonnet): Inlined code published for usage in other projects
 
