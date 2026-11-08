@@ -2,7 +2,7 @@
 
 > Relative time resolution: get the current time, and add a signed duration spec to it. `y`(ear) and `M`(onth) use calendar-aware arithmetic, so they land on the right day even though months and years aren't a fixed length - `M` is uppercase since lowercase `m` means minute. `w`(eek) and `d`(ay) are fixed-length (7/1 days). The remainder - `h`, `m`, `s`, `ms`, `us`, `ns` - is also fixed-length duration.
 
-- [Source Code](https://github.com/marcbran/jsonnet-plugin-time): Original source code
+- [Source Code](https://github.com/marcbran/jsonnet-plugin-time/tree/main/pkg/jsonnet-plugin-time): Original source code
 
 - [Inlined Code](https://github.com/marcbran/jsonnet/blob/plugin/time/plugin/time/main.libsonnet): Inlined code published for usage in other projects
 
