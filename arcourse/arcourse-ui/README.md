@@ -28,6 +28,15 @@ and wraps the result in a full page (`_view.html`).
 
 ## Fields
 
+### breadcrumbs
+
+`component` is the breadcrumbs component built from a node's `pathTemplate`.
+
+```jsonnet
+arcourse-ui.breadcrumbs
+```
+
+
 ### default
 
 Same as `list`. Fallback view.
@@ -43,6 +52,15 @@ Renders the node's neighboring links as a list, grouping any nested (two-level) 
 
 ```jsonnet
 arcourse-ui.list
+```
+
+
+### page
+
+`component` is the full-page component the views wrap their fragment in.
+
+```jsonnet
+arcourse-ui.page
 ```
 
 
