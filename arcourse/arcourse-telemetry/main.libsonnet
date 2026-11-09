@@ -488,9 +488,12 @@ local g =
   local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
   local varNameOf(seg) = std.substr(seg, 1, std.length(seg) - 1);
 
+  local varValue(node, name) =
+    if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else node[name];
+
   local resolvePath(node, path) =
     std.join('.', ['root'] + [
-      if isVar(p) then varNameOf(p) + '("' + node[varNameOf(p)] + '")'
+      if isVar(p) then varNameOf(p) + '("' + varValue(node, varNameOf(p)) + '")'
       else p
       for p in path
     ]);
@@ -498,7 +501,7 @@ local g =
   local urlPathSegments(node, path) =
     ['root'] + std.flatMap(
       function(p)
-        if isVar(p) then [varNameOf(p), node[varNameOf(p)]]
+        if isVar(p) then [varNameOf(p), varValue(node, varNameOf(p))]
         else [p],
       path
     );
@@ -523,23 +526,39 @@ local g =
   local mergeLayers(base, layers) =
     std.foldl(function(acc, l) acc + l, layers, base);
 
-  local node(path, body={}) =
+  local varFields(vars, shadowed) =
+    { [v]: vars[v] for v in std.objectFields(vars) if !std.member(shadowed, v) } + { _vars:: { [v]: vars[v] for v in shadowed } };
+
+  local shadowedVars(path, layers, exclude=[]) =
+    local merged = mergeLayers({}, layers);
+    exclude + [
+      v
+      for v in std.map(varNameOf, std.filter(isVar, path))
+      if !std.member(exclude, v) && std.objectHasAll(merged, v)
+    ];
+
+  local node(path, body={}, vars={}, shadowed=[]) =
     local layers = if std.isArray(body) then body else [body];
-    local vars = std.map(varNameOf, std.filter(isVar, path));
+    local pathVars = std.map(varNameOf, std.filter(isVar, path));
     local base = { _params:: specDefaults(std.get(self, '_paramSpecs', [])) };
-    local requiredVars = { [var]: error 'variable %s is required' % var for var in vars };
-    mergeLayers(if std.length(vars) == 0 then base else requiredVars + base, layers) +
+    local requiredVars = { [var]: error 'variable %s is required' % var for var in pathVars };
+    mergeLayers(if std.length(pathVars) == 0 || std.length(vars) > 0 then base else requiredVars + base, layers) +
     {
       _node: true,
-      _vars:: vars,
       _pathTemplate:: path,
       _defaultParams:: super._params,
       _evalPath:: resolvePath(self, path),
       _queryPath:: local n = self; url({ path: urlPathSegments(n, path), params: nonDefaultParams(n) }),
-    };
+    } +
+    (if std.length(shadowed) == 0 then vars else varFields(vars, shadowed));
 
-  local intermediate(path, vars) =
-    std.foldl(function(acc, v) acc { [v]:: vars[v] }, std.objectFields(vars), { _pathTemplate:: path });
+  local intermediate(path, vars, exclude=[]) =
+    std.foldl(
+      function(acc, v) if std.member(exclude, v) then acc else acc { [v]:: vars[v] },
+      std.objectFields(vars),
+      if std.length(exclude) == 0 then { _pathTemplate:: path }
+      else { _pathTemplate:: path, _vars:: { [v]: vars[v] for v in exclude } }
+    );
 
   local toLayers(nodeSpecs) =
     std.flatMap(
@@ -580,8 +599,11 @@ local g =
           instantiateFromShape(shapeNode.children[k], layers, defaultView, vars, path + [k])
       for k in std.objectFields(shapeNode.children)
     };
-    if std.length(leafs) == 0 then withDefaultView(intermediate(path, vars) + children)
-    else withDefaultView(node(leafs[0].fullPath, [l.layer for l in leafs]) + vars + children);
+    local conflicts = [v for v in std.objectFields(vars) if std.objectHas(children, v)];
+    if std.length(leafs) == 0 then withDefaultView(intermediate(path, vars, conflicts) + children)
+    else
+      local leafLayers = [l.layer for l in leafs];
+      withDefaultView(node(leafs[0].fullPath, leafLayers, vars, shadowedVars(path, leafLayers, conflicts)) + children);
 
   local rootFromShape(layers, compiledShape, defaultView={}) =
     local withDefaultView(obj) =
@@ -598,6 +620,7 @@ local g =
   {
     node: node,
     intermediate: intermediate,
+    shadowedVars: shadowedVars,
     graph: graph,
     toLayers: toLayers,
     shape: shape,
@@ -621,9 +644,12 @@ local queryLib =
     local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
     local varNameOf(seg) = std.substr(seg, 1, std.length(seg) - 1);
 
+    local varValue(node, name) =
+      if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else node[name];
+
     local resolvePath(node, path) =
       std.join('.', ['root'] + [
-        if isVar(p) then varNameOf(p) + '("' + node[varNameOf(p)] + '")'
+        if isVar(p) then varNameOf(p) + '("' + varValue(node, varNameOf(p)) + '")'
         else p
         for p in path
       ]);
@@ -631,7 +657,7 @@ local queryLib =
     local urlPathSegments(node, path) =
       ['root'] + std.flatMap(
         function(p)
-          if isVar(p) then [varNameOf(p), node[varNameOf(p)]]
+          if isVar(p) then [varNameOf(p), varValue(node, varNameOf(p))]
           else [p],
         path
       );
@@ -656,23 +682,39 @@ local queryLib =
     local mergeLayers(base, layers) =
       std.foldl(function(acc, l) acc + l, layers, base);
 
-    local node(path, body={}) =
+    local varFields(vars, shadowed) =
+      { [v]: vars[v] for v in std.objectFields(vars) if !std.member(shadowed, v) } + { _vars:: { [v]: vars[v] for v in shadowed } };
+
+    local shadowedVars(path, layers, exclude=[]) =
+      local merged = mergeLayers({}, layers);
+      exclude + [
+        v
+        for v in std.map(varNameOf, std.filter(isVar, path))
+        if !std.member(exclude, v) && std.objectHasAll(merged, v)
+      ];
+
+    local node(path, body={}, vars={}, shadowed=[]) =
       local layers = if std.isArray(body) then body else [body];
-      local vars = std.map(varNameOf, std.filter(isVar, path));
+      local pathVars = std.map(varNameOf, std.filter(isVar, path));
       local base = { _params:: specDefaults(std.get(self, '_paramSpecs', [])) };
-      local requiredVars = { [var]: error 'variable %s is required' % var for var in vars };
-      mergeLayers(if std.length(vars) == 0 then base else requiredVars + base, layers) +
+      local requiredVars = { [var]: error 'variable %s is required' % var for var in pathVars };
+      mergeLayers(if std.length(pathVars) == 0 || std.length(vars) > 0 then base else requiredVars + base, layers) +
       {
         _node: true,
-        _vars:: vars,
         _pathTemplate:: path,
         _defaultParams:: super._params,
         _evalPath:: resolvePath(self, path),
         _queryPath:: local n = self; url({ path: urlPathSegments(n, path), params: nonDefaultParams(n) }),
-      };
+      } +
+      (if std.length(shadowed) == 0 then vars else varFields(vars, shadowed));
 
-    local intermediate(path, vars) =
-      std.foldl(function(acc, v) acc { [v]:: vars[v] }, std.objectFields(vars), { _pathTemplate:: path });
+    local intermediate(path, vars, exclude=[]) =
+      std.foldl(
+        function(acc, v) if std.member(exclude, v) then acc else acc { [v]:: vars[v] },
+        std.objectFields(vars),
+        if std.length(exclude) == 0 then { _pathTemplate:: path }
+        else { _pathTemplate:: path, _vars:: { [v]: vars[v] for v in exclude } }
+      );
 
     local toLayers(nodeSpecs) =
       std.flatMap(
@@ -713,8 +755,11 @@ local queryLib =
             instantiateFromShape(shapeNode.children[k], layers, defaultView, vars, path + [k])
         for k in std.objectFields(shapeNode.children)
       };
-      if std.length(leafs) == 0 then withDefaultView(intermediate(path, vars) + children)
-      else withDefaultView(node(leafs[0].fullPath, [l.layer for l in leafs]) + vars + children);
+      local conflicts = [v for v in std.objectFields(vars) if std.objectHas(children, v)];
+      if std.length(leafs) == 0 then withDefaultView(intermediate(path, vars, conflicts) + children)
+      else
+        local leafLayers = [l.layer for l in leafs];
+        withDefaultView(node(leafs[0].fullPath, leafLayers, vars, shadowedVars(path, leafLayers, conflicts)) + children);
 
     local rootFromShape(layers, compiledShape, defaultView={}) =
       local withDefaultView(obj) =
@@ -731,6 +776,7 @@ local queryLib =
     {
       node: node,
       intermediate: intermediate,
+      shadowedVars: shadowedVars,
       graph: graph,
       toLayers: toLayers,
       shape: shape,
@@ -775,9 +821,12 @@ local browseLib =
     local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
     local varNameOf(seg) = std.substr(seg, 1, std.length(seg) - 1);
 
+    local varValue(node, name) =
+      if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else node[name];
+
     local resolvePath(node, path) =
       std.join('.', ['root'] + [
-        if isVar(p) then varNameOf(p) + '("' + node[varNameOf(p)] + '")'
+        if isVar(p) then varNameOf(p) + '("' + varValue(node, varNameOf(p)) + '")'
         else p
         for p in path
       ]);
@@ -785,7 +834,7 @@ local browseLib =
     local urlPathSegments(node, path) =
       ['root'] + std.flatMap(
         function(p)
-          if isVar(p) then [varNameOf(p), node[varNameOf(p)]]
+          if isVar(p) then [varNameOf(p), varValue(node, varNameOf(p))]
           else [p],
         path
       );
@@ -810,23 +859,39 @@ local browseLib =
     local mergeLayers(base, layers) =
       std.foldl(function(acc, l) acc + l, layers, base);
 
-    local node(path, body={}) =
+    local varFields(vars, shadowed) =
+      { [v]: vars[v] for v in std.objectFields(vars) if !std.member(shadowed, v) } + { _vars:: { [v]: vars[v] for v in shadowed } };
+
+    local shadowedVars(path, layers, exclude=[]) =
+      local merged = mergeLayers({}, layers);
+      exclude + [
+        v
+        for v in std.map(varNameOf, std.filter(isVar, path))
+        if !std.member(exclude, v) && std.objectHasAll(merged, v)
+      ];
+
+    local node(path, body={}, vars={}, shadowed=[]) =
       local layers = if std.isArray(body) then body else [body];
-      local vars = std.map(varNameOf, std.filter(isVar, path));
+      local pathVars = std.map(varNameOf, std.filter(isVar, path));
       local base = { _params:: specDefaults(std.get(self, '_paramSpecs', [])) };
-      local requiredVars = { [var]: error 'variable %s is required' % var for var in vars };
-      mergeLayers(if std.length(vars) == 0 then base else requiredVars + base, layers) +
+      local requiredVars = { [var]: error 'variable %s is required' % var for var in pathVars };
+      mergeLayers(if std.length(pathVars) == 0 || std.length(vars) > 0 then base else requiredVars + base, layers) +
       {
         _node: true,
-        _vars:: vars,
         _pathTemplate:: path,
         _defaultParams:: super._params,
         _evalPath:: resolvePath(self, path),
         _queryPath:: local n = self; url({ path: urlPathSegments(n, path), params: nonDefaultParams(n) }),
-      };
+      } +
+      (if std.length(shadowed) == 0 then vars else varFields(vars, shadowed));
 
-    local intermediate(path, vars) =
-      std.foldl(function(acc, v) acc { [v]:: vars[v] }, std.objectFields(vars), { _pathTemplate:: path });
+    local intermediate(path, vars, exclude=[]) =
+      std.foldl(
+        function(acc, v) if std.member(exclude, v) then acc else acc { [v]:: vars[v] },
+        std.objectFields(vars),
+        if std.length(exclude) == 0 then { _pathTemplate:: path }
+        else { _pathTemplate:: path, _vars:: { [v]: vars[v] for v in exclude } }
+      );
 
     local toLayers(nodeSpecs) =
       std.flatMap(
@@ -867,8 +932,11 @@ local browseLib =
             instantiateFromShape(shapeNode.children[k], layers, defaultView, vars, path + [k])
         for k in std.objectFields(shapeNode.children)
       };
-      if std.length(leafs) == 0 then withDefaultView(intermediate(path, vars) + children)
-      else withDefaultView(node(leafs[0].fullPath, [l.layer for l in leafs]) + vars + children);
+      local conflicts = [v for v in std.objectFields(vars) if std.objectHas(children, v)];
+      if std.length(leafs) == 0 then withDefaultView(intermediate(path, vars, conflicts) + children)
+      else
+        local leafLayers = [l.layer for l in leafs];
+        withDefaultView(node(leafs[0].fullPath, leafLayers, vars, shadowedVars(path, leafLayers, conflicts)) + children);
 
     local rootFromShape(layers, compiledShape, defaultView={}) =
       local withDefaultView(obj) =
@@ -885,6 +953,7 @@ local browseLib =
     {
       node: node,
       intermediate: intermediate,
+      shadowedVars: shadowedVars,
       graph: graph,
       toLayers: toLayers,
       shape: shape,
@@ -1189,11 +1258,14 @@ local nodesChartLib =
             local rest = splitPrefix(valueSegs[1:]);
             { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
 
+        local originValue(node, name) =
+          if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else node[name];
+
         local resolveBase(root, node, prefixSegs) =
           std.foldl(
             function(acc, seg)
               if std.objectHas(seg, 'const') then acc[seg.const]
-              else acc[seg.origin](std.toString(node[seg.origin])),
+              else acc[seg.origin](std.toString(originValue(node, seg.origin))),
             prefixSegs,
             root
           );
@@ -1229,7 +1301,7 @@ local nodesChartLib =
 
         local resolveLiteralSegment(node, item, seg) =
           if std.objectHas(seg, 'const') then seg.const
-          else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
+          else if std.objectHas(seg, 'origin') then std.toString(originValue(node, seg.origin))
           else resolveKey(seg, item);
 
         local resolveLiteralSegments(node, item, segs) =
@@ -2727,6 +2799,8 @@ local nodesChartLib =
         breadcrumbs:
           local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
           local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
+          local varValue(node, name) =
+            if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else std.get(node, name, '');
 
           local style = |||
             @scope (.breadcrumbs) {
@@ -2784,7 +2858,7 @@ local nodesChartLib =
                   local entry =
                     if isVar(seg) then
                       local v = varName(seg);
-                      local val = std.toString(std.get(c.node, v, ''));
+                      local val = std.toString(varValue(c.node, v));
                       { url: acc.url + '/' + v + '/' + val, name: v, value: val }
                     else
                       { url: acc.url + '/' + seg, name: null, value: seg };
@@ -4173,11 +4247,14 @@ local nodesListLib =
           local rest = splitPrefix(valueSegs[1:]);
           { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
 
+      local originValue(node, name) =
+        if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else node[name];
+
       local resolveBase(root, node, prefixSegs) =
         std.foldl(
           function(acc, seg)
             if std.objectHas(seg, 'const') then acc[seg.const]
-            else acc[seg.origin](std.toString(node[seg.origin])),
+            else acc[seg.origin](std.toString(originValue(node, seg.origin))),
           prefixSegs,
           root
         );
@@ -4213,7 +4290,7 @@ local nodesListLib =
 
       local resolveLiteralSegment(node, item, seg) =
         if std.objectHas(seg, 'const') then seg.const
-        else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
+        else if std.objectHas(seg, 'origin') then std.toString(originValue(node, seg.origin))
         else resolveKey(seg, item);
 
       local resolveLiteralSegments(node, item, segs) =
@@ -5711,6 +5788,8 @@ local nodesListLib =
       breadcrumbs:
         local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
         local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
+        local varValue(node, name) =
+          if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else std.get(node, name, '');
 
         local style = |||
           @scope (.breadcrumbs) {
@@ -5768,7 +5847,7 @@ local nodesListLib =
                 local entry =
                   if isVar(seg) then
                     local v = varName(seg);
-                    local val = std.toString(std.get(c.node, v, ''));
+                    local val = std.toString(varValue(c.node, v));
                     { url: acc.url + '/' + v + '/' + val, name: v, value: val }
                   else
                     { url: acc.url + '/' + seg, name: null, value: seg };
@@ -6455,11 +6534,14 @@ local nodesLabelsLib =
           local rest = splitPrefix(valueSegs[1:]);
           { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
 
+      local originValue(node, name) =
+        if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else node[name];
+
       local resolveBase(root, node, prefixSegs) =
         std.foldl(
           function(acc, seg)
             if std.objectHas(seg, 'const') then acc[seg.const]
-            else acc[seg.origin](std.toString(node[seg.origin])),
+            else acc[seg.origin](std.toString(originValue(node, seg.origin))),
           prefixSegs,
           root
         );
@@ -6495,7 +6577,7 @@ local nodesLabelsLib =
 
       local resolveLiteralSegment(node, item, seg) =
         if std.objectHas(seg, 'const') then seg.const
-        else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
+        else if std.objectHas(seg, 'origin') then std.toString(originValue(node, seg.origin))
         else resolveKey(seg, item);
 
       local resolveLiteralSegments(node, item, segs) =
@@ -7993,6 +8075,8 @@ local nodesLabelsLib =
       breadcrumbs:
         local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
         local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
+        local varValue(node, name) =
+          if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else std.get(node, name, '');
 
         local style = |||
           @scope (.breadcrumbs) {
@@ -8050,7 +8134,7 @@ local nodesLabelsLib =
                 local entry =
                   if isVar(seg) then
                     local v = varName(seg);
-                    local val = std.toString(std.get(c.node, v, ''));
+                    local val = std.toString(varValue(c.node, v));
                     { url: acc.url + '/' + v + '/' + val, name: v, value: val }
                   else
                     { url: acc.url + '/' + seg, name: null, value: seg };
@@ -8736,11 +8820,14 @@ local nodesValuesLib =
           local rest = splitPrefix(valueSegs[1:]);
           { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
 
+      local originValue(node, name) =
+        if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else node[name];
+
       local resolveBase(root, node, prefixSegs) =
         std.foldl(
           function(acc, seg)
             if std.objectHas(seg, 'const') then acc[seg.const]
-            else acc[seg.origin](std.toString(node[seg.origin])),
+            else acc[seg.origin](std.toString(originValue(node, seg.origin))),
           prefixSegs,
           root
         );
@@ -8776,7 +8863,7 @@ local nodesValuesLib =
 
       local resolveLiteralSegment(node, item, seg) =
         if std.objectHas(seg, 'const') then seg.const
-        else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
+        else if std.objectHas(seg, 'origin') then std.toString(originValue(node, seg.origin))
         else resolveKey(seg, item);
 
       local resolveLiteralSegments(node, item, segs) =
@@ -10274,6 +10361,8 @@ local nodesValuesLib =
       breadcrumbs:
         local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
         local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
+        local varValue(node, name) =
+          if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else std.get(node, name, '');
 
         local style = |||
           @scope (.breadcrumbs) {
@@ -10331,7 +10420,7 @@ local nodesValuesLib =
                 local entry =
                   if isVar(seg) then
                     local v = varName(seg);
-                    local val = std.toString(std.get(c.node, v, ''));
+                    local val = std.toString(varValue(c.node, v));
                     { url: acc.url + '/' + v + '/' + val, name: v, value: val }
                   else
                     { url: acc.url + '/' + seg, name: null, value: seg };
@@ -11015,11 +11104,14 @@ local nodesLogsLib =
           local rest = splitPrefix(valueSegs[1:]);
           { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
 
+      local originValue(node, name) =
+        if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else node[name];
+
       local resolveBase(root, node, prefixSegs) =
         std.foldl(
           function(acc, seg)
             if std.objectHas(seg, 'const') then acc[seg.const]
-            else acc[seg.origin](std.toString(node[seg.origin])),
+            else acc[seg.origin](std.toString(originValue(node, seg.origin))),
           prefixSegs,
           root
         );
@@ -11055,7 +11147,7 @@ local nodesLogsLib =
 
       local resolveLiteralSegment(node, item, seg) =
         if std.objectHas(seg, 'const') then seg.const
-        else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
+        else if std.objectHas(seg, 'origin') then std.toString(originValue(node, seg.origin))
         else resolveKey(seg, item);
 
       local resolveLiteralSegments(node, item, segs) =
@@ -12553,6 +12645,8 @@ local nodesLogsLib =
       breadcrumbs:
         local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
         local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
+        local varValue(node, name) =
+          if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else std.get(node, name, '');
 
         local style = |||
           @scope (.breadcrumbs) {
@@ -12610,7 +12704,7 @@ local nodesLogsLib =
                 local entry =
                   if isVar(seg) then
                     local v = varName(seg);
-                    local val = std.toString(std.get(c.node, v, ''));
+                    local val = std.toString(varValue(c.node, v));
                     { url: acc.url + '/' + v + '/' + val, name: v, value: val }
                   else
                     { url: acc.url + '/' + seg, name: null, value: seg };
@@ -13287,11 +13381,14 @@ local nodesLogsLib =
             local rest = splitPrefix(valueSegs[1:]);
             { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
 
+        local originValue(node, name) =
+          if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else node[name];
+
         local resolveBase(root, node, prefixSegs) =
           std.foldl(
             function(acc, seg)
               if std.objectHas(seg, 'const') then acc[seg.const]
-              else acc[seg.origin](std.toString(node[seg.origin])),
+              else acc[seg.origin](std.toString(originValue(node, seg.origin))),
             prefixSegs,
             root
           );
@@ -13327,7 +13424,7 @@ local nodesLogsLib =
 
         local resolveLiteralSegment(node, item, seg) =
           if std.objectHas(seg, 'const') then seg.const
-          else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
+          else if std.objectHas(seg, 'origin') then std.toString(originValue(node, seg.origin))
           else resolveKey(seg, item);
 
         local resolveLiteralSegments(node, item, segs) =
@@ -14825,6 +14922,8 @@ local nodesLogsLib =
         breadcrumbs:
           local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
           local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
+          local varValue(node, name) =
+            if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else std.get(node, name, '');
 
           local style = |||
             @scope (.breadcrumbs) {
@@ -14882,7 +14981,7 @@ local nodesLogsLib =
                   local entry =
                     if isVar(seg) then
                       local v = varName(seg);
-                      local val = std.toString(std.get(c.node, v, ''));
+                      local val = std.toString(varValue(c.node, v));
                       { url: acc.url + '/' + v + '/' + val, name: v, value: val }
                     else
                       { url: acc.url + '/' + seg, name: null, value: seg };
@@ -15819,11 +15918,14 @@ local nodesLogrecordLib =
           local rest = splitPrefix(valueSegs[1:]);
           { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
 
+      local originValue(node, name) =
+        if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else node[name];
+
       local resolveBase(root, node, prefixSegs) =
         std.foldl(
           function(acc, seg)
             if std.objectHas(seg, 'const') then acc[seg.const]
-            else acc[seg.origin](std.toString(node[seg.origin])),
+            else acc[seg.origin](std.toString(originValue(node, seg.origin))),
           prefixSegs,
           root
         );
@@ -15859,7 +15961,7 @@ local nodesLogrecordLib =
 
       local resolveLiteralSegment(node, item, seg) =
         if std.objectHas(seg, 'const') then seg.const
-        else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
+        else if std.objectHas(seg, 'origin') then std.toString(originValue(node, seg.origin))
         else resolveKey(seg, item);
 
       local resolveLiteralSegments(node, item, segs) =
@@ -17357,6 +17459,8 @@ local nodesLogrecordLib =
       breadcrumbs:
         local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
         local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
+        local varValue(node, name) =
+          if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else std.get(node, name, '');
 
         local style = |||
           @scope (.breadcrumbs) {
@@ -17414,7 +17518,7 @@ local nodesLogrecordLib =
                 local entry =
                   if isVar(seg) then
                     local v = varName(seg);
-                    local val = std.toString(std.get(c.node, v, ''));
+                    local val = std.toString(varValue(c.node, v));
                     { url: acc.url + '/' + v + '/' + val, name: v, value: val }
                   else
                     { url: acc.url + '/' + seg, name: null, value: seg };
@@ -18304,11 +18408,14 @@ local nodesDashboardLib =
             local rest = splitPrefix(valueSegs[1:]);
             { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
 
+        local originValue(node, name) =
+          if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else node[name];
+
         local resolveBase(root, node, prefixSegs) =
           std.foldl(
             function(acc, seg)
               if std.objectHas(seg, 'const') then acc[seg.const]
-              else acc[seg.origin](std.toString(node[seg.origin])),
+              else acc[seg.origin](std.toString(originValue(node, seg.origin))),
             prefixSegs,
             root
           );
@@ -18344,7 +18451,7 @@ local nodesDashboardLib =
 
         local resolveLiteralSegment(node, item, seg) =
           if std.objectHas(seg, 'const') then seg.const
-          else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
+          else if std.objectHas(seg, 'origin') then std.toString(originValue(node, seg.origin))
           else resolveKey(seg, item);
 
         local resolveLiteralSegments(node, item, segs) =
@@ -19842,6 +19949,8 @@ local nodesDashboardLib =
         breadcrumbs:
           local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
           local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
+          local varValue(node, name) =
+            if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else std.get(node, name, '');
 
           local style = |||
             @scope (.breadcrumbs) {
@@ -19899,7 +20008,7 @@ local nodesDashboardLib =
                   local entry =
                     if isVar(seg) then
                       local v = varName(seg);
-                      local val = std.toString(std.get(c.node, v, ''));
+                      local val = std.toString(varValue(c.node, v));
                       { url: acc.url + '/' + v + '/' + val, name: v, value: val }
                     else
                       { url: acc.url + '/' + seg, name: null, value: seg };
