@@ -1599,8 +1599,6 @@ local c = {
   breadcrumbs:
     local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
     local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
-    local varValue(node, name) =
-      if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else std.get(node, name, '');
 
     local style = |||
       @scope (.breadcrumbs) {
@@ -1658,7 +1656,7 @@ local c = {
             local entry =
               if isVar(seg) then
                 local v = varName(seg);
-                local val = std.toString(varValue(c.node, v));
+                local val = std.toString(std.get(c.node, v, ''));
                 { url: acc.url + '/' + v + '/' + val, name: v, value: val }
               else
                 { url: acc.url + '/' + seg, name: null, value: seg };
