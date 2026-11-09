@@ -267,11 +267,14 @@ local a =
         local rest = splitPrefix(valueSegs[1:]);
         { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
 
+    local originValue(node, name) =
+      if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else node[name];
+
     local resolveBase(root, node, prefixSegs) =
       std.foldl(
         function(acc, seg)
           if std.objectHas(seg, 'const') then acc[seg.const]
-          else acc[seg.origin](std.toString(node[seg.origin])),
+          else acc[seg.origin](std.toString(originValue(node, seg.origin))),
         prefixSegs,
         root
       );
@@ -307,7 +310,7 @@ local a =
 
     local resolveLiteralSegment(node, item, seg) =
       if std.objectHas(seg, 'const') then seg.const
-      else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
+      else if std.objectHas(seg, 'origin') then std.toString(originValue(node, seg.origin))
       else resolveKey(seg, item);
 
     local resolveLiteralSegments(node, item, segs) =
@@ -1805,6 +1808,8 @@ local a =
     breadcrumbs:
       local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
       local varName(seg) = std.substr(seg, 1, std.length(seg) - 1);
+      local varValue(node, name) =
+        if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else std.get(node, name, '');
 
       local style = |||
         @scope (.breadcrumbs) {
@@ -1862,7 +1867,7 @@ local a =
               local entry =
                 if isVar(seg) then
                   local v = varName(seg);
-                  local val = std.toString(std.get(c.node, v, ''));
+                  local val = std.toString(varValue(c.node, v));
                   { url: acc.url + '/' + v + '/' + val, name: v, value: val }
                 else
                   { url: acc.url + '/' + seg, name: null, value: seg };
