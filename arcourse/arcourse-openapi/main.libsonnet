@@ -697,7 +697,10 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
     ])
     else error 'unsupported literal type: ' + std.type(value);
   local paramSpecEntry(p) =
-    { name: p.name, type: 'string' } + (if p.required then {} else { default: null });
+    { name: p.name, type: std.get(p, 'type', 'string') }
+    + (if std.objectHas(p, 'items') then { items: p.items } else {})
+    + (if std.objectHas(p, 'enum') then { enum: p.enum } else {})
+    + (if p.required then {} else { default: null });
   local paramSpecsFor(op) =
     std.get(op, 'queryParams', []) + std.get(op, 'headerParams', []);
   local paramSpecsField(op) =
