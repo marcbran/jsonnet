@@ -2639,7 +2639,7 @@ local a =
     outputToken:: 'nextToken',
     pageSize:: null,
     _paramSpecs+: [
-      { name: name, type: if name == $.pageSize then 'number' else 'string', default: null }
+      { name: name, type: if name == $.pageSize then 'number' else 'string', role: 'pagination', default: null }
       for name in [$.pageSize, $.inputToken]
       if name != null
     ],
@@ -2722,7 +2722,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'Prefix', type: 'string' },
+      { default: null, name: 'Prefix', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket'], a.resource.node + aws.regional + {
@@ -2762,7 +2762,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'ContinuationToken', type: 'string' },
+      { default: null, name: 'ContinuationToken', role: 'pagination', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'analyticsConfigurations', '$Id'], a.resource.node + aws.regional + {
@@ -2802,7 +2802,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'ContinuationToken', type: 'string' },
+      { default: null, name: 'ContinuationToken', role: 'pagination', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'intelligentTieringConfigurations', '$Id'], a.resource.node + aws.regional + {
@@ -2845,7 +2845,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'ContinuationToken', type: 'string' },
+      { default: null, name: 'ContinuationToken', role: 'pagination', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'inventoryConfigurations', '$Id'], a.resource.node + aws.regional + {
@@ -2886,7 +2886,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'ContinuationToken', type: 'string' },
+      { default: null, name: 'ContinuationToken', role: 'pagination', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'metricsConfigurations', '$Id'], a.resource.node + aws.regional + {
@@ -2925,12 +2925,12 @@ local a =
       ],
     },
     _paramSpecs+: [
-      { default: null, name: 'Delimiter', type: 'string' },
-      { default: null, name: 'EncodingType', type: 'string' },
-      { default: null, name: 'KeyMarker', type: 'string' },
-      { default: null, name: 'MaxUploads', type: 'number' },
-      { default: null, name: 'Prefix', type: 'string' },
-      { default: null, name: 'UploadIdMarker', type: 'string' },
+      { default: null, name: 'Delimiter', role: 'shaping', type: 'string' },
+      { default: null, enum: ['url'], name: 'EncodingType', role: 'shaping', type: 'string' },
+      { default: null, name: 'KeyMarker', role: 'pagination', type: 'string' },
+      { default: null, name: 'MaxUploads', role: 'pagination', type: 'number' },
+      { default: null, name: 'Prefix', role: 'filter', type: 'string' },
+      { default: null, name: 'UploadIdMarker', role: 'pagination', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'objectVersions'], a.table.node + aws.regional + {
@@ -2943,6 +2943,7 @@ local a =
         EncodingType: std.get($._params, 'EncodingType', null),
         KeyMarker: std.get($._params, 'KeyMarker', null),
         MaxKeys: std.get($._params, 'MaxKeys', null),
+        OptionalObjectAttributes: std.get($._params, 'OptionalObjectAttributes', null),
         Prefix: std.get($._params, 'Prefix', null),
         VersionIdMarker: std.get($._params, 'VersionIdMarker', null),
       }
@@ -2959,12 +2960,13 @@ local a =
       ],
     },
     _paramSpecs+: [
-      { default: null, name: 'Delimiter', type: 'string' },
-      { default: null, name: 'EncodingType', type: 'string' },
-      { default: null, name: 'KeyMarker', type: 'string' },
-      { default: null, name: 'MaxKeys', type: 'number' },
-      { default: null, name: 'Prefix', type: 'string' },
-      { default: null, name: 'VersionIdMarker', type: 'string' },
+      { default: null, name: 'Delimiter', role: 'shaping', type: 'string' },
+      { default: null, enum: ['url'], name: 'EncodingType', type: 'string' },
+      { default: null, name: 'KeyMarker', role: 'pagination', type: 'string' },
+      { default: null, name: 'MaxKeys', role: 'pagination', type: 'number' },
+      { default: null, items: { enum: ['RestoreStatus'], type: 'string' }, name: 'OptionalObjectAttributes', role: 'shaping', type: 'array' },
+      { default: null, name: 'Prefix', role: 'filter', type: 'string' },
+      { default: null, name: 'VersionIdMarker', role: 'pagination', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'objects'], a.table.node + aws.regional + aws.paginated + {
@@ -2979,6 +2981,7 @@ local a =
         Delimiter: std.get($._params, 'Delimiter', null),
         EncodingType: std.get($._params, 'EncodingType', null),
         FetchOwner: std.get($._params, 'FetchOwner', null),
+        OptionalObjectAttributes: std.get($._params, 'OptionalObjectAttributes', null),
         Prefix: std.get($._params, 'Prefix', null),
         StartAfter: std.get($._params, 'StartAfter', null),
       }
@@ -3001,11 +3004,12 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'Delimiter', type: 'string' },
-      { default: null, name: 'EncodingType', type: 'string' },
-      { default: null, name: 'FetchOwner', type: 'boolean' },
-      { default: null, name: 'Prefix', type: 'string' },
-      { default: null, name: 'StartAfter', type: 'string' },
+      { default: null, name: 'Delimiter', role: 'shaping', type: 'string' },
+      { default: null, enum: ['url'], name: 'EncodingType', type: 'string' },
+      { default: null, name: 'FetchOwner', role: 'shaping', type: 'boolean' },
+      { default: null, items: { enum: ['RestoreStatus'], type: 'string' }, name: 'OptionalObjectAttributes', role: 'shaping', type: 'array' },
+      { default: null, name: 'Prefix', role: 'filter', type: 'string' },
+      { default: null, name: 'StartAfter', role: 'pagination', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'objects', '$Key'], a.resource.node + aws.regional + {
@@ -3044,8 +3048,8 @@ local a =
       ],
     },
     _paramSpecs+: [
-      { default: null, name: 'AnnotationPrefix', type: 'string' },
-      { default: null, name: 'VersionId', type: 'string' },
+      { default: null, name: 'AnnotationPrefix', role: 'filter', type: 'string' },
+      { default: null, name: 'VersionId', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 's3', 'buckets', '$Bucket', 'objects', '$Key', 'acl'], a.resource.node + aws.regional + {
