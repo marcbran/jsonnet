@@ -2639,7 +2639,7 @@ local a =
     outputToken:: 'nextToken',
     pageSize:: null,
     _paramSpecs+: [
-      { name: name, type: if name == $.pageSize then 'number' else 'string', default: null }
+      { name: name, type: if name == $.pageSize then 'number' else 'string', role: 'pagination', default: null }
       for name in [$.pageSize, $.inputToken]
       if name != null
     ],
@@ -2720,7 +2720,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'DBClusterParameterGroupName', type: 'string' },
+      { default: null, name: 'DBClusterParameterGroupName', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 'rds', 'dbClusterParameterGroups', '$DBClusterParameterGroupName'], a.resource.node + aws.regional + aws.single + {
@@ -2757,7 +2757,7 @@ local a =
       ],
     },
     _paramSpecs+: [
-      { default: null, name: 'Source', type: 'string' },
+      { default: null, name: 'Source', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 'rds', 'dbClusterSnapshots'], a.table.node + aws.regional + aws.paginated + {
@@ -2800,12 +2800,12 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'DBClusterIdentifier', type: 'string' },
-      { default: null, name: 'DBClusterSnapshotIdentifier', type: 'string' },
-      { default: null, name: 'DbClusterResourceId', type: 'string' },
-      { default: null, name: 'IncludePublic', type: 'boolean' },
-      { default: null, name: 'IncludeShared', type: 'boolean' },
-      { default: null, name: 'SnapshotType', type: 'string' },
+      { default: null, name: 'DBClusterIdentifier', role: 'filter', type: 'string' },
+      { default: null, name: 'DBClusterSnapshotIdentifier', role: 'filter', type: 'string' },
+      { default: null, name: 'DbClusterResourceId', role: 'filter', type: 'string' },
+      { default: null, name: 'IncludePublic', role: 'filter', type: 'boolean' },
+      { default: null, name: 'IncludeShared', role: 'filter', type: 'boolean' },
+      { default: null, name: 'SnapshotType', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 'rds', 'dbClusterSnapshots', '$DBClusterSnapshotIdentifier'], a.resource.node + aws.regional + aws.single + {
@@ -2896,8 +2896,8 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'DBClusterIdentifier', type: 'string' },
-      { default: null, name: 'IncludeShared', type: 'boolean' },
+      { default: null, name: 'DBClusterIdentifier', role: 'filter', type: 'string' },
+      { default: null, name: 'IncludeShared', role: 'filter', type: 'boolean' },
     ],
   }],
   [['aws', '$account', '$region', 'rds', 'dbClusters', '$DBClusterIdentifier'], a.resource.node + aws.regional + aws.single + {
@@ -2966,7 +2966,7 @@ local a =
       ],
     },
     _paramSpecs+: [
-      { default: null, name: 'BacktrackIdentifier', type: 'string' },
+      { default: null, name: 'BacktrackIdentifier', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 'rds', 'dbInstances'], a.table.node + aws.regional + aws.paginated + {
@@ -3034,7 +3034,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'DBInstanceIdentifier', type: 'string' },
+      { default: null, name: 'DBInstanceIdentifier', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 'rds', 'dbInstances', '$DBInstanceIdentifier'], a.resource.node + aws.regional + aws.single + {
@@ -3108,9 +3108,9 @@ local a =
       ],
     },
     _paramSpecs+: [
-      { default: null, name: 'FileLastWritten', type: 'number' },
-      { default: null, name: 'FileSize', type: 'number' },
-      { default: null, name: 'FilenameContains', type: 'string' },
+      { default: null, name: 'FileLastWritten', role: 'filter', type: 'number' },
+      { default: null, name: 'FileSize', role: 'filter', type: 'number' },
+      { default: null, name: 'FilenameContains', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 'rds', 'dbInstances', '$DBInstanceIdentifier', 'validModifications'], a.resource.node + aws.regional + {
@@ -3150,7 +3150,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'DBParameterGroupName', type: 'string' },
+      { default: null, name: 'DBParameterGroupName', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 'rds', 'dbParameterGroups', '$DBParameterGroupName'], a.resource.node + aws.regional + aws.single + {
@@ -3187,7 +3187,7 @@ local a =
       ],
     },
     _paramSpecs+: [
-      { default: null, name: 'Source', type: 'string' },
+      { default: null, name: 'Source', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 'rds', 'dbSnapshots'], a.table.node + aws.regional + aws.paginated + {
@@ -3240,12 +3240,12 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'DBInstanceIdentifier', type: 'string' },
-      { default: null, name: 'DBSnapshotIdentifier', type: 'string' },
-      { default: null, name: 'DbiResourceId', type: 'string' },
-      { default: null, name: 'IncludePublic', type: 'boolean' },
-      { default: null, name: 'IncludeShared', type: 'boolean' },
-      { default: null, name: 'SnapshotType', type: 'string' },
+      { default: null, name: 'DBInstanceIdentifier', role: 'filter', type: 'string' },
+      { default: null, name: 'DBSnapshotIdentifier', role: 'filter', type: 'string' },
+      { default: null, name: 'DbiResourceId', role: 'filter', type: 'string' },
+      { default: null, name: 'IncludePublic', role: 'filter', type: 'boolean' },
+      { default: null, name: 'IncludeShared', role: 'filter', type: 'boolean' },
+      { default: null, name: 'SnapshotType', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 'rds', 'dbSnapshots', '$DBSnapshotIdentifier'], a.resource.node + aws.regional + aws.single + {
@@ -3313,7 +3313,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'DBSubnetGroupName', type: 'string' },
+      { default: null, name: 'DBSubnetGroupName', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 'rds', 'dbSubnetGroups', '$DBSubnetGroupName'], a.resource.node + aws.regional + aws.single + {
@@ -3363,9 +3363,9 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'EngineName', type: 'string' },
-      { default: null, name: 'MajorEngineVersion', type: 'string' },
-      { default: null, name: 'OptionGroupName', type: 'string' },
+      { default: null, name: 'EngineName', role: 'filter', type: 'string' },
+      { default: null, name: 'MajorEngineVersion', role: 'filter', type: 'string' },
+      { default: null, name: 'OptionGroupName', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 'rds', 'optionGroups', '$OptionGroupName'], a.resource.node + aws.regional + aws.single + {
