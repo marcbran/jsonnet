@@ -2639,7 +2639,7 @@ local a =
     outputToken:: 'nextToken',
     pageSize:: null,
     _paramSpecs+: [
-      { name: name, type: if name == $.pageSize then 'number' else 'string', default: null }
+      { name: name, type: if name == $.pageSize then 'number' else 'string', role: 'pagination', default: null }
       for name in [$.pageSize, $.inputToken]
       if name != null
     ],
@@ -2697,7 +2697,10 @@ local a =
     response:: call(
       self.ctx,
       'DescribeAddresses',
-      {}
+      {
+        AllocationIds: std.get($._params, 'AllocationIds', null),
+        PublicIps: std.get($._params, 'PublicIps', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -2732,6 +2735,10 @@ local a =
         keys: [{ const: 'subnet' }, { path: ['SubnetId'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'subnets' }, { param: 'SubnetId', path: ['SubnetId'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'AllocationIds', role: 'filter', type: 'array' },
+      { default: null, items: { type: 'string' }, name: 'PublicIps', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'addresses', '$AllocationId'], a.resource.node + aws.regional + aws.single + {
@@ -2768,7 +2775,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeClientVpnEndpoints',
-      self.page
+      self.page {
+        ClientVpnEndpointIds: std.get($._params, 'ClientVpnEndpointIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -2813,6 +2822,9 @@ local a =
         keys: [{ const: 'vpc' }, { path: ['ClientVpnEndpointId'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'vpcs' }, { param: 'VpcId', path: ['VpcId'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'ClientVpnEndpointIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'clientVpnEndpoints', '$ClientVpnEndpointId'], a.resource.node + aws.regional + aws.single + {
@@ -2941,6 +2953,7 @@ local a =
       'DescribeClientVpnTargetNetworks',
       self.page {
         ClientVpnEndpointId: $.ClientVpnEndpointId,
+        AssociationIds: std.get($._params, 'AssociationIds', null),
       }
     ),
     data:: self.response,
@@ -2974,6 +2987,9 @@ local a =
         keys: [{ const: 'security group' }, { path: [] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'securityGroups' }, { param: 'GroupId', path: [] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'AssociationIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'clientVpnEndpoints', '$ClientVpnEndpointId', 'clientVpnTargetNetworks', '$AssociationId'], a.resource.node + aws.regional + aws.single + {
@@ -3018,7 +3034,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeCustomerGateways',
-      {}
+      {
+        CustomerGatewayIds: std.get($._params, 'CustomerGatewayIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -3039,6 +3057,9 @@ local a =
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'customerGateways' }, { param: 'CustomerGatewayId', path: ['CustomerGatewayId'] }],
       },
     ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'CustomerGatewayIds', role: 'filter', type: 'array' },
+    ],
   }],
   [['aws', '$account', '$region', 'ec2', 'customerGateways', '$CustomerGatewayId'], a.resource.node + aws.regional + aws.single + {
     itemsPath:: ['CustomerGateways'],
@@ -3057,7 +3078,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeDhcpOptions',
-      self.page
+      self.page {
+        DhcpOptionsIds: std.get($._params, 'DhcpOptionsIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -3074,6 +3097,9 @@ local a =
         keys: [{ path: ['DhcpOptionsId'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'dhcpOptions' }, { param: 'DhcpOptionsId', path: ['DhcpOptionsId'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'DhcpOptionsIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'dhcpOptions', '$DhcpOptionsId'], a.resource.node + aws.regional + aws.single + {
@@ -3093,7 +3119,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeEgressOnlyInternetGateways',
-      self.page
+      self.page {
+        EgressOnlyInternetGatewayIds: std.get($._params, 'EgressOnlyInternetGatewayIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -3114,6 +3142,9 @@ local a =
         keys: [{ const: 'vpc' }, { path: ['VpcId'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'vpcs' }, { param: 'VpcId', path: ['VpcId'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'EgressOnlyInternetGatewayIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'egressOnlyInternetGateways', '$EgressOnlyInternetGatewayId'], a.resource.node + aws.regional + aws.single + {
@@ -3142,6 +3173,7 @@ local a =
       'DescribeInstances',
       self.page {
         IncludeManagedResources: std.get($._params, 'IncludeManagedResources', null),
+        InstanceIds: std.get($._params, 'InstanceIds', null),
       }
     ),
     itemsPath:: ['Reservations', 'Instances'],
@@ -3204,7 +3236,8 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'IncludeManagedResources', type: 'boolean' },
+      { default: null, name: 'IncludeManagedResources', role: 'filter', type: 'boolean' },
+      { default: null, items: { type: 'string' }, name: 'InstanceIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'instances', '$InstanceId'], a.resource.node + aws.regional + aws.single + {
@@ -3326,7 +3359,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeInternetGateways',
-      self.page
+      self.page {
+        InternetGatewayIds: std.get($._params, 'InternetGatewayIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -3348,6 +3383,9 @@ local a =
         keys: [{ const: 'vpc' }, { path: ['VpcId'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'vpcs' }, { param: 'VpcId', path: ['VpcId'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'InternetGatewayIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'internetGateways', '$InternetGatewayId'], a.resource.node + aws.regional + aws.single + {
@@ -3373,6 +3411,8 @@ local a =
       'DescribeKeyPairs',
       {
         IncludePublicKey: std.get($._params, 'IncludePublicKey', null),
+        KeyNames: std.get($._params, 'KeyNames', null),
+        KeyPairIds: std.get($._params, 'KeyPairIds', null),
       }
     ),
     data:: self.response,
@@ -3395,7 +3435,9 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'IncludePublicKey', type: 'boolean' },
+      { default: null, name: 'IncludePublicKey', role: 'shaping', type: 'boolean' },
+      { default: null, items: { type: 'string' }, name: 'KeyNames', role: 'filter', type: 'array' },
+      { default: null, items: { type: 'string' }, name: 'KeyPairIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'keyPairs', '$KeyName'], a.resource.node + aws.regional + aws.single + {
@@ -3417,6 +3459,8 @@ local a =
       'DescribeLaunchTemplates',
       self.page {
         IncludeManagedResources: std.get($._params, 'IncludeManagedResources', null),
+        LaunchTemplateIds: std.get($._params, 'LaunchTemplateIds', null),
+        LaunchTemplateNames: std.get($._params, 'LaunchTemplateNames', null),
       }
     ),
     data:: self.response,
@@ -3439,7 +3483,9 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'IncludeManagedResources', type: 'boolean' },
+      { default: null, name: 'IncludeManagedResources', role: 'filter', type: 'boolean' },
+      { default: null, items: { type: 'string' }, name: 'LaunchTemplateIds', role: 'filter', type: 'array' },
+      { default: null, items: { type: 'string' }, name: 'LaunchTemplateNames', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'launchTemplates', '$LaunchTemplateId'], a.resource.node + aws.regional + aws.single + {
@@ -3459,7 +3505,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeNatGateways',
-      self.page
+      self.page {
+        NatGatewayIds: std.get($._params, 'NatGatewayIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -3511,6 +3559,9 @@ local a =
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'vpcEndpoints' }, { param: 'VpcEndpointId', path: ['VpcEndpointId'] }],
       },
     ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'NatGatewayIds', role: 'filter', type: 'array' },
+    ],
   }],
   [['aws', '$account', '$region', 'ec2', 'natGateways', '$NatGatewayId'], a.resource.node + aws.regional + aws.single + {
     itemsPath:: ['NatGateways'],
@@ -3561,7 +3612,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeNetworkAcls',
-      self.page
+      self.page {
+        NetworkAclIds: std.get($._params, 'NetworkAclIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -3590,6 +3643,9 @@ local a =
         keys: [{ const: 'subnet' }, { path: ['NetworkAclAssociationId'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'subnets' }, { param: 'SubnetId', path: ['SubnetId'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'NetworkAclIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'networkAcls', '$NetworkAclId'], a.resource.node + aws.regional + aws.single + {
@@ -3623,6 +3679,7 @@ local a =
       'DescribeNetworkInterfaces',
       self.page {
         IncludeManagedResources: std.get($._params, 'IncludeManagedResources', null),
+        NetworkInterfaceIds: std.get($._params, 'NetworkInterfaceIds', null),
       }
     ),
     data:: self.response,
@@ -3679,7 +3736,8 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'IncludeManagedResources', type: 'boolean' },
+      { default: null, name: 'IncludeManagedResources', role: 'filter', type: 'boolean' },
+      { default: null, items: { type: 'string' }, name: 'NetworkInterfaceIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'networkInterfaces', '$NetworkInterfaceId'], a.resource.node + aws.regional + aws.single + {
@@ -3747,7 +3805,7 @@ local a =
       ],
     },
     _paramSpecs+: [
-      { default: null, name: 'Attribute', type: 'string' },
+      { default: null, enum: ['associatePublicIpAddress', 'attachment', 'description', 'groupSet', 'sourceDestCheck'], name: 'Attribute', role: 'shaping', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'routeTables'], a.table.node + aws.regional + aws.paginated + {
@@ -3757,7 +3815,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeRouteTables',
-      self.page
+      self.page {
+        RouteTableIds: std.get($._params, 'RouteTableIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -3820,6 +3880,9 @@ local a =
         keys: [{ const: 'VPC peering connection' }, { path: ['DestinationCidrBlock'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'vpcPeeringConnections' }, { param: 'VpcPeeringConnectionId', path: ['VpcPeeringConnectionId'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'RouteTableIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'routeTables', '$RouteTableId'], a.resource.node + aws.regional + aws.single + {
@@ -3886,7 +3949,10 @@ local a =
     response:: call(
       self.ctx,
       'DescribeSecurityGroups',
-      self.page
+      self.page {
+        GroupIds: std.get($._params, 'GroupIds', null),
+        GroupNames: std.get($._params, 'GroupNames', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -3940,6 +4006,10 @@ local a =
         keys: [{ const: 'VPC peering connection (egress)' }, { path: ['GroupId'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'vpcPeeringConnections' }, { param: 'VpcPeeringConnectionId', path: ['VpcPeeringConnectionId'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'GroupIds', role: 'filter', type: 'array' },
+      { default: null, items: { type: 'string' }, name: 'GroupNames', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'securityGroups', '$GroupId'], a.resource.node + aws.regional + aws.single + {
@@ -4032,7 +4102,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeSubnets',
-      self.page
+      self.page {
+        SubnetIds: std.get($._params, 'SubnetIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -4058,6 +4130,9 @@ local a =
         keys: [{ const: 'vpc' }, { path: ['SubnetId'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'vpcs' }, { param: 'VpcId', path: ['VpcId'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'SubnetIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'subnets', '$SubnetId'], a.resource.node + aws.regional + aws.single + {
@@ -4100,7 +4175,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeTransitGatewayAttachments',
-      self.page
+      self.page {
+        TransitGatewayAttachmentIds: std.get($._params, 'TransitGatewayAttachmentIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -4126,6 +4203,9 @@ local a =
         keys: [{ const: 'transit gateway' }, { path: ['TransitGatewayAttachmentId'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'transitGateways' }, { param: 'TransitGatewayId', path: ['TransitGatewayId'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'TransitGatewayAttachmentIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'transitGatewayAttachments', '$TransitGatewayAttachmentId'], a.resource.node + aws.regional + aws.single + {
@@ -4182,7 +4262,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeTransitGateways',
-      self.page
+      self.page {
+        TransitGatewayIds: std.get($._params, 'TransitGatewayIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -4202,6 +4284,9 @@ local a =
         keys: [{ path: ['TransitGatewayId'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'transitGateways' }, { param: 'TransitGatewayId', path: ['TransitGatewayId'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'TransitGatewayIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'transitGateways', '$TransitGatewayId'], a.resource.node + aws.regional + aws.single + {
@@ -4223,6 +4308,7 @@ local a =
       'DescribeVolumes',
       self.page {
         IncludeManagedResources: std.get($._params, 'IncludeManagedResources', null),
+        VolumeIds: std.get($._params, 'VolumeIds', null),
       }
     ),
     data:: self.response,
@@ -4251,7 +4337,8 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'IncludeManagedResources', type: 'boolean' },
+      { default: null, name: 'IncludeManagedResources', role: 'filter', type: 'boolean' },
+      { default: null, items: { type: 'string' }, name: 'VolumeIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'volumes', '$VolumeId'], a.resource.node + aws.regional + aws.single + {
@@ -4278,7 +4365,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeVpcEndpoints',
-      self.page
+      self.page {
+        VpcEndpointIds: std.get($._params, 'VpcEndpointIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -4335,6 +4424,9 @@ local a =
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'subnets' }, { param: 'SubnetId', path: [] }],
       },
     ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'VpcEndpointIds', role: 'filter', type: 'array' },
+    ],
   }],
   [['aws', '$account', '$region', 'ec2', 'vpcEndpoints', '$VpcEndpointId'], a.resource.node + aws.regional + aws.single + {
     itemsPath:: ['VpcEndpoints'],
@@ -4390,7 +4482,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeVpcPeeringConnections',
-      self.page
+      self.page {
+        VpcPeeringConnectionIds: std.get($._params, 'VpcPeeringConnectionIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -4420,6 +4514,9 @@ local a =
         keys: [{ const: 'accepter vpc' }, { path: ['VpcPeeringConnectionId'] }, { path: ['AccepterVpcInfo', 'VpcId'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'vpcs' }, { param: 'VpcId', path: ['AccepterVpcInfo', 'VpcId'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'VpcPeeringConnectionIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'vpcPeeringConnections', '$VpcPeeringConnectionId'], a.resource.node + aws.regional + aws.single + {
@@ -4451,7 +4548,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeVpcs',
-      self.page
+      self.page {
+        VpcIds: std.get($._params, 'VpcIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -4476,6 +4575,9 @@ local a =
         keys: [{ const: 'dhcp options' }, { path: ['VpcId'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'dhcpOptions' }, { param: 'DhcpOptionsId', path: ['DhcpOptionsId'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'VpcIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'vpcs', '$VpcId'], a.resource.node + aws.regional + aws.single + {
@@ -4581,7 +4683,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeVpnConnections',
-      {}
+      {
+        VpnConnectionIds: std.get($._params, 'VpnConnectionIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -4622,6 +4726,9 @@ local a =
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'transitGatewayAttachments' }, { param: 'TransitGatewayAttachmentId', path: ['Options', 'TransportTransitGatewayAttachmentId'] }],
       },
     ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'VpnConnectionIds', role: 'filter', type: 'array' },
+    ],
   }],
   [['aws', '$account', '$region', 'ec2', 'vpnConnections', '$VpnConnectionId'], a.resource.node + aws.regional + aws.single + {
     itemsPath:: ['VpnConnections'],
@@ -4659,7 +4766,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeVpnGateways',
-      {}
+      {
+        VpnGatewayIds: std.get($._params, 'VpnGatewayIds', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -4684,6 +4793,9 @@ local a =
         keys: [{ const: 'vpc' }, { path: ['VpcId'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ec2' }, { const: 'vpcs' }, { param: 'VpcId', path: ['VpcId'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'VpnGatewayIds', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ec2', 'vpnGateways', '$VpnGatewayId'], a.resource.node + aws.regional + aws.single + {
