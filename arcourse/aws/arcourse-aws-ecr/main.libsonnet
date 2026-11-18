@@ -2639,7 +2639,7 @@ local a =
     outputToken:: 'nextToken',
     pageSize:: null,
     _paramSpecs+: [
-      { name: name, type: if name == $.pageSize then 'number' else 'string', default: null }
+      { name: name, type: if name == $.pageSize then 'number' else 'string', role: 'pagination', default: null }
       for name in [$.pageSize, $.inputToken]
       if name != null
     ],
@@ -2700,7 +2700,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribePullThroughCacheRules',
-      self.page
+      self.page {
+        ecrRepositoryPrefixes: std.get($._params, 'ecrRepositoryPrefixes', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -2718,6 +2720,9 @@ local a =
         keys: [{ path: ['ecrRepositoryPrefix'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ecr' }, { const: 'pullThroughCacheRules' }, { param: 'ecrRepositoryPrefix', path: ['ecrRepositoryPrefix'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'ecrRepositoryPrefixes', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ecr', 'pullThroughCacheRules', '$ecrRepositoryPrefix'], a.resource.node + aws.regional + aws.single + {
@@ -2747,8 +2752,8 @@ local a =
       ],
     },
     _paramSpecs+: [
-      { default: null, name: 'maxResults', type: 'number' },
-      { default: null, name: 'nextToken', type: 'string' },
+      { default: null, name: 'maxResults', role: 'pagination', type: 'number' },
+      { default: null, name: 'nextToken', role: 'pagination', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 'ecr', 'replicationBackfills'], a.table.node + aws.regional + aws.paginated + {
@@ -2816,7 +2821,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'resultStatusFilter', type: 'string' },
+      { default: null, enum: ['COMPLETE', 'FAILED'], name: 'resultStatusFilter', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', '$region', 'ecr', 'repositories'], a.table.node + aws.regional + aws.paginated + {
@@ -2826,7 +2831,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeRepositories',
-      self.page
+      self.page {
+        repositoryNames: std.get($._params, 'repositoryNames', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -2845,6 +2852,9 @@ local a =
         keys: [{ path: ['repositoryName'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ecr' }, { const: 'repositories' }, { param: 'repositoryName', path: ['repositoryName'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'repositoryNames', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ecr', 'repositories', '$repositoryName'], a.resource.node + aws.regional + aws.single + {
@@ -3017,7 +3027,9 @@ local a =
     response:: call(
       self.ctx,
       'DescribeRepositoryCreationTemplates',
-      self.page
+      self.page {
+        prefixes: std.get($._params, 'prefixes', null),
+      }
     ),
     data:: self.response,
     table:: {
@@ -3035,6 +3047,9 @@ local a =
         keys: [{ path: ['prefix'] }],
         value: [{ const: 'aws' }, { origin: 'account' }, { origin: 'region' }, { const: 'ecr' }, { const: 'repositoryCreationTemplates' }, { param: 'prefix', path: ['prefix'] }],
       },
+    ],
+    _paramSpecs+: [
+      { default: null, items: { type: 'string' }, name: 'prefixes', role: 'filter', type: 'array' },
     ],
   }],
   [['aws', '$account', '$region', 'ecr', 'repositoryCreationTemplates', '$prefix'], a.resource.node + aws.regional + aws.single + {
