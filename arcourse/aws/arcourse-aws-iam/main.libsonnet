@@ -2639,7 +2639,7 @@ local a =
     outputToken:: 'nextToken',
     pageSize:: null,
     _paramSpecs+: [
-      { name: name, type: if name == $.pageSize then 'number' else 'string', default: null }
+      { name: name, type: if name == $.pageSize then 'number' else 'string', role: 'pagination', default: null }
       for name in [$.pageSize, $.inputToken]
       if name != null
     ],
@@ -2739,7 +2739,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'PathPrefix', type: 'string' },
+      { default: null, name: 'PathPrefix', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', 'iam', 'groups', '$GroupName']],
@@ -2771,7 +2771,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'PathPrefix', type: 'string' },
+      { default: null, name: 'PathPrefix', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', 'iam', 'groups', '$GroupName', 'policies'], a.table.node + aws.global + aws.paginated + {
@@ -2880,7 +2880,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'PathPrefix', type: 'string' },
+      { default: null, name: 'PathPrefix', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', 'iam', 'instanceProfiles', '$InstanceProfileName'], a.resource.node + aws.global + {
@@ -2972,10 +2972,10 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'OnlyAttached', type: 'boolean' },
-      { default: null, name: 'PathPrefix', type: 'string' },
-      { default: null, name: 'PolicyUsageFilter', type: 'string' },
-      { default: null, name: 'Scope', type: 'string' },
+      { default: null, name: 'OnlyAttached', role: 'filter', type: 'boolean' },
+      { default: null, name: 'PathPrefix', role: 'filter', type: 'string' },
+      { default: null, enum: ['PermissionsBoundary', 'PermissionsPolicy'], name: 'PolicyUsageFilter', role: 'filter', type: 'string' },
+      { default: null, enum: ['AWS', 'All', 'Local'], name: 'Scope', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', 'iam', 'policies', '$PolicyArn'], a.resource.node + aws.global + {
@@ -3084,9 +3084,9 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'EntityFilter', type: 'string' },
+      { default: null, enum: ['AWSManagedPolicy', 'Group', 'LocalManagedPolicy', 'Role', 'User'], name: 'EntityFilter', type: 'string' },
       { default: null, name: 'PathPrefix', type: 'string' },
-      { default: null, name: 'PolicyUsageFilter', type: 'string' },
+      { default: null, enum: ['PermissionsBoundary', 'PermissionsPolicy'], name: 'PolicyUsageFilter', type: 'string' },
     ],
   }],
   [['aws', '$account', 'iam', 'roles'], a.table.node + aws.global + aws.paginated + {
@@ -3125,7 +3125,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'PathPrefix', type: 'string' },
+      { default: null, name: 'PathPrefix', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', 'iam', 'roles', '$RoleName'], a.resource.node + aws.global + {
@@ -3172,7 +3172,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'PathPrefix', type: 'string' },
+      { default: null, name: 'PathPrefix', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', 'iam', 'roles', '$RoleName', 'instanceProfilesForRole'], a.table.node + aws.global + aws.paginated + {
@@ -3312,7 +3312,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'PathPrefix', type: 'string' },
+      { default: null, name: 'PathPrefix', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', 'iam', 'users', '$UserName'], a.resource.node + aws.global + {
@@ -3360,7 +3360,7 @@ local a =
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'PathPrefix', type: 'string' },
+      { default: null, name: 'PathPrefix', role: 'filter', type: 'string' },
     ],
   }],
   [['aws', '$account', 'iam', 'users', '$UserName', 'groupsForUser'], a.table.node + aws.global + aws.paginated + {
