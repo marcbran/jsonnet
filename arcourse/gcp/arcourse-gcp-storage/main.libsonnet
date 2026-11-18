@@ -2278,7 +2278,7 @@ local a =
     outputToken:: 'nextPageToken',
     pageSize:: 'maxResults',
     _paramSpecs+: [
-      { name: name, type: if name == $.pageSize then 'number' else 'string', default: null }
+      { name: name, type: if name == $.pageSize then 'number' else 'string', role: 'pagination', default: null }
       for name in [$.pageSize, $.inputToken]
     ],
     page:: {
@@ -2443,10 +2443,10 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'prefix', type: 'string' },
-      { default: null, name: 'projection', type: 'string' },
-      { default: null, name: 'returnPartialSuccess', type: 'string' },
-      { default: null, name: 'softDeleted', type: 'string' },
+      { default: null, name: 'prefix', role: 'filter', type: 'string' },
+      { default: null, enum: ['full', 'noAcl'], name: 'projection', role: 'shaping', type: 'string' },
+      { default: null, name: 'returnPartialSuccess', role: 'shaping', type: 'boolean' },
+      { default: null, name: 'softDeleted', role: 'filter', type: 'boolean' },
       { default: null, name: 'userProject', type: 'string' },
     ],
   }],
@@ -2499,18 +2499,18 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'delimiter', type: 'string' },
-      { default: null, name: 'endOffset', type: 'string' },
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'includeFoldersAsPrefixes', type: 'string' },
-      { default: null, name: 'includeTrailingDelimiter', type: 'string' },
-      { default: null, name: 'matchGlob', type: 'string' },
-      { default: null, name: 'prefix', type: 'string' },
-      { default: null, name: 'projection', type: 'string' },
-      { default: null, name: 'softDeleted', type: 'string' },
-      { default: null, name: 'startOffset', type: 'string' },
+      { default: null, name: 'delimiter', role: 'shaping', type: 'string' },
+      { default: null, name: 'endOffset', role: 'filter', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'includeFoldersAsPrefixes', role: 'shaping', type: 'boolean' },
+      { default: null, name: 'includeTrailingDelimiter', role: 'shaping', type: 'boolean' },
+      { default: null, name: 'matchGlob', role: 'filter', type: 'string' },
+      { default: null, name: 'prefix', role: 'filter', type: 'string' },
+      { default: null, enum: ['full', 'noAcl'], name: 'projection', role: 'shaping', type: 'string' },
+      { default: null, name: 'softDeleted', role: 'filter', type: 'boolean' },
+      { default: null, name: 'startOffset', role: 'filter', type: 'string' },
       { default: null, name: 'userProject', type: 'string' },
-      { default: null, name: 'versions', type: 'string' },
+      { default: null, name: 'versions', role: 'filter', type: 'boolean' },
     ],
   }],
   [['gcp', '$project', 'storage', 'buckets', '$bucket', 'objects', '$object'], a.resource.node + gcp.project + referenced + {
