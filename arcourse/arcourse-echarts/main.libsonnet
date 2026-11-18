@@ -629,30 +629,20 @@ local a =
             return a.localeCompare(b);
           }
 
-          function firstCol(table) {
-            var th = table.querySelector('thead th');
-            return th ? th.dataset.col : null;
-          }
-
           function apply(table) {
             var ths = headers(table);
             ths.forEach(function (th) { th.classList.remove('sort-asc', 'sort-desc'); });
-            if (ths.length === 0) return;
-            var key = window.hashParams.get('sort');
-            var desc = window.hashParams.get('dir') === 'desc';
-            var i = 0;
-            if (key) {
-              i = -1;
-              ths.forEach(function (th, idx) { if (th.dataset.col === key) i = idx; });
-              if (i < 0) { i = 0; desc = false; }
-            } else {
-              desc = false;
-            }
-            ths[i].classList.add(desc ? 'sort-desc' : 'sort-asc');
             var tbody = table.querySelector('tbody');
             if (!tbody || tbody.querySelector('td.empty')) return;
             var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+            rows.forEach(function (r, idx) { if (r.dataset.order === undefined) r.dataset.order = String(idx); });
+            var key = window.hashParams.get('sort');
+            var desc = window.hashParams.get('dir') === 'desc';
+            var i = -1;
+            ths.forEach(function (th, idx) { if (th.dataset.col === key) i = idx; });
+            if (i >= 0) ths[i].classList.add(desc ? 'sort-desc' : 'sort-asc');
             rows.sort(function (a, b) {
+              if (i < 0) return Number(a.dataset.order) - Number(b.dataset.order);
               var r = compare(cellText(a, i), cellText(b, i));
               return desc ? -r : r;
             });
@@ -674,28 +664,16 @@ local a =
             var table = th.closest('table.table');
             if (!table) return;
             var key = th.dataset.col;
-            var first = firstCol(table);
-            var curKey = window.hashParams.get('sort') || first;
+            var curKey = window.hashParams.get('sort');
             var curDesc = window.hashParams.get('dir') === 'desc';
-            var nextKey;
-            var nextDesc;
             if (curKey !== key) {
-              nextKey = key;
-              nextDesc = false;
+              window.hashParams.set('sort', key);
+              window.hashParams.remove('dir');
             } else if (!curDesc) {
-              nextKey = key;
-              nextDesc = true;
+              window.hashParams.set('dir', 'desc');
             } else {
-              nextKey = first;
-              nextDesc = false;
-            }
-            if (nextKey === first && !nextDesc) {
               window.hashParams.remove('sort');
               window.hashParams.remove('dir');
-            } else {
-              window.hashParams.set('sort', nextKey);
-              if (nextDesc) window.hashParams.set('dir', 'desc');
-              else window.hashParams.remove('dir');
             }
             applyAll();
           });
@@ -793,12 +771,12 @@ local a =
         columns:: [],
         rowLinks:: [],
         pagination:: null,
-        filters:: null,
+        params:: null,
         local rows = if std.isArray(c.items) then c.items else [],
         local nav = paginationNav { pagination:: c.pagination },
         html: [
           { element: 'style', children: [style] },
-        ] + (if c.filters != null && c.filters.visible then [c.filters] else []) + [
+        ] + (if c.params != null && c.params.visible then [c.params] else []) + [
           {
             element: 'div',
             attributes: { class: 'card table-card' },
@@ -1900,7 +1878,7 @@ local a =
           ],
       },
     action:
-      local paramsLib =
+      local controlsLib =
         local text(value) = if value == null then null else std.toString(value);
 
         local option = {
@@ -2170,18 +2148,18 @@ local a =
         local initial = std.objectHas(c.initialValues, name),
         local value = if present then c.params[name] else if initial then c.initialValues[name] else null,
         html:
-          if std.member(paramsLib.scalarTypes, c.spec.type) then [{
+          if std.member(controlsLib.scalarTypes, c.spec.type) then [{
             element: 'label',
             children: [
               { element: 'span', children: [name] },
-              paramsLib.scalarControl { spec:: c.spec, value:: value },
+              controlsLib.scalarControl { spec:: c.spec, value:: value },
             ],
           }] + [
             issue { message:: i.message, hint:: !present }
             for i in c.issues
             if present || !initial
           ]
-          else paramsLib.hiddenControl { name:: name, value:: value },
+          else controlsLib.hiddenControl { name:: name, value:: value },
       };
 
       local paramsForm = {
@@ -2239,7 +2217,7 @@ local a =
         local hasParams = std.length(c.paramSpecs) > 0,
         local issues = if c.action != null && std.objectHas(c.action, 'issues') then c.action.issues else [],
         local applicable = c.action != null && !std.objectHas(c.action, 'issues'),
-        local paramNames = [spec.name for spec in c.paramSpecs if std.member(paramsLib.scalarTypes, spec.type)],
+        local paramNames = [spec.name for spec in c.paramSpecs if std.member(controlsLib.scalarTypes, spec.type)],
         local formIssues = [i for i in issues if !std.member(paramNames, std.get(i, 'param', null))],
         html: [
           { element: 'style', children: [style] },
@@ -2264,8 +2242,8 @@ local a =
           },
         ],
       },
-    filters:
-      local paramsLib =
+    params:
+      local controlsLib =
         local text(value) = if value == null then null else std.toString(value);
 
         local option = {
@@ -2391,7 +2369,7 @@ local a =
         };
 
       local style = |||
-        @scope (.table-filters) {
+        @scope (.table-params) {
           :scope.card {
             padding: 0.25em;
           }
@@ -2406,11 +2384,25 @@ local a =
           }
           form {
             display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.75em;
+            margin: 0;
+            padding: 0.3em 0.4em 0.6em;
+          }
+          .group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3em;
+          }
+          .group-title {
+            opacity: 0.6;
+          }
+          .fields {
+            display: flex;
             flex-wrap: wrap;
             align-items: flex-end;
             gap: 0.5em 1em;
-            margin: 0;
-            padding: 0.3em 0.4em 0.6em;
           }
           label {
             display: flex;
@@ -2475,9 +2467,28 @@ local a =
             if c.spec.type == 'array' then {
               element: 'div',
               attributes: { class: 'values' },
-              children: [paramsLib.arrayControl { spec:: c.spec, value:: c.value }],
+              children: [controlsLib.arrayControl { spec:: c.spec, value:: c.value }],
             }
-            else paramsLib.scalarControl { spec:: c.spec, value:: c.value },
+            else controlsLib.scalarControl { spec:: c.spec, value:: c.value },
+          ],
+        },
+      };
+
+      local group = {
+        local c = self,
+        title:: error 'group requires a title',
+        specs:: error 'group requires specs',
+        params:: {},
+        html: {
+          element: 'div',
+          attributes: { class: 'group' },
+          children: [
+            { element: 'span', attributes: { class: 'group-title' }, children: [c.title] },
+            {
+              element: 'div',
+              attributes: { class: 'fields' },
+              children: [field { spec:: spec, value:: std.get(c.params, spec.name, null) } for spec in c.specs],
+            },
           ],
         },
       };
@@ -2494,22 +2505,27 @@ local a =
         params:: {},
         clearHref:: null,
         local filterSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'filter'],
-        local keptSpecs = [spec for spec in c.paramSpecs if !std.member(['filter', 'pagination'], roleOf(spec))],
-        local active = std.length([spec for spec in filterSpecs if isSet(std.get(c.params, spec.name, null))]),
-        visible:: std.length(filterSpecs) > 0,
+        local sortSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'sort'],
+        local keptSpecs = [spec for spec in c.paramSpecs if !std.member(['filter', 'sort', 'pagination'], roleOf(spec))],
+        local active = std.length([spec for spec in filterSpecs + sortSpecs if isSet(std.get(c.params, spec.name, null))]),
+        local hasFilters = std.length(filterSpecs) > 0,
+        local hasSort = std.length(sortSpecs) > 0,
+        local title = if hasFilters && hasSort then 'Filter & sort' else if hasFilters then 'Filter' else 'Sort',
+        visible:: hasFilters || hasSort,
         html: [
           { element: 'style', children: [style] },
           {
             element: 'details',
-            attributes: { class: 'card table-filters', open: true },
+            attributes: { class: 'card table-params', open: true },
             children: [
-              { element: 'summary', children: [if active > 0 then 'Filters (%d)' % active else 'Filters'] },
+              { element: 'summary', children: [title + (if active > 0 then ' (%d)' % active else '')] },
               {
                 element: 'form',
                 attributes: { method: 'get' },
                 children:
-                  [field { spec:: spec, value:: std.get(c.params, spec.name, null) } for spec in filterSpecs] +
-                  [paramsLib.hiddenControl { name:: spec.name, value:: std.get(c.params, spec.name, null) } for spec in keptSpecs] +
+                  (if hasFilters then [group { title:: 'Filter', specs:: filterSpecs, params:: c.params }] else []) +
+                  (if hasSort then [group { title:: 'Sort', specs:: sortSpecs, params:: c.params }] else []) +
+                  [controlsLib.hiddenControl { name:: spec.name, value:: std.get(c.params, spec.name, null) } for spec in keptSpecs] +
                   [{
                     element: 'div',
                     attributes: { class: 'buttons' },
@@ -2728,7 +2744,7 @@ local a =
     items: [projectItem(item, columns) for item in dataItems],
     local specs = std.get($, '_paramSpecs', []),
     local params = std.get($, '_params', {}),
-    local droppedNames = [spec.name for spec in specs if std.member(['filter', 'pagination'], std.get(spec, 'role', null))],
+    local droppedNames = [spec.name for spec in specs if std.member(['filter', 'sort', 'pagination'], std.get(spec, 'role', null))],
     local cleared = $ { _params: { [k]: params[k] for k in std.objectFields(params) if !std.member(droppedNames, k) } },
     _view+:: {
       fragment:
@@ -2737,7 +2753,7 @@ local a =
           columns:: columns,
           rowLinks:: linkspecs.rowLinksFor($, std.get($, 'linkSpecs', []), at),
           pagination:: std.get(std.get($, 'links', {}), 'pagination', null),
-          filters:: c.filters {
+          params:: c.params {
             paramSpecs:: specs,
             params:: params,
             clearHref:: if std.objectHasAll(cleared, '_queryPath') then cleared._queryPath else null,
