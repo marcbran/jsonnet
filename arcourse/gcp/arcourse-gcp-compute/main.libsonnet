@@ -2278,7 +2278,7 @@ local a =
     outputToken:: 'nextPageToken',
     pageSize:: 'maxResults',
     _paramSpecs+: [
-      { name: name, type: if name == $.pageSize then 'number' else 'string', default: null }
+      { name: name, type: if name == $.pageSize then 'number' else 'string', role: 'pagination', default: null }
       for name in [$.pageSize, $.inputToken]
     ],
     page:: {
@@ -2454,10 +2454,10 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'includeAllScopes', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
-      { default: null, name: 'serviceProjectNumber', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'includeAllScopes', role: 'shaping', type: 'boolean' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
+      { default: null, name: 'serviceProjectNumber', role: 'filter', type: 'string' },
     ],
   }],
   [['gcp', '$project', 'compute', 'disks'], a.table.node + gcp.project + gcp.paginated + gcp.aggregated + {
@@ -2490,9 +2490,9 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'includeAllScopes', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'includeAllScopes', role: 'filter', type: 'boolean' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
       { default: null, name: 'serviceProjectNumber', type: 'string' },
     ],
   }],
@@ -2525,8 +2525,8 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
     ],
   }],
   [['gcp', '$project', 'compute', 'global', 'addresses', '$address'], a.resource.node + gcp.project + referenced + {
@@ -2567,8 +2567,8 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
     ],
   }],
   [['gcp', '$project', 'compute', 'global', 'firewalls', '$firewall'], a.resource.node + gcp.project + referenced + {
@@ -2610,8 +2610,8 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
     ],
   }],
   [['gcp', '$project', 'compute', 'global', 'images', '$image'], a.resource.node + gcp.project + referenced + {
@@ -2652,8 +2652,8 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
     ],
   }],
   [['gcp', '$project', 'compute', 'global', 'networks', '$network'], a.resource.node + gcp.project + referenced + {
@@ -2695,8 +2695,8 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
     ],
   }],
   [['gcp', '$project', 'compute', 'global', 'snapshots', '$snapshot'], a.resource.node + gcp.project + referenced + {
@@ -2739,9 +2739,9 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'includeAllScopes', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'includeAllScopes', role: 'shaping', type: 'boolean' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
       { default: null, name: 'serviceProjectNumber', type: 'string' },
     ],
   }],
@@ -2775,9 +2775,9 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'includeAllScopes', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'includeAllScopes', role: 'filter', type: 'boolean' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
       { default: null, name: 'serviceProjectNumber', type: 'string' },
     ],
   }],
@@ -2808,8 +2808,8 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
     ],
   }],
   [['gcp', '$project', 'compute', 'regions', '$region'], a.resource.node + gcp.project + referenced + {
@@ -2851,8 +2851,8 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
     ],
   }],
   [['gcp', '$project', 'compute', 'regions', '$region', 'addresses', '$address'], a.resource.node + gcp.project + referenced + {
@@ -2893,8 +2893,8 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
     ],
   }],
   [['gcp', '$project', 'compute', 'regions', '$region', 'resourcePolicies', '$resourcePolicy'], a.resource.node + gcp.project + referenced + {
@@ -2938,9 +2938,9 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
-      { default: null, name: 'views', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
+      { default: null, items: { enum: ['DEFAULT', 'WITH_UTILIZATION'], type: 'string' }, name: 'views', role: 'shaping', type: 'array' },
     ],
   }],
   [['gcp', '$project', 'compute', 'regions', '$region', 'subnetworks', '$subnetwork'], a.resource.node + gcp.project + referenced + {
@@ -2983,9 +2983,9 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'includeAllScopes', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'includeAllScopes', role: 'filter', type: 'boolean' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
       { default: null, name: 'serviceProjectNumber', type: 'string' },
     ],
   }],
@@ -3021,11 +3021,11 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'includeAllScopes', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'includeAllScopes', role: 'filter', type: 'boolean' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
       { default: null, name: 'serviceProjectNumber', type: 'string' },
-      { default: null, name: 'views', type: 'string' },
+      { default: null, items: { enum: ['DEFAULT', 'WITH_UTILIZATION'], type: 'string' }, name: 'views', role: 'shaping', type: 'array' },
     ],
   }],
   [['gcp', '$project', 'compute', 'zones'], a.table.node + gcp.project + gcp.paginated + {
@@ -3056,8 +3056,8 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
     ],
   }],
   [['gcp', '$project', 'compute', 'zones', '$zone'], a.resource.node + gcp.project + referenced + {
@@ -3098,8 +3098,8 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
     ],
   }],
   [['gcp', '$project', 'compute', 'zones', '$zone', 'disks', '$disk'], a.resource.node + gcp.project + referenced + {
@@ -3141,8 +3141,8 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
     ],
   }],
   [['gcp', '$project', 'compute', 'zones', '$zone', 'instances', '$instance'], a.resource.node + gcp.project + referenced + {
@@ -3184,8 +3184,8 @@ local referenced = gcp.referenced {
       },
     ],
     _paramSpecs+: [
-      { default: null, name: 'filter', type: 'string' },
-      { default: null, name: 'orderBy', type: 'string' },
+      { default: null, name: 'filter', role: 'filter', type: 'string' },
+      { default: null, name: 'orderBy', role: 'sort', type: 'string' },
     ],
   }],
   [['gcp', '$project', 'compute', 'zones', '$zone', 'machineTypes', '$machineType'], a.resource.node + gcp.project + referenced + {
