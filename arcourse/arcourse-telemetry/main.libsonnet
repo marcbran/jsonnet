@@ -3495,6 +3495,7 @@ local nodesChartLib =
             paramSpecs:: [],
             params:: {},
             clearHref:: null,
+            open:: true,
             local filterSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'filter'],
             local sortSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'sort'],
             local keptSpecs = [spec for spec in c.paramSpecs if !std.member(['filter', 'sort', 'pagination'], roleOf(spec))],
@@ -3507,7 +3508,7 @@ local nodesChartLib =
               { element: 'style', children: [style] },
               {
                 element: 'details',
-                attributes: { class: 'card table-params', open: true },
+                attributes: { class: 'card table-params', open: c.open || active > 0 },
                 children: [
                   { element: 'summary', children: [title + (if active > 0 then ' (%d)' % active else '')] },
                   {
@@ -3747,6 +3748,7 @@ local nodesChartLib =
               params:: c.params {
                 paramSpecs:: specs,
                 params:: params,
+                open:: std.get(std.get(table, 'params', {}), 'open', true),
                 clearHref:: if std.objectHasAll(cleared, '_queryPath') then cleared._queryPath else null,
               },
             },
@@ -6831,6 +6833,7 @@ local nodesListLib =
           paramSpecs:: [],
           params:: {},
           clearHref:: null,
+          open:: true,
           local filterSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'filter'],
           local sortSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'sort'],
           local keptSpecs = [spec for spec in c.paramSpecs if !std.member(['filter', 'sort', 'pagination'], roleOf(spec))],
@@ -6843,7 +6846,7 @@ local nodesListLib =
             { element: 'style', children: [style] },
             {
               element: 'details',
-              attributes: { class: 'card table-params', open: true },
+              attributes: { class: 'card table-params', open: c.open || active > 0 },
               children: [
                 { element: 'summary', children: [title + (if active > 0 then ' (%d)' % active else '')] },
                 {
@@ -7083,6 +7086,7 @@ local nodesListLib =
             params:: c.params {
               paramSpecs:: specs,
               params:: params,
+              open:: std.get(std.get(table, 'params', {}), 'open', true),
               clearHref:: if std.objectHasAll(cleared, '_queryPath') then cleared._queryPath else null,
             },
           },
@@ -9465,6 +9469,7 @@ local nodesLabelsLib =
           paramSpecs:: [],
           params:: {},
           clearHref:: null,
+          open:: true,
           local filterSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'filter'],
           local sortSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'sort'],
           local keptSpecs = [spec for spec in c.paramSpecs if !std.member(['filter', 'sort', 'pagination'], roleOf(spec))],
@@ -9477,7 +9482,7 @@ local nodesLabelsLib =
             { element: 'style', children: [style] },
             {
               element: 'details',
-              attributes: { class: 'card table-params', open: true },
+              attributes: { class: 'card table-params', open: c.open || active > 0 },
               children: [
                 { element: 'summary', children: [title + (if active > 0 then ' (%d)' % active else '')] },
                 {
@@ -9717,6 +9722,7 @@ local nodesLabelsLib =
             params:: c.params {
               paramSpecs:: specs,
               params:: params,
+              open:: std.get(std.get(table, 'params', {}), 'open', true),
               clearHref:: if std.objectHasAll(cleared, '_queryPath') then cleared._queryPath else null,
             },
           },
@@ -12098,6 +12104,7 @@ local nodesValuesLib =
           paramSpecs:: [],
           params:: {},
           clearHref:: null,
+          open:: true,
           local filterSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'filter'],
           local sortSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'sort'],
           local keptSpecs = [spec for spec in c.paramSpecs if !std.member(['filter', 'sort', 'pagination'], roleOf(spec))],
@@ -12110,7 +12117,7 @@ local nodesValuesLib =
             { element: 'style', children: [style] },
             {
               element: 'details',
-              attributes: { class: 'card table-params', open: true },
+              attributes: { class: 'card table-params', open: c.open || active > 0 },
               children: [
                 { element: 'summary', children: [title + (if active > 0 then ' (%d)' % active else '')] },
                 {
@@ -12350,6 +12357,7 @@ local nodesValuesLib =
             params:: c.params {
               paramSpecs:: specs,
               params:: params,
+              open:: std.get(std.get(table, 'params', {}), 'open', true),
               clearHref:: if std.objectHasAll(cleared, '_queryPath') then cleared._queryPath else null,
             },
           },
@@ -14729,6 +14737,7 @@ local nodesLogsLib =
           paramSpecs:: [],
           params:: {},
           clearHref:: null,
+          open:: true,
           local filterSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'filter'],
           local sortSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'sort'],
           local keptSpecs = [spec for spec in c.paramSpecs if !std.member(['filter', 'sort', 'pagination'], roleOf(spec))],
@@ -14741,7 +14750,7 @@ local nodesLogsLib =
             { element: 'style', children: [style] },
             {
               element: 'details',
-              attributes: { class: 'card table-params', open: true },
+              attributes: { class: 'card table-params', open: c.open || active > 0 },
               children: [
                 { element: 'summary', children: [title + (if active > 0 then ' (%d)' % active else '')] },
                 {
@@ -14981,6 +14990,7 @@ local nodesLogsLib =
             params:: c.params {
               paramSpecs:: specs,
               params:: params,
+              open:: std.get(std.get(table, 'params', {}), 'open', true),
               clearHref:: if std.objectHasAll(cleared, '_queryPath') then cleared._queryPath else null,
             },
           },
@@ -17353,6 +17363,7 @@ local nodesLogsLib =
             paramSpecs:: [],
             params:: {},
             clearHref:: null,
+            open:: true,
             local filterSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'filter'],
             local sortSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'sort'],
             local keptSpecs = [spec for spec in c.paramSpecs if !std.member(['filter', 'sort', 'pagination'], roleOf(spec))],
@@ -17365,7 +17376,7 @@ local nodesLogsLib =
               { element: 'style', children: [style] },
               {
                 element: 'details',
-                attributes: { class: 'card table-params', open: true },
+                attributes: { class: 'card table-params', open: c.open || active > 0 },
                 children: [
                   { element: 'summary', children: [title + (if active > 0 then ' (%d)' % active else '')] },
                   {
@@ -17605,6 +17616,7 @@ local nodesLogsLib =
               params:: c.params {
                 paramSpecs:: specs,
                 params:: params,
+                open:: std.get(std.get(table, 'params', {}), 'open', true),
                 clearHref:: if std.objectHasAll(cleared, '_queryPath') then cleared._queryPath else null,
               },
             },
@@ -20237,6 +20249,7 @@ local nodesLogrecordLib =
           paramSpecs:: [],
           params:: {},
           clearHref:: null,
+          open:: true,
           local filterSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'filter'],
           local sortSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'sort'],
           local keptSpecs = [spec for spec in c.paramSpecs if !std.member(['filter', 'sort', 'pagination'], roleOf(spec))],
@@ -20249,7 +20262,7 @@ local nodesLogrecordLib =
             { element: 'style', children: [style] },
             {
               element: 'details',
-              attributes: { class: 'card table-params', open: true },
+              attributes: { class: 'card table-params', open: c.open || active > 0 },
               children: [
                 { element: 'summary', children: [title + (if active > 0 then ' (%d)' % active else '')] },
                 {
@@ -20489,6 +20502,7 @@ local nodesLogrecordLib =
             params:: c.params {
               paramSpecs:: specs,
               params:: params,
+              open:: std.get(std.get(table, 'params', {}), 'open', true),
               clearHref:: if std.objectHasAll(cleared, '_queryPath') then cleared._queryPath else null,
             },
           },
@@ -23074,6 +23088,7 @@ local nodesDashboardLib =
             paramSpecs:: [],
             params:: {},
             clearHref:: null,
+            open:: true,
             local filterSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'filter'],
             local sortSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'sort'],
             local keptSpecs = [spec for spec in c.paramSpecs if !std.member(['filter', 'sort', 'pagination'], roleOf(spec))],
@@ -23086,7 +23101,7 @@ local nodesDashboardLib =
               { element: 'style', children: [style] },
               {
                 element: 'details',
-                attributes: { class: 'card table-params', open: true },
+                attributes: { class: 'card table-params', open: c.open || active > 0 },
                 children: [
                   { element: 'summary', children: [title + (if active > 0 then ' (%d)' % active else '')] },
                   {
@@ -23326,6 +23341,7 @@ local nodesDashboardLib =
               params:: c.params {
                 paramSpecs:: specs,
                 params:: params,
+                open:: std.get(std.get(table, 'params', {}), 'open', true),
                 clearHref:: if std.objectHasAll(cleared, '_queryPath') then cleared._queryPath else null,
               },
             },
