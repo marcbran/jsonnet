@@ -2296,6 +2296,7 @@ local a =
         paramSpecs:: [],
         params:: {},
         clearHref:: null,
+        open:: true,
         local filterSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'filter'],
         local sortSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'sort'],
         local keptSpecs = [spec for spec in c.paramSpecs if !std.member(['filter', 'sort', 'pagination'], roleOf(spec))],
@@ -2308,7 +2309,7 @@ local a =
           { element: 'style', children: [style] },
           {
             element: 'details',
-            attributes: { class: 'card table-params', open: true },
+            attributes: { class: 'card table-params', open: c.open || active > 0 },
             children: [
               { element: 'summary', children: [title + (if active > 0 then ' (%d)' % active else '')] },
               {
@@ -2548,6 +2549,7 @@ local a =
           params:: c.params {
             paramSpecs:: specs,
             params:: params,
+            open:: std.get(std.get(table, 'params', {}), 'open', true),
             clearHref:: if std.objectHasAll(cleared, '_queryPath') then cleared._queryPath else null,
           },
         },
