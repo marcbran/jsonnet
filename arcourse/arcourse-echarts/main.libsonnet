@@ -2090,6 +2090,9 @@ local a =
             color: inherit;
             opacity: 0.6;
           }
+          .planned {
+            opacity: 0.6;
+          }
           .buttons {
             display: flex;
             gap: 0.5em;
@@ -2125,6 +2128,19 @@ local a =
       |||;
 
       local paramsFormId = 'action-params';
+
+      local planned = {
+        local c = self,
+        at:: error 'planned requires at',
+        html: {
+          element: 'p',
+          attributes: { class: 'planned' },
+          children: [
+            'Planned ',
+            { element: 'time', attributes: { datetime: c.at }, children: [std.strReplace(std.substr(c.at, 0, 19), 'T', ' ')] },
+          ],
+        },
+      };
 
       local issue = {
         local c = self,
@@ -2170,7 +2186,7 @@ local a =
         issues:: [],
         html: {
           element: 'form',
-          attributes: { id: paramsFormId, class: 'params', method: 'get' },
+          attributes: { id: paramsFormId, class: 'params', method: 'get', autocomplete: 'off' },
           children: [
             field {
               spec:: spec,
@@ -2208,6 +2224,7 @@ local a =
       {
         local c = self,
         evaluationId:: error 'Action requires an evaluationId',
+        evaluatedAt:: '',
         summary:: '',
         label:: 'Apply',
         paramSpecs:: [],
@@ -2227,6 +2244,7 @@ local a =
             attributes: { class: 'action card' },
             children:
               (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
+              (if c.evaluatedAt != '' then [planned { at:: c.evaluatedAt }] else []) +
               [
                 issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
                 for i in formIssues
@@ -2796,6 +2814,7 @@ local a =
     _view+:: {
       fragment: c.action {
         evaluationId:: std.get($, '_evaluationId', ''),
+        evaluatedAt:: std.get($, '_evaluatedAt', ''),
         summary:: std.get($, '_summary', ''),
         paramSpecs:: std.get($, '_paramSpecs', []),
         params:: std.get($, '_params', {}),
