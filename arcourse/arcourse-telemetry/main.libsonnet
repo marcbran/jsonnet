@@ -3081,6 +3081,9 @@ local nodesChartLib =
                 color: inherit;
                 opacity: 0.6;
               }
+              .planned {
+                opacity: 0.6;
+              }
               .buttons {
                 display: flex;
                 gap: 0.5em;
@@ -3116,6 +3119,19 @@ local nodesChartLib =
           |||;
 
           local paramsFormId = 'action-params';
+
+          local planned = {
+            local c = self,
+            at:: error 'planned requires at',
+            html: {
+              element: 'p',
+              attributes: { class: 'planned' },
+              children: [
+                'Planned ',
+                { element: 'time', attributes: { datetime: c.at }, children: [std.strReplace(std.substr(c.at, 0, 19), 'T', ' ')] },
+              ],
+            },
+          };
 
           local issue = {
             local c = self,
@@ -3161,7 +3177,7 @@ local nodesChartLib =
             issues:: [],
             html: {
               element: 'form',
-              attributes: { id: paramsFormId, class: 'params', method: 'get' },
+              attributes: { id: paramsFormId, class: 'params', method: 'get', autocomplete: 'off' },
               children: [
                 field {
                   spec:: spec,
@@ -3199,6 +3215,7 @@ local nodesChartLib =
           {
             local c = self,
             evaluationId:: error 'Action requires an evaluationId',
+            evaluatedAt:: '',
             summary:: '',
             label:: 'Apply',
             paramSpecs:: [],
@@ -3218,6 +3235,7 @@ local nodesChartLib =
                 attributes: { class: 'action card' },
                 children:
                   (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
+                  (if c.evaluatedAt != '' then [planned { at:: c.evaluatedAt }] else []) +
                   [
                     issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
                     for i in formIssues
@@ -3787,6 +3805,7 @@ local nodesChartLib =
         _view+:: {
           fragment: c.action {
             evaluationId:: std.get($, '_evaluationId', ''),
+            evaluatedAt:: std.get($, '_evaluatedAt', ''),
             summary:: std.get($, '_summary', ''),
             paramSpecs:: std.get($, '_paramSpecs', []),
             params:: std.get($, '_params', {}),
@@ -6419,6 +6438,9 @@ local nodesListLib =
               color: inherit;
               opacity: 0.6;
             }
+            .planned {
+              opacity: 0.6;
+            }
             .buttons {
               display: flex;
               gap: 0.5em;
@@ -6454,6 +6476,19 @@ local nodesListLib =
         |||;
 
         local paramsFormId = 'action-params';
+
+        local planned = {
+          local c = self,
+          at:: error 'planned requires at',
+          html: {
+            element: 'p',
+            attributes: { class: 'planned' },
+            children: [
+              'Planned ',
+              { element: 'time', attributes: { datetime: c.at }, children: [std.strReplace(std.substr(c.at, 0, 19), 'T', ' ')] },
+            ],
+          },
+        };
 
         local issue = {
           local c = self,
@@ -6499,7 +6534,7 @@ local nodesListLib =
           issues:: [],
           html: {
             element: 'form',
-            attributes: { id: paramsFormId, class: 'params', method: 'get' },
+            attributes: { id: paramsFormId, class: 'params', method: 'get', autocomplete: 'off' },
             children: [
               field {
                 spec:: spec,
@@ -6537,6 +6572,7 @@ local nodesListLib =
         {
           local c = self,
           evaluationId:: error 'Action requires an evaluationId',
+          evaluatedAt:: '',
           summary:: '',
           label:: 'Apply',
           paramSpecs:: [],
@@ -6556,6 +6592,7 @@ local nodesListLib =
               attributes: { class: 'action card' },
               children:
                 (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
+                (if c.evaluatedAt != '' then [planned { at:: c.evaluatedAt }] else []) +
                 [
                   issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
                   for i in formIssues
@@ -7125,6 +7162,7 @@ local nodesListLib =
       _view+:: {
         fragment: c.action {
           evaluationId:: std.get($, '_evaluationId', ''),
+          evaluatedAt:: std.get($, '_evaluatedAt', ''),
           summary:: std.get($, '_summary', ''),
           paramSpecs:: std.get($, '_paramSpecs', []),
           params:: std.get($, '_params', {}),
@@ -9055,6 +9093,9 @@ local nodesLabelsLib =
               color: inherit;
               opacity: 0.6;
             }
+            .planned {
+              opacity: 0.6;
+            }
             .buttons {
               display: flex;
               gap: 0.5em;
@@ -9090,6 +9131,19 @@ local nodesLabelsLib =
         |||;
 
         local paramsFormId = 'action-params';
+
+        local planned = {
+          local c = self,
+          at:: error 'planned requires at',
+          html: {
+            element: 'p',
+            attributes: { class: 'planned' },
+            children: [
+              'Planned ',
+              { element: 'time', attributes: { datetime: c.at }, children: [std.strReplace(std.substr(c.at, 0, 19), 'T', ' ')] },
+            ],
+          },
+        };
 
         local issue = {
           local c = self,
@@ -9135,7 +9189,7 @@ local nodesLabelsLib =
           issues:: [],
           html: {
             element: 'form',
-            attributes: { id: paramsFormId, class: 'params', method: 'get' },
+            attributes: { id: paramsFormId, class: 'params', method: 'get', autocomplete: 'off' },
             children: [
               field {
                 spec:: spec,
@@ -9173,6 +9227,7 @@ local nodesLabelsLib =
         {
           local c = self,
           evaluationId:: error 'Action requires an evaluationId',
+          evaluatedAt:: '',
           summary:: '',
           label:: 'Apply',
           paramSpecs:: [],
@@ -9192,6 +9247,7 @@ local nodesLabelsLib =
               attributes: { class: 'action card' },
               children:
                 (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
+                (if c.evaluatedAt != '' then [planned { at:: c.evaluatedAt }] else []) +
                 [
                   issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
                   for i in formIssues
@@ -9761,6 +9817,7 @@ local nodesLabelsLib =
       _view+:: {
         fragment: c.action {
           evaluationId:: std.get($, '_evaluationId', ''),
+          evaluatedAt:: std.get($, '_evaluatedAt', ''),
           summary:: std.get($, '_summary', ''),
           paramSpecs:: std.get($, '_paramSpecs', []),
           params:: std.get($, '_params', {}),
@@ -11690,6 +11747,9 @@ local nodesValuesLib =
               color: inherit;
               opacity: 0.6;
             }
+            .planned {
+              opacity: 0.6;
+            }
             .buttons {
               display: flex;
               gap: 0.5em;
@@ -11725,6 +11785,19 @@ local nodesValuesLib =
         |||;
 
         local paramsFormId = 'action-params';
+
+        local planned = {
+          local c = self,
+          at:: error 'planned requires at',
+          html: {
+            element: 'p',
+            attributes: { class: 'planned' },
+            children: [
+              'Planned ',
+              { element: 'time', attributes: { datetime: c.at }, children: [std.strReplace(std.substr(c.at, 0, 19), 'T', ' ')] },
+            ],
+          },
+        };
 
         local issue = {
           local c = self,
@@ -11770,7 +11843,7 @@ local nodesValuesLib =
           issues:: [],
           html: {
             element: 'form',
-            attributes: { id: paramsFormId, class: 'params', method: 'get' },
+            attributes: { id: paramsFormId, class: 'params', method: 'get', autocomplete: 'off' },
             children: [
               field {
                 spec:: spec,
@@ -11808,6 +11881,7 @@ local nodesValuesLib =
         {
           local c = self,
           evaluationId:: error 'Action requires an evaluationId',
+          evaluatedAt:: '',
           summary:: '',
           label:: 'Apply',
           paramSpecs:: [],
@@ -11827,6 +11901,7 @@ local nodesValuesLib =
               attributes: { class: 'action card' },
               children:
                 (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
+                (if c.evaluatedAt != '' then [planned { at:: c.evaluatedAt }] else []) +
                 [
                   issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
                   for i in formIssues
@@ -12396,6 +12471,7 @@ local nodesValuesLib =
       _view+:: {
         fragment: c.action {
           evaluationId:: std.get($, '_evaluationId', ''),
+          evaluatedAt:: std.get($, '_evaluatedAt', ''),
           summary:: std.get($, '_summary', ''),
           paramSpecs:: std.get($, '_paramSpecs', []),
           params:: std.get($, '_params', {}),
@@ -14323,6 +14399,9 @@ local nodesLogsLib =
               color: inherit;
               opacity: 0.6;
             }
+            .planned {
+              opacity: 0.6;
+            }
             .buttons {
               display: flex;
               gap: 0.5em;
@@ -14358,6 +14437,19 @@ local nodesLogsLib =
         |||;
 
         local paramsFormId = 'action-params';
+
+        local planned = {
+          local c = self,
+          at:: error 'planned requires at',
+          html: {
+            element: 'p',
+            attributes: { class: 'planned' },
+            children: [
+              'Planned ',
+              { element: 'time', attributes: { datetime: c.at }, children: [std.strReplace(std.substr(c.at, 0, 19), 'T', ' ')] },
+            ],
+          },
+        };
 
         local issue = {
           local c = self,
@@ -14403,7 +14495,7 @@ local nodesLogsLib =
           issues:: [],
           html: {
             element: 'form',
-            attributes: { id: paramsFormId, class: 'params', method: 'get' },
+            attributes: { id: paramsFormId, class: 'params', method: 'get', autocomplete: 'off' },
             children: [
               field {
                 spec:: spec,
@@ -14441,6 +14533,7 @@ local nodesLogsLib =
         {
           local c = self,
           evaluationId:: error 'Action requires an evaluationId',
+          evaluatedAt:: '',
           summary:: '',
           label:: 'Apply',
           paramSpecs:: [],
@@ -14460,6 +14553,7 @@ local nodesLogsLib =
               attributes: { class: 'action card' },
               children:
                 (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
+                (if c.evaluatedAt != '' then [planned { at:: c.evaluatedAt }] else []) +
                 [
                   issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
                   for i in formIssues
@@ -15029,6 +15123,7 @@ local nodesLogsLib =
       _view+:: {
         fragment: c.action {
           evaluationId:: std.get($, '_evaluationId', ''),
+          evaluatedAt:: std.get($, '_evaluatedAt', ''),
           summary:: std.get($, '_summary', ''),
           paramSpecs:: std.get($, '_paramSpecs', []),
           params:: std.get($, '_params', {}),
@@ -16949,6 +17044,9 @@ local nodesLogsLib =
                 color: inherit;
                 opacity: 0.6;
               }
+              .planned {
+                opacity: 0.6;
+              }
               .buttons {
                 display: flex;
                 gap: 0.5em;
@@ -16984,6 +17082,19 @@ local nodesLogsLib =
           |||;
 
           local paramsFormId = 'action-params';
+
+          local planned = {
+            local c = self,
+            at:: error 'planned requires at',
+            html: {
+              element: 'p',
+              attributes: { class: 'planned' },
+              children: [
+                'Planned ',
+                { element: 'time', attributes: { datetime: c.at }, children: [std.strReplace(std.substr(c.at, 0, 19), 'T', ' ')] },
+              ],
+            },
+          };
 
           local issue = {
             local c = self,
@@ -17029,7 +17140,7 @@ local nodesLogsLib =
             issues:: [],
             html: {
               element: 'form',
-              attributes: { id: paramsFormId, class: 'params', method: 'get' },
+              attributes: { id: paramsFormId, class: 'params', method: 'get', autocomplete: 'off' },
               children: [
                 field {
                   spec:: spec,
@@ -17067,6 +17178,7 @@ local nodesLogsLib =
           {
             local c = self,
             evaluationId:: error 'Action requires an evaluationId',
+            evaluatedAt:: '',
             summary:: '',
             label:: 'Apply',
             paramSpecs:: [],
@@ -17086,6 +17198,7 @@ local nodesLogsLib =
                 attributes: { class: 'action card' },
                 children:
                   (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
+                  (if c.evaluatedAt != '' then [planned { at:: c.evaluatedAt }] else []) +
                   [
                     issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
                     for i in formIssues
@@ -17655,6 +17768,7 @@ local nodesLogsLib =
         _view+:: {
           fragment: c.action {
             evaluationId:: std.get($, '_evaluationId', ''),
+            evaluatedAt:: std.get($, '_evaluatedAt', ''),
             summary:: std.get($, '_summary', ''),
             paramSpecs:: std.get($, '_paramSpecs', []),
             params:: std.get($, '_params', {}),
@@ -19835,6 +19949,9 @@ local nodesLogrecordLib =
               color: inherit;
               opacity: 0.6;
             }
+            .planned {
+              opacity: 0.6;
+            }
             .buttons {
               display: flex;
               gap: 0.5em;
@@ -19870,6 +19987,19 @@ local nodesLogrecordLib =
         |||;
 
         local paramsFormId = 'action-params';
+
+        local planned = {
+          local c = self,
+          at:: error 'planned requires at',
+          html: {
+            element: 'p',
+            attributes: { class: 'planned' },
+            children: [
+              'Planned ',
+              { element: 'time', attributes: { datetime: c.at }, children: [std.strReplace(std.substr(c.at, 0, 19), 'T', ' ')] },
+            ],
+          },
+        };
 
         local issue = {
           local c = self,
@@ -19915,7 +20045,7 @@ local nodesLogrecordLib =
           issues:: [],
           html: {
             element: 'form',
-            attributes: { id: paramsFormId, class: 'params', method: 'get' },
+            attributes: { id: paramsFormId, class: 'params', method: 'get', autocomplete: 'off' },
             children: [
               field {
                 spec:: spec,
@@ -19953,6 +20083,7 @@ local nodesLogrecordLib =
         {
           local c = self,
           evaluationId:: error 'Action requires an evaluationId',
+          evaluatedAt:: '',
           summary:: '',
           label:: 'Apply',
           paramSpecs:: [],
@@ -19972,6 +20103,7 @@ local nodesLogrecordLib =
               attributes: { class: 'action card' },
               children:
                 (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
+                (if c.evaluatedAt != '' then [planned { at:: c.evaluatedAt }] else []) +
                 [
                   issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
                   for i in formIssues
@@ -20541,6 +20673,7 @@ local nodesLogrecordLib =
       _view+:: {
         fragment: c.action {
           evaluationId:: std.get($, '_evaluationId', ''),
+          evaluatedAt:: std.get($, '_evaluatedAt', ''),
           summary:: std.get($, '_summary', ''),
           paramSpecs:: std.get($, '_paramSpecs', []),
           params:: std.get($, '_params', {}),
@@ -22674,6 +22807,9 @@ local nodesDashboardLib =
                 color: inherit;
                 opacity: 0.6;
               }
+              .planned {
+                opacity: 0.6;
+              }
               .buttons {
                 display: flex;
                 gap: 0.5em;
@@ -22709,6 +22845,19 @@ local nodesDashboardLib =
           |||;
 
           local paramsFormId = 'action-params';
+
+          local planned = {
+            local c = self,
+            at:: error 'planned requires at',
+            html: {
+              element: 'p',
+              attributes: { class: 'planned' },
+              children: [
+                'Planned ',
+                { element: 'time', attributes: { datetime: c.at }, children: [std.strReplace(std.substr(c.at, 0, 19), 'T', ' ')] },
+              ],
+            },
+          };
 
           local issue = {
             local c = self,
@@ -22754,7 +22903,7 @@ local nodesDashboardLib =
             issues:: [],
             html: {
               element: 'form',
-              attributes: { id: paramsFormId, class: 'params', method: 'get' },
+              attributes: { id: paramsFormId, class: 'params', method: 'get', autocomplete: 'off' },
               children: [
                 field {
                   spec:: spec,
@@ -22792,6 +22941,7 @@ local nodesDashboardLib =
           {
             local c = self,
             evaluationId:: error 'Action requires an evaluationId',
+            evaluatedAt:: '',
             summary:: '',
             label:: 'Apply',
             paramSpecs:: [],
@@ -22811,6 +22961,7 @@ local nodesDashboardLib =
                 attributes: { class: 'action card' },
                 children:
                   (if c.summary != '' then [{ element: 'p', children: [c.summary] }] else []) +
+                  (if c.evaluatedAt != '' then [planned { at:: c.evaluatedAt }] else []) +
                   [
                     issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
                     for i in formIssues
@@ -23380,6 +23531,7 @@ local nodesDashboardLib =
         _view+:: {
           fragment: c.action {
             evaluationId:: std.get($, '_evaluationId', ''),
+            evaluatedAt:: std.get($, '_evaluatedAt', ''),
             summary:: std.get($, '_summary', ''),
             paramSpecs:: std.get($, '_paramSpecs', []),
             params:: std.get($, '_params', {}),
